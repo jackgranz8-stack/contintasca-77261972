@@ -1,0 +1,47 @@
+import { createContext, useContext, useState, type ReactNode } from "react";
+import { useRouterState } from "@tanstack/react-router";
+import { Plus } from "lucide-react";
+import { useApp } from "@/lib/store";
+import { Onboarding } from "./Onboarding";
+import { BottomNav } from "./BottomNav";
+import { AddExpenseModal } from "./AddExpenseModal";
+
+const UiContext = createContext<{ openAdd: () => void }>({ openAdd: () => {} });
+export const useUi = () => useContext(UiContext);
+
+export function AppShell({ children }: { children: ReactNode }) {
+  const { state, loaded } = useApp();
+  const [addOpen, setAddOpen] = useState(false);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  if (!loaded) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <span className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-primary" />
+      </div>
+    );
+  }
+
+  if (!state.profilo.onboardingCompletato) return <Onboarding />;
+
+  const showFab = pathname === "/" || pathname.startsWith("/storico");
+
+  return (
+    <UiContext.Provider value={{ openAdd: () => setAddOpen(true) }}>
+      <div className="mx-auto w-full max-w-[430px] px-4 pt-6 pb-32">{children}</div>
+
+      {showFab && (
+        <button
+          onClick={() => setAddOpen(true)}
+          aria-label="Aggiungi spesa"
+          className="lime-fill float-shadow fixed bottom-[calc(84px+env(safe-area-inset-bottom))] right-[max(16px,calc(50vw-215px+16px))] z-40 flex h-14 w-14 items-center justify-center rounded-full active:scale-95"
+        >
+          <Plus size={26} strokeWidth={2.6} />
+        </button>
+      )}
+
+      <BottomNav />
+      <AddExpenseModal open={addOpen} onClose={() => setAddOpen(false)} />
+    </UiContext.Provider>
+  );
+}
