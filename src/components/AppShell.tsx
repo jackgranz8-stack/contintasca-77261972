@@ -14,6 +14,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [addOpen, setAddOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
+  // La pagina di accesso ha un layout autonomo (nessun onboarding, nessuna nav).
+  if (pathname.startsWith("/auth")) return <>{children}</>;
+
   if (!loaded) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -28,7 +31,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <UiContext.Provider value={{ openAdd: () => setAddOpen(true) }}>
-      <div className="mx-auto w-full max-w-[430px] px-4 pt-6 pb-32">{children}</div>
+      <div className="mx-auto w-full max-w-[430px] px-4 pt-[calc(env(safe-area-inset-top,0px)+28px)] pb-32">
+        {children}
+      </div>
+
 
       {showFab && (
         <button
