@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Download, FileDown, Upload } from "lucide-react";
+import { Download, FileDown, LogIn, LogOut, Upload } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { eur, formatDay, uid } from "@/lib/format";
 import { PALETTE } from "@/lib/types";
@@ -27,7 +27,8 @@ export const Route = createFileRoute("/profilo")({
 });
 
 function ProfiloPage() {
-  const { state, update, reset } = useApp();
+  const { state, update, reset, account, syncing, signOut } = useApp();
+  const navigate = useNavigate();
   const [nome, setNome] = useState(state.profilo.nome);
   const [resetStep, setResetStep] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -82,6 +83,41 @@ function ProfiloPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold tracking-tight">Profilo</h1>
+
+      <section className="card-surface p-5">
+        <h2 className="text-sm font-semibold">Account</h2>
+        {account ? (
+          <>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {account.email ?? "Account collegato"} — spese sincronizzate
+              {syncing ? " (sincronizzazione…)" : ""}
+            </p>
+            <button
+              onClick={() => {
+                void signOut();
+                toast.success("Disconnesso");
+              }}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-border py-2.5 text-sm font-medium"
+            >
+              <LogOut size={16} /> Esci
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Accedi per ritrovare le tue spese su telefono e computer.
+            </p>
+            <button
+              onClick={() => void navigate({ to: "/auth" })}
+              className="lime-fill mt-3 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold"
+            >
+              <LogIn size={16} /> Accedi o registrati
+            </button>
+          </>
+        )}
+      </section>
+
+
 
       <section className="card-surface p-5">
         <label className="mb-1 block text-xs text-muted-foreground">Nome</label>

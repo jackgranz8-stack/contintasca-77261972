@@ -1,9 +1,17 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { X } from "lucide-react";
+import { Delete, X } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { iconFor } from "@/lib/icons";
 import { todayISO, uid } from "@/lib/format";
+
+const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "back"] as const;
+
+function shiftDay(days: number) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
 
 export function AddExpenseModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { state, addTransaction, update } = useApp();
@@ -27,6 +35,18 @@ export function AddExpenseModal({ open, onClose }: { open: boolean; onClose: () 
   if (!open) return null;
 
   const valore = Number(importo.replace(",", "."));
+
+  const premi = (k: string) => {
+    setImporto((v) => {
+      if (k === "back") return v.slice(0, -1);
+      if (k === ",") return v.includes(",") ? v : v === "" ? "0," : `${v},`;
+      const [, dec] = v.split(",");
+      if (dec !== undefined && dec.length >= 2) return v;
+      if (v === "0") return k;
+      if (v.replace(",", "").length >= 8) return v;
+      return v + k;
+    });
+  };
 
   const salva = () => {
     if (!Number.isFinite(valore) || valore <= 0) {
@@ -60,36 +80,56 @@ export function AddExpenseModal({ open, onClose }: { open: boolean; onClose: () 
     onClose();
   };
 
+  const dateChips: { label: string; value: string }[] = [
+    { label: "Oggi", value: todayISO() },
+    { label: "Ieri", value: shiftDay(-1) },
+    { label: "2 gg fa", value: shiftDay(-2) },
+  ];
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-background/70 backdrop-blur-sm">
       <button className="absolute inset-0" aria-label="Chiudi" onClick={onClose} />
-      <div className="relative z-10 max-h-[92vh] w-full max-w-[430px] overflow-y-auto rounded-t-[24px] border border-border bg-popover px-5 pt-5 pb-[max(env(safe-area-inset-bottom),20px)]">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Aggiungi spesa</h2>
+      <div className="relative z-10 max-h-[94vh] w-full max-w-[430px] overflow-y-auto rounded-t-[28px] border border-border bg-popover px-5 pt-4 pb-[max(env(safe-area-inset-bottom),20px)]">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Nuova spesa</h2>
           <button
             onClick={onClose}
-            className="rounded-full bg-surface-2 p-2 text-muted-foreground"
+            className="rounded-full bg-surface-2 p-2.5 text-muted-foreground"
             aria-label="Chiudi"
           >
-            <X size={16} />
+            <X size={18} />
           </button>
         </div>
 
-        <label className="mb-1 block text-xs text-muted-foreground">Importo</label>
-        <div className="mb-4 flex items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3">
-          <span className="text-2xl font-semibold text-muted-foreground">€</span>
-          <input
-            autoFocus
-            inputMode="decimal"
-            value={importo}
-            onChange={(e) => setImporto(e.target.value)}
-            placeholder="0"
-            className="w-full bg-transparent text-3xl font-semibold tracking-tight outline-none placeholder:text-muted-foreground"
-          />
+        {/* Importo grande */}
+        <div className="mb-4 flex items-baseline justify-center gap-2 rounded-3xl bg-surface px-4 py-6">
+          <span className="text-3xl font-semibold text-muted-foreground">€</span>
+          <span
+            className={`text-[52px] font-semibold leading-none tracking-tight ${
+              importo ? "" : "text-muted-foreground"
+            }`}
+          >
+            {importo || "0"}
+          </span>
         </div>
 
-        <label className="mb-2 block text-xs text-muted-foreground">Categoria</label>
-        <div className="mb-4 grid grid-cols-4 gap-2">
+        {/* Tastierino */}
+        <div className="mb-5 grid grid-cols-3 gap-2.5">
+          {KEYS.map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => premi(k)}
+              className="flex h-14 items-center justify-center rounded-2xl bg-surface-2 text-2xl font-medium active:scale-95"
+              aria-label={k === "back" ? "Cancella" : k}
+            >
+              {k === "back" ? <Delete size={22} /> : k}
+            </button>
+          ))}
+        </div>
+
+        <label className="mb-2 block text-sm font-medium">Categoria</label>
+        <div className="no-scrollbar -mx-5 mb-5 flex gap-2 overflow-x-auto px-5 pb-1">
           {state.categorie.map((c) => {
             const Icon = iconFor(c.icona);
             const active = c.id === categoria;
@@ -98,71 +138,80 @@ export function AddExpenseModal({ open, onClose }: { open: boolean; onClose: () 
                 key={c.id}
                 type="button"
                 onClick={() => setCategoria(c.id)}
-                className={`flex flex-col items-center gap-1.5 rounded-2xl border px-1 py-3 text-[10px] leading-tight transition-colors ${
+                className={`flex shrink-0 items-center gap-2 rounded-full border px-4 py-3 text-sm transition-colors ${
                   active
-                    ? "border-primary bg-surface-2 text-foreground"
+                    ? "border-primary bg-surface-2 font-semibold text-foreground"
                     : "border-border bg-surface text-muted-foreground"
                 }`}
               >
                 <span
-                  className="flex h-9 w-9 items-center justify-center rounded-full"
+                  className="flex h-8 w-8 items-center justify-center rounded-full"
                   style={{ backgroundColor: `${c.colore}22`, color: c.colore }}
                 >
-                  <Icon size={18} />
+                  <Icon size={17} />
                 </span>
-                <span className="line-clamp-2 text-center">{c.nome}</span>
+                {c.nome}
               </button>
             );
           })}
         </div>
 
-        <div className="mb-4 grid grid-cols-2 gap-3">
-          <div>
-            <label className="mb-1 block text-xs text-muted-foreground">Data</label>
-            <input
-              type="date"
-              value={data}
-              onChange={(e) => setData(e.target.value)}
-              className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-muted-foreground">Nota</label>
-            <input
-              value={nota}
-              onChange={(e) => setNota(e.target.value)}
-              placeholder="Opzionale"
-              className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
-            />
-          </div>
+        <label className="mb-2 block text-sm font-medium">Quando</label>
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          {dateChips.map((d) => (
+            <button
+              key={d.value}
+              type="button"
+              onClick={() => setData(d.value)}
+              className={`rounded-full border px-4 py-2.5 text-sm ${
+                data === d.value
+                  ? "border-primary bg-surface-2 font-semibold"
+                  : "border-border bg-surface text-muted-foreground"
+              }`}
+            >
+              {d.label}
+            </button>
+          ))}
+          <input
+            type="date"
+            value={data}
+            onChange={(e) => setData(e.target.value)}
+            className="rounded-full border border-border bg-surface px-4 py-2.5 text-sm outline-none"
+          />
         </div>
 
-        <div className="mb-5 rounded-2xl border border-border bg-surface px-4 py-3">
+        <label className="mb-2 block text-sm font-medium">Descrizione</label>
+        <input
+          value={nota}
+          onChange={(e) => setNota(e.target.value)}
+          placeholder="Es. spesa supermercato"
+          className="mb-4 w-full rounded-2xl border border-border bg-surface px-4 py-4 text-base outline-none placeholder:text-muted-foreground"
+        />
+
+        <div className="mb-5 rounded-2xl border border-border bg-surface px-4 py-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm">Ripeti ogni mese</span>
+            <span className="text-sm font-medium">Ripeti ogni mese</span>
             <button
               type="button"
               onClick={() => setRipeti((v) => !v)}
               aria-pressed={ripeti}
-              className={`h-7 w-12 rounded-full p-1 transition-colors ${ripeti ? "lime-fill" : "bg-surface-2"}`}
+              className={`h-8 w-14 rounded-full p-1 transition-colors ${ripeti ? "lime-fill" : "bg-surface-2"}`}
             >
               <span
-                className={`block h-5 w-5 rounded-full bg-background transition-transform ${ripeti ? "translate-x-5" : ""}`}
+                className={`block h-6 w-6 rounded-full bg-background transition-transform ${ripeti ? "translate-x-6" : ""}`}
               />
             </button>
           </div>
           {ripeti && (
             <div className="mt-3 flex items-center justify-between gap-3">
-              <span className="text-xs text-muted-foreground">Giorno del mese</span>
+              <span className="text-sm text-muted-foreground">Giorno del mese</span>
               <input
                 type="number"
                 min={1}
                 max={28}
                 value={giorno}
-                onChange={(e) =>
-                  setGiorno(Math.min(28, Math.max(1, Number(e.target.value) || 1)))
-                }
-                className="w-20 rounded-xl border border-border bg-surface-2 px-3 py-2 text-center text-sm outline-none"
+                onChange={(e) => setGiorno(Math.min(28, Math.max(1, Number(e.target.value) || 1)))}
+                className="w-20 rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-center text-base outline-none"
               />
             </div>
           )}
@@ -170,7 +219,7 @@ export function AddExpenseModal({ open, onClose }: { open: boolean; onClose: () 
 
         <button
           onClick={salva}
-          className="lime-fill w-full rounded-2xl py-3.5 text-sm font-semibold"
+          className="lime-fill w-full rounded-2xl py-4 text-base font-semibold active:scale-[0.99]"
         >
           Salva spesa
         </button>

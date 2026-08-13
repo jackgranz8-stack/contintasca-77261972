@@ -109,7 +109,7 @@ export function Onboarding() {
   };
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col px-5 pt-10 pb-8">
+    <div className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col px-5 pt-[calc(env(safe-area-inset-top,0px)+40px)] pb-8">
       <div className="mb-6 flex gap-1.5">
         {[0, 1, 2, 3, 4, 5].map((i) => (
           <span
