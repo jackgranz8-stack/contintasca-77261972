@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Download, FileDown, Upload } from "lucide-react";
+import { Download, FileDown, LogIn, LogOut, Upload } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { eur, formatDay, uid } from "@/lib/format";
 import { PALETTE } from "@/lib/types";
@@ -27,7 +27,8 @@ export const Route = createFileRoute("/profilo")({
 });
 
 function ProfiloPage() {
-  const { state, update, reset } = useApp();
+  const { state, update, reset, account, syncing, signOut } = useApp();
+  const navigate = useNavigate();
   const [nome, setNome] = useState(state.profilo.nome);
   const [resetStep, setResetStep] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
