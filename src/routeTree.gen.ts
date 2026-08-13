@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as BudgetRouteImport } from './routes/budget'
 import { Route as ProfiloRouteImport } from './routes/profilo'
 import { Route as StoricoRouteImport } from './routes/storico'
@@ -17,6 +18,11 @@ import { Route as StoricoRouteImport } from './routes/storico'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BudgetRoute = BudgetRouteImport.update({
@@ -37,12 +43,14 @@ const StoricoRoute = StoricoRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/budget': typeof BudgetRoute
   '/profilo': typeof ProfiloRoute
   '/storico': typeof StoricoRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/budget': typeof BudgetRoute
   '/profilo': typeof ProfiloRoute
   '/storico': typeof StoricoRoute
@@ -50,20 +58,22 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/budget': typeof BudgetRoute
   '/profilo': typeof ProfiloRoute
   '/storico': typeof StoricoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/budget' | '/profilo' | '/storico'
+  fullPaths: '/' | '/auth' | '/budget' | '/profilo' | '/storico'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/budget' | '/profilo' | '/storico'
-  id: '__root__' | '/' | '/budget' | '/profilo' | '/storico'
+  to: '/' | '/auth' | '/budget' | '/profilo' | '/storico'
+  id: '__root__' | '/' | '/auth' | '/budget' | '/profilo' | '/storico'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthRoute: typeof AuthRoute
   BudgetRoute: typeof BudgetRoute
   ProfiloRoute: typeof ProfiloRoute
   StoricoRoute: typeof StoricoRoute
@@ -76,6 +86,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/budget': {
@@ -104,6 +121,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthRoute: AuthRoute,
   BudgetRoute: BudgetRoute,
   ProfiloRoute: ProfiloRoute,
   StoricoRoute: StoricoRoute,
