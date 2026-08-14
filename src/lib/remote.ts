@@ -71,7 +71,7 @@ function toRecurring(r: RecurringRow): Recurring {
     importo: num(r.amount),
     giorno: r.day ?? 1,
     attiva: r.active ?? true,
-    ultimaGenerazione: r.last_generated_month ?? undefined,
+    ...(r.last_generated_month ? { ultimaGenerazione: r.last_generated_month } : {}),
   };
 }
 
@@ -156,7 +156,7 @@ function byId<T extends { id: string }>(arr: T[]) {
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 export async function persistDiff(prev: AppState, next: AppState, userId: string) {
-  const ops: Promise<unknown>[] = [];
+  const ops: PromiseLike<unknown>[] = [];
   const fail = (e: { message?: string } | null) => {
     if (e) throw e;
   };
