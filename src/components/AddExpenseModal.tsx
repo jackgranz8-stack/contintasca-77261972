@@ -4,6 +4,7 @@ import { Delete, X } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { iconFor } from "@/lib/icons";
 import { todayISO, uid } from "@/lib/format";
+import type { Transaction } from "@/lib/types";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "back"] as const;
 
@@ -13,8 +14,16 @@ function shiftDay(days: number) {
   return d.toISOString().slice(0, 10);
 }
 
-export function AddExpenseModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { state, addTransaction, update } = useApp();
+export function AddExpenseModal({
+  open,
+  onClose,
+  edit = null,
+}: {
+  open: boolean;
+  onClose: () => void;
+  edit?: Transaction | null;
+}) {
+  const { state, addTransaction, updateTransaction, update } = useApp();
   const [importo, setImporto] = useState("");
   const [categoria, setCategoria] = useState("");
   const [data, setData] = useState(todayISO());
@@ -24,13 +33,20 @@ export function AddExpenseModal({ open, onClose }: { open: boolean; onClose: () 
 
   useEffect(() => {
     if (!open) return;
-    setImporto("");
-    setNota("");
-    setData(todayISO());
+    if (edit) {
+      setImporto(String(edit.importo).replace(".", ","));
+      setNota(edit.nota ?? "");
+      setData(edit.data);
+      setCategoria(edit.categoria);
+    } else {
+      setImporto("");
+      setNota("");
+      setData(todayISO());
+      setCategoria(state.categorie[0]?.id ?? "");
+    }
     setRipeti(false);
     setGiorno(Math.min(28, new Date().getDate()));
-    setCategoria(state.categorie[0]?.id ?? "");
-  }, [open, state.categorie]);
+  }, [open, edit, state.categorie]);
 
   if (!open) return null;
 
@@ -55,6 +71,12 @@ export function AddExpenseModal({ open, onClose }: { open: boolean; onClose: () 
     }
     if (!categoria) {
       toast.error("Scegli una categoria");
+      return;
+    }
+    if (edit) {
+      updateTransaction(edit.id, { importo: valore, categoria, data, nota: nota.trim() });
+      toast.success("Spesa aggiornata");
+      onClose();
       return;
     }
     addTransaction({ importo: valore, categoria, data, nota: nota.trim() });
@@ -91,7 +113,7 @@ export function AddExpenseModal({ open, onClose }: { open: boolean; onClose: () 
       <button className="absolute inset-0" aria-label="Chiudi" onClick={onClose} />
       <div className="relative z-10 max-h-[94vh] w-full max-w-[430px] overflow-y-auto rounded-t-[28px] border border-border bg-popover px-5 pt-4 pb-[max(env(safe-area-inset-bottom),20px)]">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Nuova spesa</h2>
+          <h2 className="text-lg font-semibold">{edit ? "Modifica spesa" : "Nuova spesa"}</h2>
           <button
             onClick={onClose}
             className="rounded-full bg-surface-2 p-2.5 text-muted-foreground"
@@ -188,7 +210,7 @@ export function AddExpenseModal({ open, onClose }: { open: boolean; onClose: () 
           className="mb-4 w-full rounded-2xl border border-border bg-surface px-4 py-4 text-base outline-none placeholder:text-muted-foreground"
         />
 
-        <div className="mb-5 rounded-2xl border border-border bg-surface px-4 py-4">
+        <div className={`mb-5 rounded-2xl border border-border bg-surface px-4 py-4 ${edit ? "hidden" : ""}`}>
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Ripeti ogni mese</span>
             <button
@@ -221,7 +243,7 @@ export function AddExpenseModal({ open, onClose }: { open: boolean; onClose: () 
           onClick={salva}
           className="lime-fill w-full rounded-2xl py-4 text-base font-semibold active:scale-[0.99]"
         >
-          Salva spesa
+          {edit ? "Salva modifiche" : "Salva spesa"}
         </button>
       </div>
     </div>
