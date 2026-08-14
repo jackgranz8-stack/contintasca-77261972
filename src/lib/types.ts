@@ -12,6 +12,7 @@ export type Transaction = {
   categoria: string;
   data: string; // YYYY-MM-DD
   nota: string;
+  ricorrenteId?: string | null;
 };
 
 export type Recurring = {

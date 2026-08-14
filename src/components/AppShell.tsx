@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
-import { useRouterState } from "@tanstack/react-router";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { Onboarding } from "./Onboarding";
@@ -10,14 +10,21 @@ const UiContext = createContext<{ openAdd: () => void }>({ openAdd: () => {} });
 export const useUi = () => useContext(UiContext);
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { state, loaded } = useApp();
+  const { state, loaded, account } = useApp();
   const [addOpen, setAddOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
+  const isAuthRoute = pathname.startsWith("/auth");
+
+  // Senza account si accede prima di tutto: nessun onboarding, nessun dato.
+  useEffect(() => {
+    if (loaded && !account && !isAuthRoute) void navigate({ to: "/auth", replace: true });
+  }, [loaded, account, isAuthRoute, navigate]);
 
   // La pagina di accesso ha un layout autonomo (nessun onboarding, nessuna nav).
-  if (pathname.startsWith("/auth")) return <>{children}</>;
+  if (isAuthRoute) return <>{children}</>;
 
-  if (!loaded) {
+  if (!loaded || !account) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <span className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-primary" />

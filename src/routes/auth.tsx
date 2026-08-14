@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
+import { Loader2, Wallet } from "lucide-react";
+import { db } from "@/integrations/external/client";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -19,6 +18,8 @@ export const Route = createFileRoute("/auth")({
         property: "og:description",
         content: "Un account per sincronizzare spese e budget su tutti i tuoi dispositivi.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: AuthPage,
@@ -32,7 +33,7 @@ function AuthPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    void db.auth.getSession().then(({ data }) => {
       if (data.session) void navigate({ to: "/", replace: true });
     });
   }, [navigate]);
@@ -45,7 +46,7 @@ function AuthPage() {
     }
     setBusy(true);
     if (mode === "signup") {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await db.auth.signUp({
         email: email.trim(),
         password,
         options: { emailRedirectTo: window.location.origin },
@@ -55,14 +56,16 @@ function AuthPage() {
         toast.error(error.message);
         return;
       }
+      if (data.session) {
+        toast.success("Account creato!");
+        void navigate({ to: "/", replace: true });
+        return;
+      }
       toast.success("Account creato! Controlla la mail per confermare.");
       setMode("login");
       return;
     }
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
+    const { error } = await db.auth.signInWithPassword({ email: email.trim(), password });
     setBusy(false);
     if (error) {
       toast.error(error.message);
@@ -72,56 +75,27 @@ function AuthPage() {
     void navigate({ to: "/", replace: true });
   };
 
-  const google = async () => {
-    setBusy(true);
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
-    });
-    if (result.error) {
-      setBusy(false);
-      toast.error("Accesso con Google non riuscito");
-      return;
-    }
-    if (result.redirected) return;
-    void navigate({ to: "/", replace: true });
-  };
-
   return (
-    <div className="mx-auto w-full max-w-[430px] px-4 pt-[max(env(safe-area-inset-top),28px)] pb-16">
-      <button
-        onClick={() => void navigate({ to: "/" })}
-        className="mb-6 flex items-center gap-1.5 text-sm text-muted-foreground"
-      >
-        <ArrowLeft size={16} /> Continua senza account
-      </button>
+    <div className="mx-auto w-full max-w-[430px] px-5 pt-[calc(env(safe-area-inset-top,0px)+56px)] pb-16">
+      <span className="lime-fill flex h-14 w-14 items-center justify-center rounded-2xl">
+        <Wallet size={26} />
+      </span>
 
-      <h1 className="text-2xl font-semibold tracking-tight">
-        {mode === "login" ? "Accedi" : "Crea account"}
-      </h1>
+      <h1 className="mt-6 text-3xl font-semibold tracking-tight">Conti in Tasca</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Con un account le tue spese si sincronizzano tra telefono e computer.
+        {mode === "login"
+          ? "Accedi per ritrovare spese, budget e ricorrenti su ogni dispositivo."
+          : "Crea un account: i tuoi dati restano legati solo a te."}
       </p>
 
-      <button
-        onClick={google}
-        disabled={busy}
-        className="mt-6 w-full rounded-2xl border border-border bg-surface py-3.5 text-sm font-semibold disabled:opacity-60"
-      >
-        Continua con Google
-      </button>
-
-      <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
-        <span className="h-px flex-1 bg-border" /> oppure <span className="h-px flex-1 bg-border" />
-      </div>
-
-      <form onSubmit={submit} className="space-y-3">
+      <form onSubmit={submit} className="mt-8 space-y-3">
         <input
           type="email"
           autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Email"
-          className="w-full rounded-2xl border border-border bg-surface px-4 py-3.5 text-base outline-none placeholder:text-muted-foreground"
+          className="w-full rounded-2xl border border-border bg-surface px-4 py-4 text-base outline-none placeholder:text-muted-foreground"
         />
         <input
           type="password"
@@ -129,12 +103,12 @@ function AuthPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Password"
-          className="w-full rounded-2xl border border-border bg-surface px-4 py-3.5 text-base outline-none placeholder:text-muted-foreground"
+          className="w-full rounded-2xl border border-border bg-surface px-4 py-4 text-base outline-none placeholder:text-muted-foreground"
         />
         <button
           type="submit"
           disabled={busy}
-          className="lime-fill flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-semibold disabled:opacity-60"
+          className="lime-fill flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-semibold disabled:opacity-60"
         >
           {busy && <Loader2 size={16} className="animate-spin" />}
           {mode === "login" ? "Accedi" : "Crea account"}
@@ -143,7 +117,7 @@ function AuthPage() {
 
       <button
         onClick={() => setMode(mode === "login" ? "signup" : "login")}
-        className="mt-5 w-full text-center text-sm text-muted-foreground"
+        className="mt-6 w-full text-center text-sm text-muted-foreground"
       >
         {mode === "login" ? "Non hai un account? Registrati" : "Hai già un account? Accedi"}
       </button>

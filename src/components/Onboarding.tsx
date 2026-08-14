@@ -94,7 +94,7 @@ export function Onboarding() {
   const conferma = () => {
     update((s) => ({
       ...s,
-      categorie: attive.map(({ attiva: _attiva, ...c }) => c),
+      categorie: attive.map(({ attiva: _attiva, ...c }) => ({ ...c, id: uid() })),
       profilo: {
         ...s.profilo,
         nome: nome.trim(),
@@ -124,8 +124,8 @@ export function Onboarding() {
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">Conti in Tasca</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Tieni le spese sotto controllo in pochi tap. I dati restano solo su questo
-              dispositivo.
+              Tieni le spese sotto controllo in pochi tap. I tuoi dati sono salvati nel tuo account e
+              disponibili su ogni dispositivo.
             </p>
             <label className="mt-8 mb-1 block text-xs text-muted-foreground">
               Come ti chiami? (opzionale)

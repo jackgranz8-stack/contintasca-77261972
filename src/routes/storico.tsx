@@ -1,13 +1,15 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { FileSpreadsheet, Trash2 } from "lucide-react";
+import { FileSpreadsheet, Pencil, Trash2 } from "lucide-react";
 import { sum, totalsByCategory, txInMonth, useApp } from "@/lib/store";
 import { eur, formatDay, lastMonths, monthLabel, monthKey } from "@/lib/format";
 import { iconFor } from "@/lib/icons";
 import { TrendBars } from "@/components/TrendBars";
 import { Donut } from "@/components/Donut";
 import { exportTransactions } from "@/lib/excel";
+import { AddExpenseModal } from "@/components/AddExpenseModal";
+import type { Transaction } from "@/lib/types";
 
 export const Route = createFileRoute("/storico")({
   head: () => ({
@@ -33,6 +35,7 @@ function StoricoPage() {
   const [mese, setMese] = useState<string | "all">(monthKey(new Date()));
   const [cat, setCat] = useState<string | "all">("all");
   const [daEliminare, setDaEliminare] = useState<string | null>(null);
+  const [daModificare, setDaModificare] = useState<Transaction | null>(null);
 
   const mesiDisponibili = useMemo(() => {
     const set = new Set(state.transazioni.map((t) => monthKey(t.data)));
@@ -179,8 +182,15 @@ function StoricoPage() {
               </div>
               <span className="text-sm font-semibold">{eur(t.importo)}</span>
               <button
+                onClick={() => setDaModificare(t)}
+                className="p-1.5 text-muted-foreground"
+                aria-label="Modifica"
+              >
+                <Pencil size={16} />
+              </button>
+              <button
                 onClick={() => setDaEliminare(t.id)}
-                className="text-muted-foreground"
+                className="p-1.5 text-muted-foreground"
                 aria-label="Elimina"
               >
                 <Trash2 size={16} />
@@ -189,6 +199,12 @@ function StoricoPage() {
           );
         })}
       </section>
+
+      <AddExpenseModal
+        open={daModificare !== null}
+        edit={daModificare}
+        onClose={() => setDaModificare(null)}
+      />
 
       {daEliminare && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-6 backdrop-blur-sm">

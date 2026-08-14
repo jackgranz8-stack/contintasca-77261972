@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/integrations/external/client";
+import { loadRemoteState, persistDiff, wipeRemote } from "./remote";
 import {
   initialState,
   type AppState,
@@ -10,8 +11,6 @@ import {
   type Transaction,
 } from "./types";
 import { currentMonth, monthKey, uid } from "./format";
-
-const KEY = "conti-in-tasca-v1";
 
 type Account = { id: string; email: string | null } | null;
 
@@ -23,6 +22,7 @@ type Ctx = {
   signOut: () => Promise<void>;
   update: (fn: (s: AppState) => AppState) => void;
   addTransaction: (t: Omit<Transaction, "id">) => void;
+  updateTransaction: (id: string, patch: Partial<Omit<Transaction, "id">>) => void;
   deleteTransaction: (id: string) => void;
   addCategory: (c: Omit<Category, "id">) => Category;
   updateCategory: (id: string, patch: Partial<Category>) => void;
@@ -35,26 +35,6 @@ type Ctx = {
 };
 
 const AppContext = createContext<Ctx | null>(null);
-
-function normalize(parsed: AppState | null): AppState | null {
-  if (!parsed || !parsed.profilo) return null;
-  return { ...initialState(), ...parsed };
-}
-
-function load(): AppState | null {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return null;
-    return normalize(JSON.parse(raw) as AppState);
-  } catch {
-    return null;
-  }
-}
-
-function hasData(s: AppState | null) {
-  if (!s) return false;
-  return s.profilo.onboardingCompletato || s.transazioni.length > 0 || s.categorie.length > 0;
-}
 
 /** Genera le transazioni delle spese ricorrenti attive già scadute nel mese corrente. */
 function runRecurring(s: AppState): { next: AppState; created: number } {
@@ -72,6 +52,7 @@ function runRecurring(s: AppState): { next: AppState; created: number } {
       categoria: r.categoria,
       data: `${mk}-${String(r.giorno).padStart(2, "0")}`,
       nota: r.nome,
+      ricorrenteId: r.id,
     });
     created++;
     return { ...r, ultimaGenerazione: mk };
@@ -85,83 +66,57 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [account, setAccount] = useState<Account>(null);
   const [syncing, setSyncing] = useState(false);
   const accountRef = useRef<Account>(null);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const baseline = useRef<AppState | null>(null);
+  const queue = useRef<Promise<void>>(Promise.resolve());
 
-  const applyLocal = useCallback(() => {
-    const stored = load();
-    if (!stored) {
+  const loadFor = useCallback(async (userId: string) => {
+    setSyncing(true);
+    try {
+      const remote = await loadRemoteState(userId);
+      const { next, created } = runRecurring(remote);
+      baseline.current = remote;
+      setState(next);
+      setLoaded(true);
+      if (created > 0) {
+        setTimeout(
+          () =>
+            toast.success(
+              created === 1
+                ? "1 spesa ricorrente registrata"
+                : `${created} spese ricorrenti registrate`,
+            ),
+          400,
+        );
+      }
+    } catch {
+      baseline.current = null;
       setState(initialState());
       setLoaded(true);
-      return;
-    }
-    const { next, created } = runRecurring(stored);
-    setState(next);
-    setLoaded(true);
-    if (created > 0) {
-      setTimeout(
-        () =>
-          toast.success(
-            created === 1 ? "1 spesa ricorrente registrata" : `${created} spese ricorrenti registrate`,
-          ),
-        400,
-      );
+      toast.error("Non riesco a leggere i tuoi dati, riprova più tardi");
+    } finally {
+      setSyncing(false);
     }
   }, []);
-
-  /** Carica dal cloud; se il cloud è vuoto, carica i dati locali e li sincronizza. */
-  const applyCloud = useCallback(
-    async (userId: string) => {
-      setSyncing(true);
-      try {
-        const { data, error } = await supabase
-          .from("user_data")
-          .select("payload")
-          .eq("user_id", userId)
-          .maybeSingle();
-        if (error) throw error;
-        const cloud = normalize((data?.payload as AppState | undefined) ?? null);
-        const base = hasData(cloud) ? cloud! : (load() ?? initialState());
-        const { next, created } = runRecurring(base);
-        setState(next);
-        setLoaded(true);
-        if (created > 0) {
-          setTimeout(
-            () =>
-              toast.success(
-                created === 1
-                  ? "1 spesa ricorrente registrata"
-                  : `${created} spese ricorrenti registrate`,
-              ),
-            400,
-          );
-        }
-      } catch {
-        toast.error("Sincronizzazione non riuscita, uso i dati sul dispositivo");
-        applyLocal();
-      } finally {
-        setSyncing(false);
-      }
-    },
-    [applyLocal],
-  );
 
   useEffect(() => {
     let cancelled = false;
 
-    supabase.auth.getSession().then(({ data }) => {
+    void db.auth.getSession().then(({ data }) => {
       if (cancelled) return;
       const user = data.session?.user;
       if (user) {
         const acc = { id: user.id, email: user.email ?? null };
         accountRef.current = acc;
         setAccount(acc);
-        void applyCloud(user.id);
+        void loadFor(user.id);
       } else {
-        applyLocal();
+        baseline.current = null;
+        setState(initialState());
+        setLoaded(true);
       }
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: sub } = db.auth.onAuthStateChange((event, session) => {
       if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
       const user = session?.user;
       if (user) {
@@ -170,12 +125,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         accountRef.current = acc;
         setAccount(acc);
         setLoaded(false);
-        void applyCloud(user.id);
+        void loadFor(user.id);
       } else {
         accountRef.current = null;
+        baseline.current = null;
         setAccount(null);
-        setLoaded(false);
-        applyLocal();
+        setState(initialState());
+        setLoaded(true);
       }
     });
 
@@ -183,35 +139,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       sub.subscription.unsubscribe();
     };
-  }, [applyCloud, applyLocal]);
+  }, [loadFor]);
 
-  // Persistenza: sempre in locale, e sul cloud (con debounce) se autenticato.
+  // Ogni modifica dello stato viene sincronizzata come differenza sulle tabelle.
   useEffect(() => {
-    if (!loaded) return;
-    try {
-      localStorage.setItem(KEY, JSON.stringify(state));
-    } catch {
-      /* quota */
-    }
     const acc = accountRef.current;
-    if (!acc) return;
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      void supabase
-        .from("user_data")
-        .upsert({ user_id: acc.id, payload: state as unknown as never, updated_at: new Date().toISOString() });
-    }, 700);
+    const prev = baseline.current;
+    if (!loaded || !acc || !prev || prev === state) return;
+    baseline.current = state;
+    setSyncing(true);
+    queue.current = queue.current
+      .then(() => persistDiff(prev, state, acc.id))
+      .catch(() => {
+        toast.error("Salvataggio non riuscito, controlla la connessione");
+      })
+      .finally(() => setSyncing(false));
   }, [state, loaded]);
 
   const update = useCallback((fn: (s: AppState) => AppState) => setState((s) => fn(s)), []);
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
-    try {
-      localStorage.removeItem(KEY);
-    } catch {
-      /* noop */
-    }
+    await db.auth.signOut();
+    accountRef.current = null;
+    baseline.current = null;
+    setAccount(null);
+    setState(initialState());
   }, []);
 
   const value = useMemo<Ctx>(
@@ -224,6 +176,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       update,
       addTransaction: (t) =>
         update((s) => ({ ...s, transazioni: [...s.transazioni, { ...t, id: uid() }] })),
+      updateTransaction: (id, patch) =>
+        update((s) => ({
+          ...s,
+          transazioni: s.transazioni.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+        })),
       deleteTransaction: (id) =>
         update((s) => ({ ...s, transazioni: s.transazioni.filter((t) => t.id !== id) })),
       addCategory: (c) => {
@@ -256,11 +213,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       dismissTip: (id) =>
         update((s) => ({ ...s, consigliIgnorati: [...s.consigliIgnorati, id] })),
       reset: () => {
-        try {
-          localStorage.removeItem(KEY);
-        } catch {
-          /* noop */
+        const acc = accountRef.current;
+        if (acc) {
+          setSyncing(true);
+          queue.current = queue.current
+            .then(() => wipeRemote(acc.id))
+            .catch(() => {
+              toast.error("Reimpostazione non riuscita");
+            })
+            .finally(() => setSyncing(false));
         }
+        baseline.current = initialState();
         setState(initialState());
       },
     }),
