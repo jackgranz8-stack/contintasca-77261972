@@ -218,7 +218,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setSyncing(true);
           queue.current = queue.current
             .then(() => wipeRemote(acc.id))
-            .catch(() => toast.error("Reimpostazione non riuscita"))
+            .catch(() => {
+              toast.error("Reimpostazione non riuscita");
+            })
             .finally(() => setSyncing(false));
         }
         baseline.current = initialState();
