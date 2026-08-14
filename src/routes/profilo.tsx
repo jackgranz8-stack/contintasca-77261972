@@ -205,7 +205,7 @@ function ProfiloPage() {
       <section className="card-surface p-5">
         <h2 className="text-sm font-semibold">Reimposta app</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Cancella spese, categorie, ricorrenti e profilo da questo dispositivo.
+          Cancella spese, categorie, ricorrenti e profilo dal tuo account.
         </p>
         {resetStep === 0 && (
           <button
