@@ -1,11 +1,14 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Pause, Play, Plus, Trash2 } from "lucide-react";
-import { useApp } from "@/lib/store";
-import { eur } from "@/lib/format";
+import { sum, totalsByCategory, txInMonth, useApp } from "@/lib/store";
+import { currentMonth, eur, monthLabel } from "@/lib/format";
 import { ICON_KEYS, iconFor } from "@/lib/icons";
 import { PALETTE } from "@/lib/types";
+import { Donut } from "@/components/Donut";
+import { ProgressBar } from "@/components/ProgressBar";
+
 
 export const Route = createFileRoute("/budget")({
   head: () => ({
