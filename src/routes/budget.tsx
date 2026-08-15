@@ -50,7 +50,24 @@ function BudgetPage() {
     giorno: 1,
   });
 
+  const [focusCat, setFocusCat] = useState<string | null>(null);
+  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
   const totale = state.categorie.reduce((a, c) => a + c.budget, 0);
+  const mese = currentMonth();
+  const spesiMese = totalsByCategory(txInMonth(state.transazioni, mese));
+  const spesoTotale = sum(txInMonth(state.transazioni, mese));
+  const slicesBudget = state.categorie
+    .map((c) => ({ id: c.id, label: c.nome, value: c.budget, color: c.colore }))
+    .filter((s) => s.value > 0);
+
+  const vaiAlCampo = (id: string) => {
+    setFocusCat(id);
+    const el = inputRefs.current[id];
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(() => el?.focus(), 350);
+  };
+
 
   const creaCategoria = () => {
     const n = nuovaCat.trim();
