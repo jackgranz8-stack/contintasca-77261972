@@ -43,6 +43,9 @@ function StoricoPage() {
     return [...set].sort().reverse();
   }, [state.transazioni]);
 
+  const mesiGrafico = useMemo(() => lastMonths(6), []);
+
+
   const base = txInMonth(state.transazioni, mese);
   const filtrate = (cat === "all" ? base : base.filter((t) => t.categoria === cat)).sort((a, b) =>
     a.data < b.data ? 1 : -1,
