@@ -89,7 +89,7 @@ function StoricoPage() {
               txInMonth(state.transazioni, m).filter((t) => cat === "all" || t.categoria === cat),
             ),
           }))}
-          selected={mese === "all" ? undefined : mese}
+          selected={mese === "all" ? "" : mese}
           onSelect={setMese}
         />
         <div className="no-scrollbar -mx-1 mt-4 flex gap-2 overflow-x-auto px-1 pb-1">
