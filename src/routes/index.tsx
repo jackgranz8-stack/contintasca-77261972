@@ -79,7 +79,7 @@ function HomePage() {
   };
 
   const slices = state.categorie
-    .map((c) => ({ label: c.nome, value: totali.get(c.id) ?? 0, color: c.colore }))
+    .map((c) => ({ id: c.id, label: c.nome, value: totali.get(c.id) ?? 0, color: c.colore }))
     .filter((s) => s.value > 0)
     .sort((a, b) => b.value - a.value);
 
@@ -94,6 +94,7 @@ function HomePage() {
         <h1 className="text-2xl font-semibold tracking-tight">Conti in Tasca</h1>
       </header>
 
+      {/* 1. Riepilogo */}
       <section className="card-hero p-5">
         <p className="text-xs text-muted-foreground">
           Speso in {monthLabel(mese)}
@@ -112,67 +113,7 @@ function HomePage() {
         </p>
       </section>
 
-      <section className="card-surface p-5">
-        <div className="mb-4 flex items-center gap-2">
-          <TrendingUp size={16} className="text-primary" />
-          <h2 className="text-sm font-semibold">Andamento</h2>
-          <span className="ml-auto text-[11px] text-muted-foreground">ultimi 6 mesi</span>
-        </div>
-        <TrendBars
-          data={mesi.map((m) => ({ key: m, value: sum(txInMonth(state.transazioni, m)) }))}
-          selected={mese}
-          onSelect={setMese}
-        />
-      </section>
-
-      <section className="card-surface p-5">
-        <h2 className="mb-3 text-sm font-semibold">Dove finiscono i soldi</h2>
-        <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-          <button
-            onClick={() => setCatSel("all")}
-            className={`shrink-0 rounded-full border px-3 py-1.5 text-xs ${
-              catSel === "all"
-                ? "border-primary text-primary"
-                : "border-border text-muted-foreground"
-            }`}
-          >
-            Tutte
-          </button>
-          {state.categorie.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setCatSel(catSel === c.id ? "all" : c.id)}
-              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs ${
-                catSel === c.id ? "border-primary text-primary" : "border-border text-muted-foreground"
-              }`}
-            >
-              {c.nome}
-            </button>
-          ))}
-        </div>
-        {slices.length > 0 ? (
-          <>
-            <Donut slices={slices} total={sum(txMese)} />
-            <ul className="mt-1 space-y-1.5">
-              {slices.slice(0, 5).map((s) => (
-                <li key={s.label} className="flex items-center gap-2 text-xs">
-                  <span
-                    className="h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: s.color }}
-                  />
-                  <span className="flex-1 text-muted-foreground">{s.label}</span>
-                  <span className="font-medium">{eur(s.value)}</span>
-                </li>
-              ))}
-            </ul>
-          </>
-        ) : (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            Nessuna spesa in {monthLabel(mese)}
-          </p>
-        )}
-      </section>
-
+      {/* 2. Consigli intelligenti */}
       {tips.length > 0 && (
         <section className="space-y-3">
           <div className="flex items-center gap-2">
@@ -217,32 +158,103 @@ function HomePage() {
         </section>
       )}
 
+      {/* 3. Andamento nel tempo */}
       <section className="card-surface p-5">
-        <h2 className="mb-4 text-sm font-semibold">Budget per categoria</h2>
-        <ul className="space-y-4">
-          {state.categorie.map((c) => {
-            const val = totali.get(c.id) ?? 0;
-            const Icon = iconFor(c.icona);
-            return (
-              <li key={c.id}>
-                <div className="mb-1.5 flex items-center gap-2">
-                  <span
-                    className="flex h-7 w-7 items-center justify-center rounded-full"
-                    style={{ backgroundColor: `${c.colore}22`, color: c.colore }}
-                  >
-                    <Icon size={14} />
-                  </span>
-                  <span className="flex-1 text-sm">{c.nome}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {eur(val)} / {eur(c.budget)}
-                  </span>
-                </div>
-                <ProgressBar value={val} max={c.budget} height={8} />
-              </li>
-            );
-          })}
-        </ul>
+        <div className="mb-4 flex items-center gap-2">
+          <TrendingUp size={16} className="text-primary" />
+          <h2 className="text-sm font-semibold">Andamento nel tempo</h2>
+          <span className="ml-auto text-[11px] text-muted-foreground">ultimi 6 mesi</span>
+        </div>
+        <TrendBars
+          data={mesi.map((m) => ({
+            key: m,
+            value: sum(
+              txInMonth(state.transazioni, m).filter(
+                (t) => catSel === "all" || t.categoria === catSel,
+              ),
+            ),
+          }))}
+          selected={mese}
+          onSelect={setMese}
+        />
+      </section>
+
+      {/* 4. Ripartizione per categoria */}
+      <section className="card-surface p-5">
+        <h2 className="mb-3 text-sm font-semibold">Ripartizione per categoria</h2>
+        <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+          <button
+            onClick={() => setCatSel("all")}
+            className={`shrink-0 rounded-full border px-3.5 py-2 text-xs ${
+              catSel === "all"
+                ? "border-primary text-primary"
+                : "border-border text-muted-foreground"
+            }`}
+          >
+            Tutte
+          </button>
+          {state.categorie.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setCatSel(catSel === c.id ? "all" : c.id)}
+              className={`shrink-0 rounded-full border px-3.5 py-2 text-xs ${
+                catSel === c.id ? "border-primary text-primary" : "border-border text-muted-foreground"
+              }`}
+            >
+              {c.nome}
+            </button>
+          ))}
+        </div>
+        {slices.length > 0 ? (
+          <>
+            <Donut
+              slices={slices}
+              total={sum(txMese)}
+              selected={catSel === "all" ? null : catSel}
+              onSelect={(id) => setCatSel((v) => (v === id ? "all" : id))}
+            />
+            <ul className="mt-2 space-y-4 border-t border-border pt-4">
+              {state.categorie.map((c) => {
+                const val = totali.get(c.id) ?? 0;
+                const Icon = iconFor(c.icona);
+                const attiva = catSel === c.id;
+                return (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      onClick={() => setCatSel(attiva ? "all" : c.id)}
+                      className="w-full text-left"
+                    >
+                      <div className="mb-1.5 flex items-center gap-2">
+                        <span
+                          className="flex h-7 w-7 items-center justify-center rounded-full"
+                          style={{ backgroundColor: `${c.colore}22`, color: c.colore }}
+                        >
+                          <Icon size={14} />
+                        </span>
+                        <span
+                          className={`flex-1 text-sm ${attiva ? "font-semibold text-primary" : ""}`}
+                        >
+                          {c.nome}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {eur(val)} / {eur(c.budget)}
+                        </span>
+                      </div>
+                      <ProgressBar value={val} max={c.budget} height={8} />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        ) : (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            Nessuna spesa in {monthLabel(mese)}
+          </p>
+        )}
       </section>
     </div>
   );
 }
+
