@@ -49,7 +49,7 @@ function StoricoPage() {
   );
   const totali = totalsByCategory(cat === "all" ? base : base.filter((t) => t.categoria === cat));
   const slices = state.categorie
-    .map((c) => ({ label: c.nome, value: totali.get(c.id) ?? 0, color: c.colore }))
+    .map((c) => ({ id: c.id, label: c.nome, value: totali.get(c.id) ?? 0, color: c.colore }))
     .filter((s) => s.value > 0)
     .sort((a, b) => b.value - a.value);
 
@@ -66,22 +66,35 @@ function StoricoPage() {
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold tracking-tight">Storico</h1>
 
-      <section className="card-surface p-4">
-        <p className="mb-2 text-xs text-muted-foreground">Mese</p>
-        <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+      {/* Grafico a barre: unico pilota del filtro mese */}
+      <section className="card-surface p-5">
+        <div className="mb-4 flex items-center gap-2">
+          <h2 className="text-sm font-semibold">Andamento nel tempo</h2>
           <button
             onClick={() => setMese("all")}
-            className={`shrink-0 rounded-full border px-3 py-1.5 text-xs ${
+            className={`ml-auto shrink-0 rounded-full border px-3 py-1.5 text-xs ${
               mese === "all" ? "border-primary text-primary" : "border-border text-muted-foreground"
             }`}
           >
             Tutto
           </button>
+        </div>
+        <TrendBars
+          data={mesiGrafico.map((m) => ({
+            key: m,
+            value: sum(
+              txInMonth(state.transazioni, m).filter((t) => cat === "all" || t.categoria === cat),
+            ),
+          }))}
+          selected={mese === "all" ? undefined : mese}
+          onSelect={setMese}
+        />
+        <div className="no-scrollbar -mx-1 mt-4 flex gap-2 overflow-x-auto px-1 pb-1">
           {mesiDisponibili.map((m) => (
             <button
               key={m}
               onClick={() => setMese(m)}
-              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs capitalize ${
+              className={`shrink-0 rounded-full border px-3.5 py-2 text-xs capitalize ${
                 mese === m ? "border-primary text-primary" : "border-border text-muted-foreground"
               }`}
             >
@@ -89,12 +102,26 @@ function StoricoPage() {
             </button>
           ))}
         </div>
+      </section>
 
-        <p className="mt-3 mb-2 text-xs text-muted-foreground">Categoria</p>
+      <section className="card-hero p-5">
+        <p className="text-xs text-muted-foreground">
+          Totale {mese === "all" ? "di tutti i mesi" : monthLabel(mese)}
+          {cat !== "all" && ` · ${state.categorie.find((c) => c.id === cat)?.nome}`}
+        </p>
+        <p className="mt-1 text-3xl font-semibold tracking-tight">{eur(sum(filtrate))}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {filtrate.length} {filtrate.length === 1 ? "transazione" : "transazioni"}
+        </p>
+      </section>
+
+      {/* Pillole categoria + donut */}
+      <section className="card-surface p-5">
+        <h2 className="mb-3 text-sm font-semibold">Ripartizione per categoria</h2>
         <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
           <button
             onClick={() => setCat("all")}
-            className={`shrink-0 rounded-full border px-3 py-1.5 text-xs ${
+            className={`shrink-0 rounded-full border px-3.5 py-2 text-xs ${
               cat === "all" ? "border-primary text-primary" : "border-border text-muted-foreground"
             }`}
           >
@@ -103,8 +130,8 @@ function StoricoPage() {
           {state.categorie.map((c) => (
             <button
               key={c.id}
-              onClick={() => setCat(c.id)}
-              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs ${
+              onClick={() => setCat(cat === c.id ? "all" : c.id)}
+              className={`shrink-0 rounded-full border px-3.5 py-2 text-xs ${
                 cat === c.id ? "border-primary text-primary" : "border-border text-muted-foreground"
               }`}
             >
@@ -112,38 +139,20 @@ function StoricoPage() {
             </button>
           ))}
         </div>
-      </section>
-
-      <section className="card-hero p-5">
-        <p className="text-xs text-muted-foreground">Totale filtrato</p>
-        <p className="mt-1 text-3xl font-semibold tracking-tight">{eur(sum(filtrate))}</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {filtrate.length} {filtrate.length === 1 ? "transazione" : "transazioni"}
-        </p>
-      </section>
-
-      {mese === "all" ? null : (
-        <section className="card-surface p-5">
-          <h2 className="mb-4 text-sm font-semibold">Andamento</h2>
-          <TrendBars
-            data={lastMonths(6).map((m) => ({
-              key: m,
-              value: sum(
-                txInMonth(state.transazioni, m).filter((t) => cat === "all" || t.categoria === cat),
-              ),
-            }))}
-            selected={mese}
-            onSelect={setMese}
+        {slices.length > 0 ? (
+          <Donut
+            slices={slices}
+            total={sum(filtrate)}
+            selected={cat === "all" ? null : cat}
+            onSelect={(id) => setCat((v) => (v === id ? "all" : id))}
           />
-        </section>
-      )}
+        ) : (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            Nessuna spesa con questi filtri
+          </p>
+        )}
+      </section>
 
-      {slices.length > 0 && (
-        <section className="card-surface p-5">
-          <h2 className="text-sm font-semibold">Dove finiscono i soldi</h2>
-          <Donut slices={slices} total={sum(filtrate)} />
-        </section>
-      )}
 
       <button
         onClick={esporta}
