@@ -1,11 +1,14 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Pause, Play, Plus, Trash2 } from "lucide-react";
-import { useApp } from "@/lib/store";
-import { eur } from "@/lib/format";
+import { sum, totalsByCategory, txInMonth, useApp } from "@/lib/store";
+import { currentMonth, eur, monthLabel } from "@/lib/format";
 import { ICON_KEYS, iconFor } from "@/lib/icons";
 import { PALETTE } from "@/lib/types";
+import { Donut } from "@/components/Donut";
+import { ProgressBar } from "@/components/ProgressBar";
+
 
 export const Route = createFileRoute("/budget")({
   head: () => ({
@@ -47,7 +50,24 @@ function BudgetPage() {
     giorno: 1,
   });
 
+  const [focusCat, setFocusCat] = useState<string | null>(null);
+  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
   const totale = state.categorie.reduce((a, c) => a + c.budget, 0);
+  const mese = currentMonth();
+  const spesiMese = totalsByCategory(txInMonth(state.transazioni, mese));
+  const spesoTotale = sum(txInMonth(state.transazioni, mese));
+  const slicesBudget = state.categorie
+    .map((c) => ({ id: c.id, label: c.nome, value: c.budget, color: c.colore }))
+    .filter((s) => s.value > 0);
+
+  const vaiAlCampo = (id: string) => {
+    setFocusCat(id);
+    const el = inputRefs.current[id];
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(() => el?.focus(), 350);
+  };
+
 
   const creaCategoria = () => {
     const n = nuovaCat.trim();
@@ -92,42 +112,83 @@ function BudgetPage() {
         </p>
       </section>
 
+      {slicesBudget.length > 0 && (
+        <section className="card-surface p-5">
+          <h2 className="text-sm font-semibold">Budget pianificato vs speso</h2>
+          <p className="mt-1 text-[11px] capitalize text-muted-foreground">{monthLabel(mese)}</p>
+          <Donut
+            slices={slicesBudget}
+            total={totale}
+            selected={focusCat}
+            onSelect={vaiAlCampo}
+            centerLabel="Pianificato"
+          />
+          <div className="mt-1 flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Speso questo mese</span>
+            <span className="font-semibold">
+              {eur(spesoTotale)} / {eur(totale)}
+            </span>
+          </div>
+          <div className="mt-2">
+            <ProgressBar value={spesoTotale} max={totale} height={8} />
+          </div>
+        </section>
+      )}
+
       <section className="card-surface divide-y divide-border">
         {state.categorie.map((c) => {
           const Icon = iconFor(c.icona);
+          const speso = spesiMese.get(c.id) ?? 0;
+          const evidenzia = focusCat === c.id;
           return (
-            <div key={c.id} className="flex items-center gap-3 px-4 py-3">
-              <span
-                className="flex h-9 w-9 items-center justify-center rounded-full"
-                style={{ backgroundColor: `${c.colore}22`, color: c.colore }}
-              >
-                <Icon size={16} />
-              </span>
-              <span className="flex-1 truncate text-sm">{c.nome}</span>
-              <div className="flex items-center gap-1 rounded-xl bg-surface px-3 py-1.5">
-                <input
-                  inputMode="decimal"
-                  value={c.budget}
-                  onChange={(e) =>
-                    updateCategory(c.id, { budget: Math.max(0, Number(e.target.value) || 0) })
-                  }
-                  className="w-16 bg-transparent text-right text-sm font-semibold outline-none"
-                />
-                <span className="text-xs text-muted-foreground">€</span>
+            <div
+              key={c.id}
+              className={`px-4 py-3 transition-colors ${evidenzia ? "bg-surface-2" : ""}`}
+            >
+              <div className="flex items-center gap-3">
+                <span
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                  style={{ backgroundColor: `${c.colore}22`, color: c.colore }}
+                >
+                  <Icon size={16} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm">{c.nome}</p>
+                  <p className="text-[11px] text-muted-foreground">speso {eur(speso)}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1 rounded-xl bg-surface px-3 py-1.5">
+                  <input
+                    ref={(el) => {
+                      inputRefs.current[c.id] = el;
+                    }}
+                    inputMode="decimal"
+                    value={c.budget}
+                    onFocus={() => setFocusCat(c.id)}
+                    onChange={(e) =>
+                      updateCategory(c.id, { budget: Math.max(0, Number(e.target.value) || 0) })
+                    }
+                    className="w-16 bg-transparent text-right text-sm font-semibold outline-none"
+                  />
+                  <span className="text-xs text-muted-foreground">€</span>
+                </div>
+                <button
+                  onClick={() => {
+                    if (!deleteCategory(c.id))
+                      toast.error("Categoria in uso: non può essere eliminata");
+                    else toast.success("Categoria eliminata");
+                  }}
+                  className="shrink-0 p-1 text-muted-foreground"
+                  aria-label={`Elimina ${c.nome}`}
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
-              <button
-                onClick={() => {
-                  if (!deleteCategory(c.id))
-                    toast.error("Categoria in uso: non può essere eliminata");
-                  else toast.success("Categoria eliminata");
-                }}
-                className="text-muted-foreground"
-                aria-label={`Elimina ${c.nome}`}
-              >
-                <Trash2 size={16} />
-              </button>
+              <div className="mt-2">
+                <ProgressBar value={speso} max={c.budget} height={6} />
+              </div>
             </div>
           );
+
         })}
       </section>
 

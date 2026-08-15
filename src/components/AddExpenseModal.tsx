@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Delete, X } from "lucide-react";
+import { Delete, Repeat, X } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { iconFor } from "@/lib/icons";
 import { todayISO, uid } from "@/lib/format";
@@ -12,6 +12,11 @@ function shiftDay(days: number) {
   const d = new Date();
   d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
+}
+
+function dayOf(iso: string) {
+  const n = Number(iso.slice(8, 10));
+  return Math.min(28, Math.max(1, Number.isFinite(n) && n > 0 ? n : 1));
 }
 
 export function AddExpenseModal({
@@ -30,23 +35,35 @@ export function AddExpenseModal({
   const [nota, setNota] = useState("");
   const [ripeti, setRipeti] = useState(false);
   const [giorno, setGiorno] = useState(1);
+  const [confermaStop, setConfermaStop] = useState(false);
+
+  const regola = edit?.ricorrenteId
+    ? state.ricorrenti.find((r) => r.id === edit.ricorrenteId)
+    : undefined;
+  const avevaRicorrenza = Boolean(regola && regola.attiva);
 
   useEffect(() => {
     if (!open) return;
+    setConfermaStop(false);
     if (edit) {
       setImporto(String(edit.importo).replace(".", ","));
       setNota(edit.nota ?? "");
       setData(edit.data);
       setCategoria(edit.categoria);
+      const linked = edit.ricorrenteId
+        ? state.ricorrenti.find((r) => r.id === edit.ricorrenteId)
+        : undefined;
+      setRipeti(Boolean(linked && linked.attiva));
+      setGiorno(linked ? linked.giorno : dayOf(edit.data));
     } else {
       setImporto("");
       setNota("");
       setData(todayISO());
       setCategoria(state.categorie[0]?.id ?? "");
+      setRipeti(false);
+      setGiorno(Math.min(28, new Date().getDate()));
     }
-    setRipeti(false);
-    setGiorno(Math.min(28, new Date().getDate()));
-  }, [open, edit, state.categorie]);
+  }, [open, edit, state.categorie, state.ricorrenti]);
 
   if (!open) return null;
 
@@ -64,6 +81,72 @@ export function AddExpenseModal({
     });
   };
 
+  const nomeRegola = () =>
+    nota.trim() || state.categorie.find((c) => c.id === categoria)?.nome || "Spesa";
+
+  const salvaEdit = (stopRicorrenza: boolean) => {
+    if (!edit) return;
+    const patch: Partial<Omit<Transaction, "id">> = {
+      importo: valore,
+      categoria,
+      data,
+      nota: nota.trim(),
+    };
+    if (ripeti && !avevaRicorrenza) {
+      const nuovoId = uid();
+      update((s) => ({
+        ...s,
+        ricorrenti: [
+          ...s.ricorrenti.filter((r) => r.id !== edit.ricorrenteId),
+          {
+            id: nuovoId,
+            nome: nomeRegola(),
+            categoria,
+            importo: valore,
+            giorno,
+            attiva: true,
+            ultimaGenerazione: data.slice(0, 7),
+          },
+        ],
+        transazioni: s.transazioni.map((t) =>
+          t.id === edit.id ? { ...t, ...patch, ricorrenteId: nuovoId } : t,
+        ),
+      }));
+      toast.success("Spesa aggiornata e resa ricorrente");
+      onClose();
+      return;
+    }
+    if (!ripeti && avevaRicorrenza && stopRicorrenza) {
+      update((s) => ({
+        ...s,
+        ricorrenti: s.ricorrenti.map((r) =>
+          r.id === edit.ricorrenteId ? { ...r, attiva: false } : r,
+        ),
+        transazioni: s.transazioni.map((t) => (t.id === edit.id ? { ...t, ...patch } : t)),
+      }));
+      toast.success("Ricorrenza disattivata");
+      onClose();
+      return;
+    }
+    if (ripeti && avevaRicorrenza) {
+      update((s) => ({
+        ...s,
+        ricorrenti: s.ricorrenti.map((r) =>
+          r.id === edit.ricorrenteId
+            ? { ...r, categoria, importo: valore, giorno, attiva: true }
+            : r,
+        ),
+        transazioni: s.transazioni.map((t) => (t.id === edit.id ? { ...t, ...patch } : t)),
+      }));
+      toast.success("Spesa aggiornata");
+      onClose();
+      return;
+    }
+    updateTransaction(edit.id, patch);
+    toast.success("Spesa aggiornata");
+    onClose();
+  };
+
   const salva = () => {
     if (!Number.isFinite(valore) || valore <= 0) {
       toast.error("Inserisci un importo valido");
@@ -74,21 +157,22 @@ export function AddExpenseModal({
       return;
     }
     if (edit) {
-      updateTransaction(edit.id, { importo: valore, categoria, data, nota: nota.trim() });
-      toast.success("Spesa aggiornata");
-      onClose();
+      if (!ripeti && avevaRicorrenza) {
+        setConfermaStop(true);
+        return;
+      }
+      salvaEdit(false);
       return;
     }
     addTransaction({ importo: valore, categoria, data, nota: nota.trim() });
     if (ripeti) {
-      const nome = nota.trim() || state.categorie.find((c) => c.id === categoria)?.nome || "Spesa";
       update((s) => ({
         ...s,
         ricorrenti: [
           ...s.ricorrenti,
           {
             id: uid(),
-            nome,
+            nome: nomeRegola(),
             categoria,
             importo: valore,
             giorno,
@@ -111,23 +195,23 @@ export function AddExpenseModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-background/70 backdrop-blur-sm">
       <button className="absolute inset-0" aria-label="Chiudi" onClick={onClose} />
-      <div className="relative z-10 max-h-[94vh] w-full max-w-[430px] overflow-y-auto rounded-t-[28px] border border-border bg-popover px-5 pt-4 pb-[max(env(safe-area-inset-bottom),20px)]">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">{edit ? "Modifica spesa" : "Nuova spesa"}</h2>
+      <div className="relative z-10 max-h-[92vh] w-full max-w-[430px] overflow-y-auto rounded-t-[28px] border border-border bg-popover px-4 pt-3 pb-[max(env(safe-area-inset-bottom),14px)]">
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-base font-semibold">{edit ? "Modifica spesa" : "Nuova spesa"}</h2>
           <button
             onClick={onClose}
-            className="rounded-full bg-surface-2 p-2.5 text-muted-foreground"
+            className="rounded-full bg-surface-2 p-2 text-muted-foreground"
             aria-label="Chiudi"
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* Importo grande */}
-        <div className="mb-4 flex items-baseline justify-center gap-2 rounded-3xl bg-surface px-4 py-6">
-          <span className="text-3xl font-semibold text-muted-foreground">€</span>
+        {/* Importo in evidenza */}
+        <div className="mb-2.5 flex items-baseline justify-center gap-2 rounded-2xl bg-surface px-4 py-3">
+          <span className="text-2xl font-semibold text-muted-foreground">€</span>
           <span
-            className={`text-[52px] font-semibold leading-none tracking-tight ${
+            className={`text-[42px] font-semibold leading-none tracking-tight ${
               importo ? "" : "text-muted-foreground"
             }`}
           >
@@ -135,23 +219,23 @@ export function AddExpenseModal({
           </span>
         </div>
 
-        {/* Tastierino */}
-        <div className="mb-5 grid grid-cols-3 gap-2.5">
+        {/* Tastierino compatto */}
+        <div className="mb-3 grid grid-cols-3 gap-2">
           {KEYS.map((k) => (
             <button
               key={k}
               type="button"
               onClick={() => premi(k)}
-              className="flex h-14 items-center justify-center rounded-2xl bg-surface-2 text-2xl font-medium active:scale-95"
+              className="flex h-11 items-center justify-center rounded-xl bg-surface-2 text-xl font-medium active:scale-95"
               aria-label={k === "back" ? "Cancella" : k}
             >
-              {k === "back" ? <Delete size={22} /> : k}
+              {k === "back" ? <Delete size={20} /> : k}
             </button>
           ))}
         </div>
 
-        <label className="mb-2 block text-sm font-medium">Categoria</label>
-        <div className="no-scrollbar -mx-5 mb-5 flex gap-2 overflow-x-auto px-5 pb-1">
+        {/* Categorie: riga orizzontale di icone */}
+        <div className="no-scrollbar -mx-4 mb-3 flex gap-2 overflow-x-auto px-4">
           {state.categorie.map((c) => {
             const Icon = iconFor(c.icona);
             const active = c.id === categoria;
@@ -160,32 +244,32 @@ export function AddExpenseModal({
                 key={c.id}
                 type="button"
                 onClick={() => setCategoria(c.id)}
-                className={`flex shrink-0 items-center gap-2 rounded-full border px-4 py-3 text-sm transition-colors ${
+                className={`flex w-[68px] shrink-0 flex-col items-center gap-1 rounded-2xl border px-1 py-2 text-[11px] transition-colors ${
                   active
                     ? "border-primary bg-surface-2 font-semibold text-foreground"
                     : "border-border bg-surface text-muted-foreground"
                 }`}
               >
                 <span
-                  className="flex h-8 w-8 items-center justify-center rounded-full"
+                  className="flex h-9 w-9 items-center justify-center rounded-full"
                   style={{ backgroundColor: `${c.colore}22`, color: c.colore }}
                 >
-                  <Icon size={17} />
+                  <Icon size={18} />
                 </span>
-                {c.nome}
+                <span className="w-full truncate text-center">{c.nome}</span>
               </button>
             );
           })}
         </div>
 
-        <label className="mb-2 block text-sm font-medium">Quando</label>
-        <div className="mb-4 flex flex-wrap items-center gap-2">
+        {/* Data + descrizione */}
+        <div className="no-scrollbar -mx-4 mb-2.5 flex items-center gap-2 overflow-x-auto px-4">
           {dateChips.map((d) => (
             <button
               key={d.value}
               type="button"
               onClick={() => setData(d.value)}
-              className={`rounded-full border px-4 py-2.5 text-sm ${
+              className={`shrink-0 rounded-full border px-3.5 py-2 text-xs ${
                 data === d.value
                   ? "border-primary bg-surface-2 font-semibold"
                   : "border-border bg-surface text-muted-foreground"
@@ -198,53 +282,80 @@ export function AddExpenseModal({
             type="date"
             value={data}
             onChange={(e) => setData(e.target.value)}
-            className="rounded-full border border-border bg-surface px-4 py-2.5 text-sm outline-none"
+            className="shrink-0 rounded-full border border-border bg-surface px-3 py-2 text-xs outline-none"
           />
         </div>
 
-        <label className="mb-2 block text-sm font-medium">Descrizione</label>
         <input
           value={nota}
           onChange={(e) => setNota(e.target.value)}
-          placeholder="Es. spesa supermercato"
-          className="mb-4 w-full rounded-2xl border border-border bg-surface px-4 py-4 text-base outline-none placeholder:text-muted-foreground"
+          placeholder="Descrizione (opzionale)"
+          className="mb-2.5 w-full rounded-2xl border border-border bg-surface px-4 py-3 text-base outline-none placeholder:text-muted-foreground"
         />
 
-        <div className={`mb-5 rounded-2xl border border-border bg-surface px-4 py-4 ${edit ? "hidden" : ""}`}>
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Ripeti ogni mese</span>
-            <button
-              type="button"
-              onClick={() => setRipeti((v) => !v)}
-              aria-pressed={ripeti}
-              className={`h-8 w-14 rounded-full p-1 transition-colors ${ripeti ? "lime-fill" : "bg-surface-2"}`}
-            >
-              <span
-                className={`block h-6 w-6 rounded-full bg-background transition-transform ${ripeti ? "translate-x-6" : ""}`}
-              />
-            </button>
-          </div>
+        {/* Toggle ricorrenza compatto */}
+        <div className="mb-3 flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-2.5">
+          <Repeat size={15} className="shrink-0 text-primary" />
+          <span className="flex-1 truncate text-sm">Ripeti ogni mese</span>
           {ripeti && (
-            <div className="mt-3 flex items-center justify-between gap-3">
-              <span className="text-sm text-muted-foreground">Giorno del mese</span>
-              <input
-                type="number"
-                min={1}
-                max={28}
-                value={giorno}
-                onChange={(e) => setGiorno(Math.min(28, Math.max(1, Number(e.target.value) || 1)))}
-                className="w-20 rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-center text-base outline-none"
-              />
-            </div>
+            <input
+              type="number"
+              min={1}
+              max={28}
+              value={giorno}
+              onChange={(e) => setGiorno(Math.min(28, Math.max(1, Number(e.target.value) || 1)))}
+              aria-label="Giorno del mese"
+              className="w-14 rounded-xl border border-border bg-surface-2 px-2 py-1.5 text-center text-sm outline-none"
+            />
           )}
+          <button
+            type="button"
+            onClick={() => setRipeti((v) => !v)}
+            aria-pressed={ripeti}
+            aria-label="Ripeti ogni mese"
+            className={`h-7 w-12 shrink-0 rounded-full p-1 transition-colors ${ripeti ? "lime-fill" : "bg-surface-2"}`}
+          >
+            <span
+              className={`block h-5 w-5 rounded-full bg-background transition-transform ${ripeti ? "translate-x-5" : ""}`}
+            />
+          </button>
         </div>
 
         <button
           onClick={salva}
-          className="lime-fill w-full rounded-2xl py-4 text-base font-semibold active:scale-[0.99]"
+          className="lime-fill w-full rounded-2xl py-3.5 text-base font-semibold active:scale-[0.99]"
         >
           {edit ? "Salva modifiche" : "Salva spesa"}
         </button>
+
+        {confermaStop && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/80 px-6 backdrop-blur-sm">
+            <div className="card-surface w-full max-w-[340px] p-5">
+              <h3 className="text-base font-semibold">Fermare la ricorrenza?</h3>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Le spese già registrate in passato non vengono toccate: si ferma solo la
+                generazione automatica dei prossimi mesi.
+              </p>
+              <div className="mt-4 flex gap-2">
+                <button
+                  onClick={() => setConfermaStop(false)}
+                  className="flex-1 rounded-xl bg-surface-2 py-2.5 text-sm"
+                >
+                  Annulla
+                </button>
+                <button
+                  onClick={() => {
+                    setConfermaStop(false);
+                    salvaEdit(true);
+                  }}
+                  className="flex-1 rounded-xl bg-destructive py-2.5 text-sm font-semibold text-destructive-foreground"
+                >
+                  Ferma
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
