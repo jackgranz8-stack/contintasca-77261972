@@ -3,6 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { FileSpreadsheet, Pencil, Trash2 } from "lucide-react";
 import { sum, totalsByCategory, txInMonth, useApp } from "@/lib/store";
+import { useScrollLock } from "@/hooks/use-scroll-lock";
+
 import { eur, formatDay, lastMonths, monthLabel, monthKey } from "@/lib/format";
 import { iconFor } from "@/lib/icons";
 import { TrendBars } from "@/components/TrendBars";
@@ -35,6 +37,8 @@ function StoricoPage() {
   const [mese, setMese] = useState<string | "all">(monthKey(new Date()));
   const [cat, setCat] = useState<string | "all">("all");
   const [daEliminare, setDaEliminare] = useState<string | null>(null);
+  useScrollLock(daEliminare !== null);
+
   const [daModificare, setDaModificare] = useState<Transaction | null>(null);
 
   const mesiDisponibili = useMemo(() => {

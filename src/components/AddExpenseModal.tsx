@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Delete, Repeat, X } from "lucide-react";
+import { Repeat, X } from "lucide-react";
 import { useApp } from "@/lib/store";
+import { useScrollLock } from "@/hooks/use-scroll-lock";
 import { iconFor } from "@/lib/icons";
 import { todayISO, uid } from "@/lib/format";
 import type { Transaction } from "@/lib/types";
 
-const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "back"] as const;
 
 function shiftDay(days: number) {
   const d = new Date();
@@ -36,6 +36,8 @@ export function AddExpenseModal({
   const [ripeti, setRipeti] = useState(false);
   const [giorno, setGiorno] = useState(1);
   const [confermaStop, setConfermaStop] = useState(false);
+  const [campo, setCampo] = useState<"importo" | "nota" | null>(null);
+
 
   const regola = edit?.ricorrenteId
     ? state.ricorrenti.find((r) => r.id === edit.ricorrenteId)
@@ -45,6 +47,8 @@ export function AddExpenseModal({
   useEffect(() => {
     if (!open) return;
     setConfermaStop(false);
+    setCampo(null);
+
     if (edit) {
       setImporto(String(edit.importo).replace(".", ","));
       setNota(edit.nota ?? "");
@@ -65,21 +69,12 @@ export function AddExpenseModal({
     }
   }, [open, edit, state.categorie, state.ricorrenti]);
 
+  useScrollLock(open);
+
   if (!open) return null;
 
   const valore = Number(importo.replace(",", "."));
 
-  const premi = (k: string) => {
-    setImporto((v) => {
-      if (k === "back") return v.slice(0, -1);
-      if (k === ",") return v.includes(",") ? v : v === "" ? "0," : `${v},`;
-      const [, dec] = v.split(",");
-      if (dec !== undefined && dec.length >= 2) return v;
-      if (v === "0") return k;
-      if (v.replace(",", "").length >= 8) return v;
-      return v + k;
-    });
-  };
 
   const nomeRegola = () =>
     nota.trim() || state.categorie.find((c) => c.id === categoria)?.nome || "Spesa";
@@ -193,9 +188,9 @@ export function AddExpenseModal({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-background/70 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-end justify-center overscroll-none bg-background/70 backdrop-blur-sm">
       <button className="absolute inset-0" aria-label="Chiudi" onClick={onClose} />
-      <div className="relative z-10 max-h-[92vh] w-full max-w-[430px] overflow-y-auto rounded-t-[28px] border border-border bg-popover px-4 pt-3 pb-[max(env(safe-area-inset-bottom),14px)]">
+      <div className="relative z-10 max-h-[92dvh] w-full max-w-[430px] overflow-y-auto overscroll-contain rounded-t-[28px] border border-border bg-popover px-4 pt-3 pb-[max(env(safe-area-inset-bottom),14px)]">
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-base font-semibold">{edit ? "Modifica spesa" : "Nuova spesa"}</h2>
           <button
@@ -207,8 +202,12 @@ export function AddExpenseModal({
           </button>
         </div>
 
-        {/* Importo in evidenza */}
-        <div className="mb-2.5 flex items-center justify-center gap-2 rounded-2xl bg-surface px-4 py-4">
+        {/* Importo in evidenza — solo tastiera nativa iOS */}
+        <div
+          className={`mb-3 flex items-center justify-center gap-2 rounded-2xl bg-surface px-4 py-5 transition-opacity ${
+            campo === "importo" ? "ring-2 ring-primary" : ""
+          } ${campo === "nota" ? "pointer-events-none opacity-40" : ""}`}
+        >
           <span className="text-2xl font-semibold text-muted-foreground">€</span>
           <input
             type="number"
@@ -216,7 +215,14 @@ export function AddExpenseModal({
             step="0.01"
             min="0"
             value={importo.replace(",", ".")}
-            onFocus={(e) => e.target.select()}
+            onFocus={(e) => {
+              setCampo("importo");
+              e.target.select();
+            }}
+            onBlur={() => setCampo((v) => (v === "importo" ? null : v))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
             onChange={(e) => setImporto(e.target.value.replace(".", ","))}
             placeholder="0"
             aria-label="Importo"
@@ -224,82 +230,81 @@ export function AddExpenseModal({
           />
         </div>
 
-        {/* Tastierino compatto */}
-        <div className="mb-3 grid grid-cols-3 gap-2">
-          {KEYS.map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => premi(k)}
-              className="flex h-11 items-center justify-center rounded-xl bg-surface-2 text-xl font-medium active:scale-95"
-              aria-label={k === "back" ? "Cancella" : k}
-            >
-              {k === "back" ? <Delete size={20} /> : k}
-            </button>
-          ))}
-        </div>
+        <div className={campo ? "pointer-events-none opacity-40" : ""}>
+          {/* Categorie: riga orizzontale di icone */}
+          <div className="no-scrollbar -mx-4 mb-3 flex gap-2 overflow-x-auto px-4">
+            {state.categorie.map((c) => {
+              const Icon = iconFor(c.icona);
+              const active = c.id === categoria;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setCategoria(c.id)}
+                  className={`flex w-[68px] shrink-0 flex-col items-center gap-1 rounded-2xl border px-1 py-2 text-[11px] transition-colors ${
+                    active
+                      ? "border-primary bg-surface-2 font-semibold text-foreground"
+                      : "border-border bg-surface text-muted-foreground"
+                  }`}
+                >
+                  <span
+                    className="flex h-9 w-9 items-center justify-center rounded-full"
+                    style={{ backgroundColor: `${c.colore}22`, color: c.colore }}
+                  >
+                    <Icon size={18} />
+                  </span>
+                  <span className="w-full truncate text-center">{c.nome}</span>
+                </button>
+              );
+            })}
+          </div>
 
-        {/* Categorie: riga orizzontale di icone */}
-        <div className="no-scrollbar -mx-4 mb-3 flex gap-2 overflow-x-auto px-4">
-          {state.categorie.map((c) => {
-            const Icon = iconFor(c.icona);
-            const active = c.id === categoria;
-            return (
+          {/* Data */}
+          <div className="no-scrollbar -mx-4 mb-2.5 flex items-center gap-2 overflow-x-auto px-4">
+            {dateChips.map((d) => (
               <button
-                key={c.id}
+                key={d.value}
                 type="button"
-                onClick={() => setCategoria(c.id)}
-                className={`flex w-[68px] shrink-0 flex-col items-center gap-1 rounded-2xl border px-1 py-2 text-[11px] transition-colors ${
-                  active
-                    ? "border-primary bg-surface-2 font-semibold text-foreground"
+                onClick={() => setData(d.value)}
+                className={`shrink-0 rounded-full border px-3.5 py-2 text-xs ${
+                  data === d.value
+                    ? "border-primary bg-surface-2 font-semibold"
                     : "border-border bg-surface text-muted-foreground"
                 }`}
               >
-                <span
-                  className="flex h-9 w-9 items-center justify-center rounded-full"
-                  style={{ backgroundColor: `${c.colore}22`, color: c.colore }}
-                >
-                  <Icon size={18} />
-                </span>
-                <span className="w-full truncate text-center">{c.nome}</span>
+                {d.label}
               </button>
-            );
-          })}
-        </div>
-
-        {/* Data + descrizione */}
-        <div className="no-scrollbar -mx-4 mb-2.5 flex items-center gap-2 overflow-x-auto px-4">
-          {dateChips.map((d) => (
-            <button
-              key={d.value}
-              type="button"
-              onClick={() => setData(d.value)}
-              className={`shrink-0 rounded-full border px-3.5 py-2 text-xs ${
-                data === d.value
-                  ? "border-primary bg-surface-2 font-semibold"
-                  : "border-border bg-surface text-muted-foreground"
-              }`}
-            >
-              {d.label}
-            </button>
-          ))}
-          <input
-            type="date"
-            value={data}
-            onChange={(e) => setData(e.target.value)}
-            className="shrink-0 rounded-full border border-border bg-surface px-3 py-2 text-xs outline-none"
-          />
+            ))}
+            <input
+              type="date"
+              value={data}
+              onChange={(e) => setData(e.target.value)}
+              className="shrink-0 rounded-full border border-border bg-surface px-3 py-2 text-xs outline-none"
+            />
+          </div>
         </div>
 
         <input
           value={nota}
+          onFocus={() => setCampo("nota")}
+          onBlur={() => setCampo((v) => (v === "nota" ? null : v))}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
           onChange={(e) => setNota(e.target.value)}
           placeholder="Descrizione (opzionale)"
-          className="mb-2.5 w-full rounded-2xl border border-border bg-surface px-4 py-3 text-base outline-none placeholder:text-muted-foreground"
+          className={`mb-2.5 w-full rounded-2xl border bg-surface px-4 py-3 text-base outline-none placeholder:text-muted-foreground ${
+            campo === "nota" ? "border-primary ring-2 ring-primary" : "border-border"
+          } ${campo === "importo" ? "pointer-events-none opacity-40" : ""}`}
         />
 
         {/* Toggle ricorrenza compatto */}
-        <div className="mb-3 flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-2.5">
+        <div
+          className={`mb-3 flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-2.5 ${
+            campo ? "pointer-events-none opacity-40" : ""
+          }`}
+        >
+
           <Repeat size={15} className="shrink-0 text-primary" />
           <span className="flex-1 truncate text-sm">Ripeti ogni mese</span>
           {ripeti && (
