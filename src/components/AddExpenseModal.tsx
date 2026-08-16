@@ -47,6 +47,8 @@ export function AddExpenseModal({
   useEffect(() => {
     if (!open) return;
     setConfermaStop(false);
+    setCampo(null);
+
     if (edit) {
       setImporto(String(edit.importo).replace(".", ","));
       setNota(edit.nota ?? "");
