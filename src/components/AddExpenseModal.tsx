@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Delete, Repeat, X } from "lucide-react";
+import { Repeat, X } from "lucide-react";
 import { useApp } from "@/lib/store";
+import { useScrollLock } from "@/hooks/use-scroll-lock";
 import { iconFor } from "@/lib/icons";
 import { todayISO, uid } from "@/lib/format";
 import type { Transaction } from "@/lib/types";
 
-const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "back"] as const;
 
 function shiftDay(days: number) {
   const d = new Date();
