@@ -208,15 +208,20 @@ export function AddExpenseModal({
         </div>
 
         {/* Importo in evidenza */}
-        <div className="mb-2.5 flex items-baseline justify-center gap-2 rounded-2xl bg-surface px-4 py-3">
+        <div className="mb-2.5 flex items-center justify-center gap-2 rounded-2xl bg-surface px-4 py-4">
           <span className="text-2xl font-semibold text-muted-foreground">€</span>
-          <span
-            className={`text-[42px] font-semibold leading-none tracking-tight ${
-              importo ? "" : "text-muted-foreground"
-            }`}
-          >
-            {importo || "0"}
-          </span>
+          <input
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            min="0"
+            value={importo.replace(",", ".")}
+            onFocus={(e) => e.target.select()}
+            onChange={(e) => setImporto(e.target.value.replace(".", ","))}
+            placeholder="0"
+            aria-label="Importo"
+            className="w-full min-w-0 bg-transparent text-center text-[42px] font-semibold leading-tight tracking-tight outline-none placeholder:text-muted-foreground"
+          />
         </div>
 
         {/* Tastierino compatto */}
@@ -298,15 +303,18 @@ export function AddExpenseModal({
           <Repeat size={15} className="shrink-0 text-primary" />
           <span className="flex-1 truncate text-sm">Ripeti ogni mese</span>
           {ripeti && (
-            <input
-              type="number"
-              min={1}
-              max={28}
+            <select
               value={giorno}
-              onChange={(e) => setGiorno(Math.min(28, Math.max(1, Number(e.target.value) || 1)))}
+              onChange={(e) => setGiorno(Number(e.target.value))}
               aria-label="Giorno del mese"
-              className="w-14 rounded-xl border border-border bg-surface-2 px-2 py-1.5 text-center text-sm outline-none"
-            />
+              className="native-select w-20 shrink-0"
+            >
+              {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
           )}
           <button
             type="button"
