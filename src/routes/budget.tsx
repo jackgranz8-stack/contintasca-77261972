@@ -51,7 +51,10 @@ function BudgetPage() {
   });
 
   const [focusCat, setFocusCat] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  useScrollLock(editing !== null);
+
 
   const totale = state.categorie.reduce((a, c) => a + c.budget, 0);
   const mese = currentMonth();
