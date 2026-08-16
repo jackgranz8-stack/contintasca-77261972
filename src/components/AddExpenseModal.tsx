@@ -65,21 +65,12 @@ export function AddExpenseModal({
     }
   }, [open, edit, state.categorie, state.ricorrenti]);
 
+  useScrollLock(open);
+
   if (!open) return null;
 
   const valore = Number(importo.replace(",", "."));
 
-  const premi = (k: string) => {
-    setImporto((v) => {
-      if (k === "back") return v.slice(0, -1);
-      if (k === ",") return v.includes(",") ? v : v === "" ? "0," : `${v},`;
-      const [, dec] = v.split(",");
-      if (dec !== undefined && dec.length >= 2) return v;
-      if (v === "0") return k;
-      if (v.replace(",", "").length >= 8) return v;
-      return v + k;
-    });
-  };
 
   const nomeRegola = () =>
     nota.trim() || state.categorie.find((c) => c.id === categoria)?.nome || "Spesa";
