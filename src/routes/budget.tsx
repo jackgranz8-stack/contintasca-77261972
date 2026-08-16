@@ -3,6 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Pause, Play, Plus, Trash2 } from "lucide-react";
 import { sum, totalsByCategory, txInMonth, useApp } from "@/lib/store";
+import { useScrollLock } from "@/hooks/use-scroll-lock";
+
 import { currentMonth, eur, monthLabel } from "@/lib/format";
 import { ICON_KEYS, iconFor } from "@/lib/icons";
 import { PALETTE } from "@/lib/types";
