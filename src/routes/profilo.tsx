@@ -253,7 +253,7 @@ function ProfiloPage() {
       </section>
 
       <p className="pb-2 text-center text-[11px] text-muted-foreground">
-        Conti in Tasca · i dati restano solo su questo dispositivo
+        Conti in Tasca · i dati sono legati al tuo account e disponibili su ogni dispositivo dopo il login
       </p>
     </div>
   );

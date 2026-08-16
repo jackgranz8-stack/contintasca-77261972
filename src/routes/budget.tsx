@@ -156,18 +156,23 @@ function BudgetPage() {
                   <p className="truncate text-sm">{c.nome}</p>
                   <p className="text-[11px] text-muted-foreground">speso {eur(speso)}</p>
                 </div>
-                <div className="flex shrink-0 items-center gap-1 rounded-xl bg-surface px-3 py-1.5">
+                <div className="flex shrink-0 items-center gap-1 rounded-xl bg-surface px-3 py-2">
                   <input
                     ref={(el) => {
                       inputRefs.current[c.id] = el;
                     }}
+                    type="number"
                     inputMode="decimal"
+                    min={0}
                     value={c.budget}
-                    onFocus={() => setFocusCat(c.id)}
+                    onFocus={(e) => {
+                      setFocusCat(c.id);
+                      e.target.select();
+                    }}
                     onChange={(e) =>
                       updateCategory(c.id, { budget: Math.max(0, Number(e.target.value) || 0) })
                     }
-                    className="w-16 bg-transparent text-right text-sm font-semibold outline-none"
+                    className="w-20 bg-transparent py-1.5 text-right text-lg font-semibold outline-none"
                   />
                   <span className="text-xs text-muted-foreground">€</span>
                 </div>
@@ -258,22 +263,28 @@ function BudgetPage() {
             </select>
             <div className="grid grid-cols-2 gap-3">
               <input
+                type="number"
                 inputMode="decimal"
+                step="0.01"
+                min="0"
                 value={ric.importo}
+                onFocus={(e) => e.target.select()}
                 onChange={(e) => setRic({ ...ric, importo: e.target.value })}
                 placeholder="Importo €"
-                className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
+                className="w-full rounded-xl border border-border bg-surface px-3 py-3.5 text-lg font-semibold outline-none placeholder:text-base placeholder:font-normal placeholder:text-muted-foreground"
               />
-              <input
-                type="number"
-                min={1}
-                max={28}
+              <select
                 value={ric.giorno}
-                onChange={(e) =>
-                  setRic({ ...ric, giorno: Math.min(28, Math.max(1, Number(e.target.value) || 1)) })
-                }
-                className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none"
-              />
+                onChange={(e) => setRic({ ...ric, giorno: Number(e.target.value) })}
+                aria-label="Giorno del mese"
+                className="native-select w-full py-3.5"
+              >
+                {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                  <option key={d} value={d}>
+                    Giorno {d}
+                  </option>
+                ))}
+              </select>
             </div>
             <button
               onClick={creaRicorrente}

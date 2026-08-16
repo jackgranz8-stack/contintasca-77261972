@@ -157,15 +157,6 @@ function StoricoPage() {
       </section>
 
 
-      <button
-        onClick={esporta}
-        disabled={filtrate.length === 0}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-surface py-3 text-sm font-medium disabled:opacity-40"
-      >
-        <FileSpreadsheet size={16} className="text-primary" />
-        Esporta questo filtro in Excel
-      </button>
-
       <section className="space-y-2">
         {filtrate.length === 0 && (
           <p className="py-8 text-center text-sm text-muted-foreground">
@@ -211,6 +202,15 @@ function StoricoPage() {
           );
         })}
       </section>
+
+      <button
+        onClick={esporta}
+        disabled={filtrate.length === 0}
+        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-surface py-3 text-sm font-medium disabled:opacity-40"
+      >
+        <FileSpreadsheet size={16} className="text-primary" />
+        Esporta questo filtro in Excel
+      </button>
 
       <AddExpenseModal
         open={daModificare !== null}
