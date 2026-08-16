@@ -35,6 +35,8 @@ function StoricoPage() {
   const [mese, setMese] = useState<string | "all">(monthKey(new Date()));
   const [cat, setCat] = useState<string | "all">("all");
   const [daEliminare, setDaEliminare] = useState<string | null>(null);
+  useScrollLock(daEliminare !== null);
+
   const [daModificare, setDaModificare] = useState<Transaction | null>(null);
 
   const mesiDisponibili = useMemo(() => {
