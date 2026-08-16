@@ -36,6 +36,8 @@ export function AddExpenseModal({
   const [ripeti, setRipeti] = useState(false);
   const [giorno, setGiorno] = useState(1);
   const [confermaStop, setConfermaStop] = useState(false);
+  const [campo, setCampo] = useState<"importo" | "nota" | null>(null);
+
 
   const regola = edit?.ricorrenteId
     ? state.ricorrenti.find((r) => r.id === edit.ricorrenteId)
