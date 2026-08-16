@@ -184,9 +184,9 @@ export function AddExpenseModal({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-background/70 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-end justify-center overscroll-none bg-background/70 backdrop-blur-sm">
       <button className="absolute inset-0" aria-label="Chiudi" onClick={onClose} />
-      <div className="relative z-10 max-h-[92vh] w-full max-w-[430px] overflow-y-auto rounded-t-[28px] border border-border bg-popover px-4 pt-3 pb-[max(env(safe-area-inset-bottom),14px)]">
+      <div className="relative z-10 max-h-[92dvh] w-full max-w-[430px] overflow-y-auto overscroll-contain rounded-t-[28px] border border-border bg-popover px-4 pt-3 pb-[max(env(safe-area-inset-bottom),14px)]">
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-base font-semibold">{edit ? "Modifica spesa" : "Nuova spesa"}</h2>
           <button
@@ -198,8 +198,8 @@ export function AddExpenseModal({
           </button>
         </div>
 
-        {/* Importo in evidenza */}
-        <div className="mb-2.5 flex items-center justify-center gap-2 rounded-2xl bg-surface px-4 py-4">
+        {/* Importo in evidenza — solo tastiera nativa iOS */}
+        <div className="mb-3 flex items-center justify-center gap-2 rounded-2xl bg-surface px-4 py-5">
           <span className="text-2xl font-semibold text-muted-foreground">€</span>
           <input
             type="number"
@@ -215,20 +215,6 @@ export function AddExpenseModal({
           />
         </div>
 
-        {/* Tastierino compatto */}
-        <div className="mb-3 grid grid-cols-3 gap-2">
-          {KEYS.map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => premi(k)}
-              className="flex h-11 items-center justify-center rounded-xl bg-surface-2 text-xl font-medium active:scale-95"
-              aria-label={k === "back" ? "Cancella" : k}
-            >
-              {k === "back" ? <Delete size={20} /> : k}
-            </button>
-          ))}
-        </div>
 
         {/* Categorie: riga orizzontale di icone */}
         <div className="no-scrollbar -mx-4 mb-3 flex gap-2 overflow-x-auto px-4">
