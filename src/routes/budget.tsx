@@ -140,15 +140,27 @@ function BudgetPage() {
         </section>
       )}
 
+      {editing && (
+        <button
+          type="button"
+          aria-label="Conferma importo"
+          onClick={() => inputRefs.current[editing]?.blur()}
+          className="fixed inset-0 z-30 bg-background/70 backdrop-blur-sm"
+        />
+      )}
+
       <section className="card-surface divide-y divide-border">
         {state.categorie.map((c) => {
           const Icon = iconFor(c.icona);
           const speso = spesiMese.get(c.id) ?? 0;
           const evidenzia = focusCat === c.id;
+          const inModifica = editing === c.id;
           return (
             <div
               key={c.id}
-              className={`px-4 py-3 transition-colors ${evidenzia ? "bg-surface-2" : ""}`}
+              className={`px-4 py-3 transition-colors ${evidenzia ? "bg-surface-2" : ""} ${
+                inModifica ? "relative z-40 rounded-2xl bg-surface-2 ring-2 ring-primary" : ""
+              }`}
             >
               <div className="flex items-center gap-3">
                 <span
@@ -161,7 +173,7 @@ function BudgetPage() {
                   <p className="truncate text-sm">{c.nome}</p>
                   <p className="text-[11px] text-muted-foreground">speso {eur(speso)}</p>
                 </div>
-                <div className="flex shrink-0 items-center gap-1 rounded-xl bg-surface px-3 py-2">
+                <div className="flex shrink-0 items-center gap-1 rounded-xl bg-surface px-2.5 py-1.5">
                   <input
                     ref={(el) => {
                       inputRefs.current[c.id] = el;
@@ -172,12 +184,17 @@ function BudgetPage() {
                     value={c.budget}
                     onFocus={(e) => {
                       setFocusCat(c.id);
+                      setEditing(c.id);
                       e.target.select();
+                    }}
+                    onBlur={() => setEditing((v) => (v === c.id ? null : v))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.currentTarget.blur();
                     }}
                     onChange={(e) =>
                       updateCategory(c.id, { budget: Math.max(0, Number(e.target.value) || 0) })
                     }
-                    className="w-20 bg-transparent py-1.5 text-right text-lg font-semibold outline-none"
+                    className="w-[72px] bg-transparent py-1 text-right text-base font-semibold outline-none"
                   />
                   <span className="text-xs text-muted-foreground">€</span>
                 </div>
@@ -198,6 +215,7 @@ function BudgetPage() {
               </div>
             </div>
           );
+
 
         })}
       </section>
