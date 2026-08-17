@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Pause, Play, Plus, Trash2 } from "lucide-react";
+import { Pause, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import { sum, totalsByCategory, txInMonth, useApp } from "@/lib/store";
 import { useScrollLock } from "@/hooks/use-scroll-lock";
 
@@ -10,6 +10,8 @@ import { ICON_KEYS, iconFor } from "@/lib/icons";
 import { PALETTE } from "@/lib/types";
 import { Donut } from "@/components/Donut";
 import { ProgressBar } from "@/components/ProgressBar";
+import { EditRecurringModal } from "@/components/EditRecurringModal";
+
 
 
 export const Route = createFileRoute("/budget")({
