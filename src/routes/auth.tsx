@@ -103,7 +103,9 @@ function AuthPage() {
       <p className="mt-2 text-sm text-muted-foreground">
         {mode === "login"
           ? "Accedi per ritrovare spese, budget e ricorrenti su ogni dispositivo."
-          : "Crea un account: i tuoi dati restano legati solo a te."}
+          : mode === "signup"
+            ? "Crea un account: i tuoi dati restano legati solo a te."
+            : "Inserisci la tua email: ti inviamo un link per reimpostare la password."}
       </p>
 
       <form onSubmit={submit} className="mt-8 space-y-3">
@@ -115,23 +117,34 @@ function AuthPage() {
           placeholder="Email"
           className="w-full rounded-2xl border border-border bg-surface px-4 py-4 text-base outline-none placeholder:text-muted-foreground"
         />
-        <input
-          type="password"
-          autoComplete={mode === "login" ? "current-password" : "new-password"}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-          className="w-full rounded-2xl border border-border bg-surface px-4 py-4 text-base outline-none placeholder:text-muted-foreground"
-        />
+        {mode !== "reset" && (
+          <input
+            type="password"
+            autoComplete={mode === "login" ? "current-password" : "new-password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            className="w-full rounded-2xl border border-border bg-surface px-4 py-4 text-base outline-none placeholder:text-muted-foreground"
+          />
+        )}
         <button
           type="submit"
           disabled={busy}
           className="lime-fill flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-semibold disabled:opacity-60"
         >
           {busy && <Loader2 size={16} className="animate-spin" />}
-          {mode === "login" ? "Accedi" : "Crea account"}
+          {mode === "login" ? "Accedi" : mode === "signup" ? "Crea account" : "Invia link di reset"}
         </button>
       </form>
+
+      {mode === "login" && (
+        <button
+          onClick={() => setMode("reset")}
+          className="mt-4 w-full text-center text-sm text-primary"
+        >
+          Password dimenticata?
+        </button>
+      )}
 
       <button
         onClick={() => setMode(mode === "login" ? "signup" : "login")}
