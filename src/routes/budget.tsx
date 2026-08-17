@@ -74,9 +74,8 @@ function BudgetPage() {
 
   const vaiAlCampo = (id: string) => {
     setFocusCat(id);
-    const el = inputRefs.current[id];
-    el?.scrollIntoView({ behavior: "smooth", block: "center" });
-    setTimeout(() => el?.focus(), 350);
+    const row = document.getElementById(`cat-row-${id}`);
+    row?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
 
@@ -163,8 +162,9 @@ function BudgetPage() {
           const inModifica = editing === c.id;
           return (
             <div
+              id={`cat-row-${c.id}`}
               key={c.id}
-              className={`px-4 py-3 transition-colors ${evidenzia ? "bg-surface-2" : ""} ${
+              className={`px-4 py-3 transition-colors ${evidenzia ? "bg-surface-2 ring-1 ring-primary/40" : ""} ${
                 inModifica ? "relative z-40 rounded-2xl bg-surface-2 ring-2 ring-primary" : ""
               }`}
             >
