@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as BudgetRouteImport } from './routes/budget'
 import { Route as ProfiloRouteImport } from './routes/profilo'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as StoricoRouteImport } from './routes/storico'
 
 const IndexRoute = IndexRouteImport.update({
@@ -35,6 +36,11 @@ const ProfiloRoute = ProfiloRouteImport.update({
   path: '/profilo',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StoricoRoute = StoricoRouteImport.update({
   id: '/storico',
   path: '/storico',
@@ -46,6 +52,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/budget': typeof BudgetRoute
   '/profilo': typeof ProfiloRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/storico': typeof StoricoRoute
 }
 export interface FileRoutesByTo {
@@ -53,6 +60,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/budget': typeof BudgetRoute
   '/profilo': typeof ProfiloRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/storico': typeof StoricoRoute
 }
 export interface FileRoutesById {
@@ -61,14 +69,23 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/budget': typeof BudgetRoute
   '/profilo': typeof ProfiloRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/storico': typeof StoricoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/budget' | '/profilo' | '/storico'
+  fullPaths:
+    '/' | '/auth' | '/budget' | '/profilo' | '/reset-password' | '/storico'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/budget' | '/profilo' | '/storico'
-  id: '__root__' | '/' | '/auth' | '/budget' | '/profilo' | '/storico'
+  to: '/' | '/auth' | '/budget' | '/profilo' | '/reset-password' | '/storico'
+  id:
+    | '__root__'
+    | '/'
+    | '/auth'
+    | '/budget'
+    | '/profilo'
+    | '/reset-password'
+    | '/storico'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -76,6 +93,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   BudgetRoute: typeof BudgetRoute
   ProfiloRoute: typeof ProfiloRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   StoricoRoute: typeof StoricoRoute
 }
 
@@ -109,6 +127,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProfiloRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/storico': {
       id: '/storico'
       path: '/storico'
@@ -124,6 +149,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   BudgetRoute: BudgetRoute,
   ProfiloRoute: ProfiloRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   StoricoRoute: StoricoRoute,
 }
 export const routeTree = rootRouteImport

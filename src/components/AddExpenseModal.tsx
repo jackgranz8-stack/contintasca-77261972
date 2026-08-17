@@ -23,10 +23,13 @@ export function AddExpenseModal({
   open,
   onClose,
   edit = null,
+  preset = null,
 }: {
   open: boolean;
   onClose: () => void;
   edit?: Transaction | null;
+  /** Precompilazione (es. duplica transazione) senza collegarsi a una spesa esistente. */
+  preset?: Pick<Transaction, "importo" | "categoria" | "nota"> | null;
 }) {
   const { state, addTransaction, updateTransaction, update } = useApp();
   const [importo, setImporto] = useState("");
@@ -59,6 +62,13 @@ export function AddExpenseModal({
         : undefined;
       setRipeti(Boolean(linked && linked.attiva));
       setGiorno(linked ? linked.giorno : dayOf(edit.data));
+    } else if (preset) {
+      setImporto(String(preset.importo).replace(".", ","));
+      setNota(preset.nota ?? "");
+      setData(todayISO());
+      setCategoria(preset.categoria || state.categorie[0]?.id || "");
+      setRipeti(false);
+      setGiorno(Math.min(28, new Date().getDate()));
     } else {
       setImporto("");
       setNota("");
@@ -67,13 +77,22 @@ export function AddExpenseModal({
       setRipeti(false);
       setGiorno(Math.min(28, new Date().getDate()));
     }
-  }, [open, edit, state.categorie, state.ricorrenti]);
+  }, [open, edit, preset, state.categorie, state.ricorrenti]);
 
   useScrollLock(open);
 
   if (!open) return null;
 
   const valore = Number(importo.replace(",", "."));
+
+  // Categorie ordinate per uso reale: le più usate per prime, quelle mai usate in fondo.
+  const usoPerCategoria = new Map<string, number>();
+  for (const t of state.transazioni) {
+    usoPerCategoria.set(t.categoria, (usoPerCategoria.get(t.categoria) ?? 0) + 1);
+  }
+  const categorieOrdinate = [...state.categorie].sort(
+    (a, b) => (usoPerCategoria.get(b.id) ?? 0) - (usoPerCategoria.get(a.id) ?? 0),
+  );
 
 
   const nomeRegola = () =>
@@ -233,7 +252,7 @@ export function AddExpenseModal({
         <div className={campo ? "pointer-events-none opacity-40" : ""}>
           {/* Categorie: riga orizzontale di icone */}
           <div className="no-scrollbar -mx-4 mb-3 flex gap-2 overflow-x-auto px-4">
-            {state.categorie.map((c) => {
+            {categorieOrdinate.map((c) => {
               const Icon = iconFor(c.icona);
               const active = c.id === categoria;
               return (

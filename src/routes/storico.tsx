@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { FileSpreadsheet, Pencil, Trash2 } from "lucide-react";
+import { Copy, FileSpreadsheet, Pencil, Repeat, Search, Trash2 } from "lucide-react";
 import { sum, totalsByCategory, txInMonth, useApp } from "@/lib/store";
 import { useScrollLock } from "@/hooks/use-scroll-lock";
 
@@ -40,6 +40,10 @@ function StoricoPage() {
   useScrollLock(daEliminare !== null);
 
   const [daModificare, setDaModificare] = useState<Transaction | null>(null);
+  const [daDuplicare, setDaDuplicare] = useState<
+    Pick<Transaction, "importo" | "categoria" | "nota"> | null
+  >(null);
+  const [ricerca, setRicerca] = useState("");
 
   const mesiDisponibili = useMemo(() => {
     const set = new Set(state.transazioni.map((t) => monthKey(t.data)));
@@ -51,9 +55,10 @@ function StoricoPage() {
 
 
   const base = txInMonth(state.transazioni, mese);
-  const filtrate = (cat === "all" ? base : base.filter((t) => t.categoria === cat)).sort((a, b) =>
-    a.data < b.data ? 1 : -1,
-  );
+  const q = ricerca.trim().toLowerCase();
+  const filtrate = (cat === "all" ? base : base.filter((t) => t.categoria === cat))
+    .filter((t) => (q ? (t.nota ?? "").toLowerCase().includes(q) : true))
+    .sort((a, b) => (a.data < b.data ? 1 : -1));
   const totali = totalsByCategory(cat === "all" ? base : base.filter((t) => t.categoria === cat));
   const slices = state.categorie
     .map((c) => ({ id: c.id, label: c.nome, value: totali.get(c.id) ?? 0, color: c.colore }))
@@ -72,6 +77,17 @@ function StoricoPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold tracking-tight">Storico</h1>
+
+      <div className="flex items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3">
+        <Search size={16} className="shrink-0 text-muted-foreground" />
+        <input
+          value={ricerca}
+          onChange={(e) => setRicerca(e.target.value)}
+          placeholder="Cerca nella descrizione"
+          aria-label="Cerca nelle note"
+          className="w-full min-w-0 bg-transparent text-base outline-none placeholder:text-muted-foreground"
+        />
+      </div>
 
       {/* Grafico a barre: unico pilota del filtro mese */}
       <section className="card-surface p-5">
@@ -164,7 +180,7 @@ function StoricoPage() {
       <section className="space-y-2">
         {filtrate.length === 0 && (
           <p className="py-8 text-center text-sm text-muted-foreground">
-            Nessuna transazione con questi filtri
+            {q ? "Nessuna transazione trovata" : "Nessuna transazione con questi filtri"}
           </p>
         )}
         {filtrate.map((t) => {
@@ -182,12 +198,32 @@ function StoricoPage() {
                 <Icon size={16} />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm">{t.nota || (c?.nome ?? "Spesa")}</p>
+                <p className="flex items-center gap-1.5 truncate text-sm">
+                  <span className="truncate">{t.nota || (c?.nome ?? "Spesa")}</span>
+                  {t.ricorrenteId && (
+                    <span
+                      title="Generata da una spesa ricorrente"
+                      aria-label="Generata da una spesa ricorrente"
+                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary"
+                    >
+                      <Repeat size={10} />
+                    </span>
+                  )}
+                </p>
                 <p className="text-[11px] text-muted-foreground">
                   {formatDay(t.data)} · {c?.nome ?? "Categoria eliminata"}
                 </p>
               </div>
               <span className="text-sm font-semibold">{eur(t.importo)}</span>
+              <button
+                onClick={() =>
+                  setDaDuplicare({ importo: t.importo, categoria: t.categoria, nota: t.nota })
+                }
+                className="p-1.5 text-muted-foreground"
+                aria-label="Duplica"
+              >
+                <Copy size={16} />
+              </button>
               <button
                 onClick={() => setDaModificare(t)}
                 className="p-1.5 text-muted-foreground"
@@ -220,6 +256,12 @@ function StoricoPage() {
         open={daModificare !== null}
         edit={daModificare}
         onClose={() => setDaModificare(null)}
+      />
+
+      <AddExpenseModal
+        open={daDuplicare !== null}
+        preset={daDuplicare}
+        onClose={() => setDaDuplicare(null)}
       />
 
       {daEliminare && (

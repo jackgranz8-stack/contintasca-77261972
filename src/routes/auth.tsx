@@ -27,7 +27,7 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<"login" | "signup" | "reset">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -40,6 +40,24 @@ function AuthPage() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (mode === "reset") {
+      if (!email.trim()) {
+        toast.error("Inserisci la tua email");
+        return;
+      }
+      setBusy(true);
+      const { error } = await db.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      setBusy(false);
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      toast.success("Ti abbiamo inviato il link per reimpostare la password");
+      setMode("login");
+      return;
+    }
     if (!email.trim() || password.length < 6) {
       toast.error("Inserisci email e una password di almeno 6 caratteri");
       return;
@@ -85,7 +103,9 @@ function AuthPage() {
       <p className="mt-2 text-sm text-muted-foreground">
         {mode === "login"
           ? "Accedi per ritrovare spese, budget e ricorrenti su ogni dispositivo."
-          : "Crea un account: i tuoi dati restano legati solo a te."}
+          : mode === "signup"
+            ? "Crea un account: i tuoi dati restano legati solo a te."
+            : "Inserisci la tua email: ti inviamo un link per reimpostare la password."}
       </p>
 
       <form onSubmit={submit} className="mt-8 space-y-3">
@@ -97,23 +117,34 @@ function AuthPage() {
           placeholder="Email"
           className="w-full rounded-2xl border border-border bg-surface px-4 py-4 text-base outline-none placeholder:text-muted-foreground"
         />
-        <input
-          type="password"
-          autoComplete={mode === "login" ? "current-password" : "new-password"}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-          className="w-full rounded-2xl border border-border bg-surface px-4 py-4 text-base outline-none placeholder:text-muted-foreground"
-        />
+        {mode !== "reset" && (
+          <input
+            type="password"
+            autoComplete={mode === "login" ? "current-password" : "new-password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            className="w-full rounded-2xl border border-border bg-surface px-4 py-4 text-base outline-none placeholder:text-muted-foreground"
+          />
+        )}
         <button
           type="submit"
           disabled={busy}
           className="lime-fill flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-semibold disabled:opacity-60"
         >
           {busy && <Loader2 size={16} className="animate-spin" />}
-          {mode === "login" ? "Accedi" : "Crea account"}
+          {mode === "login" ? "Accedi" : mode === "signup" ? "Crea account" : "Invia link di reset"}
         </button>
       </form>
+
+      {mode === "login" && (
+        <button
+          onClick={() => setMode("reset")}
+          className="mt-4 w-full text-center text-sm text-primary"
+        >
+          Password dimenticata?
+        </button>
+      )}
 
       <button
         onClick={() => setMode(mode === "login" ? "signup" : "login")}
