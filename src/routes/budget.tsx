@@ -74,9 +74,8 @@ function BudgetPage() {
 
   const vaiAlCampo = (id: string) => {
     setFocusCat(id);
-    const el = inputRefs.current[id];
-    el?.scrollIntoView({ behavior: "smooth", block: "center" });
-    setTimeout(() => el?.focus(), 350);
+    const row = document.getElementById(`cat-row-${id}`);
+    row?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
 
