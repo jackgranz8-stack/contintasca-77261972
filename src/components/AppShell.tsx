@@ -14,7 +14,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [addOpen, setAddOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
-  const isAuthRoute = pathname.startsWith("/auth");
+  const isAuthRoute =
+    pathname.startsWith("/auth") || pathname.startsWith("/reset-password");
 
   // Senza account si accede prima di tutto: nessun onboarding, nessun dato.
   useEffect(() => {
