@@ -27,7 +27,7 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<"login" | "signup" | "reset">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -40,6 +40,24 @@ function AuthPage() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (mode === "reset") {
+      if (!email.trim()) {
+        toast.error("Inserisci la tua email");
+        return;
+      }
+      setBusy(true);
+      const { error } = await db.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      setBusy(false);
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      toast.success("Ti abbiamo inviato il link per reimpostare la password");
+      setMode("login");
+      return;
+    }
     if (!email.trim() || password.length < 6) {
       toast.error("Inserisci email e una password di almeno 6 caratteri");
       return;
