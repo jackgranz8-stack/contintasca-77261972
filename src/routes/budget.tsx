@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Pause, Play, Plus, Trash2 } from "lucide-react";
+import { Pause, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import { sum, totalsByCategory, txInMonth, useApp } from "@/lib/store";
 import { useScrollLock } from "@/hooks/use-scroll-lock";
 
@@ -10,6 +10,8 @@ import { ICON_KEYS, iconFor } from "@/lib/icons";
 import { PALETTE } from "@/lib/types";
 import { Donut } from "@/components/Donut";
 import { ProgressBar } from "@/components/ProgressBar";
+import { EditRecurringModal } from "@/components/EditRecurringModal";
+
 
 
 export const Route = createFileRoute("/budget")({
@@ -54,8 +56,12 @@ function BudgetPage() {
 
   const [focusCat, setFocusCat] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  const [ricEdit, setRicEdit] = useState<string | null>(null);
+  const [ricDaEliminare, setRicDaEliminare] = useState<string | null>(null);
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   useScrollLock(editing !== null);
+  useScrollLock(ricDaEliminare !== null);
+
 
 
   const totale = state.categorie.reduce((a, c) => a + c.budget, 0);
@@ -355,10 +361,14 @@ function BudgetPage() {
                 {r.attiva ? <Pause size={16} /> : <Play size={16} />}
               </button>
               <button
-                onClick={() => {
-                  deleteRecurring(r.id);
-                  toast.success("Ricorrente eliminata");
-                }}
+                onClick={() => setRicEdit(r.id)}
+                className="text-muted-foreground"
+                aria-label={`Modifica ${r.nome}`}
+              >
+                <Pencil size={16} />
+              </button>
+              <button
+                onClick={() => setRicDaEliminare(r.id)}
                 className="text-muted-foreground"
                 aria-label="Elimina"
               >
@@ -368,6 +378,48 @@ function BudgetPage() {
           );
         })}
       </section>
+
+      <EditRecurringModal
+        open={ricEdit !== null}
+        onClose={() => setRicEdit(null)}
+        edit={state.ricorrenti.find((r) => r.id === ricEdit) ?? null}
+      />
+
+      {ricDaEliminare && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overscroll-none bg-background/70 px-6 backdrop-blur-sm">
+          <button
+            className="absolute inset-0"
+            aria-label="Annulla"
+            onClick={() => setRicDaEliminare(null)}
+          />
+          <div className="relative z-10 w-full max-w-[340px] rounded-3xl border border-border bg-popover p-5">
+            <p className="text-sm font-semibold">Eliminare questa spesa ricorrente?</p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Le transazioni già generate in passato non verranno toccate: si ferma solo la
+              generazione futura.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => setRicDaEliminare(null)}
+                className="flex-1 rounded-xl bg-surface-2 py-2.5 text-sm font-medium"
+              >
+                Annulla
+              </button>
+              <button
+                onClick={() => {
+                  deleteRecurring(ricDaEliminare);
+                  setRicDaEliminare(null);
+                  toast.success("Ricorrente eliminata");
+                }}
+                className="flex-1 rounded-xl bg-destructive py-2.5 text-sm font-semibold text-destructive-foreground"
+              >
+                Elimina
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
