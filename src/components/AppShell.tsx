@@ -12,7 +12,7 @@ const UiContext = createContext<{ openAdd: () => void }>({ openAdd: () => {} });
 export const useUi = () => useContext(UiContext);
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { state, loaded, account, offlinePending } = useApp();
+  const { state, loaded, loadError, retryLoad, account, syncing, offlinePending } = useApp();
   const [addOpen, setAddOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
@@ -30,6 +30,25 @@ export function AppShell({ children }: { children: ReactNode }) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <span className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-primary" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
+        <p className="text-sm font-semibold">Non riesco a leggere i tuoi dati</p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Sembra un problema di connessione momentaneo. I tuoi dati sono al sicuro, non è stato
+          toccato nulla: riprova appena hai rete.
+        </p>
+        <button
+          onClick={retryLoad}
+          disabled={syncing}
+          className="lime-fill mt-6 rounded-2xl px-6 py-3 text-sm font-semibold disabled:opacity-60"
+        >
+          {syncing ? "Verifico..." : "Riprova"}
+        </button>
       </div>
     );
   }
