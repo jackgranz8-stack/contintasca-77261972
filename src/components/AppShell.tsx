@@ -2,20 +2,21 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { useApp } from "@/lib/store";
+import { isFaceIdEnabled } from "@/lib/webauthn";
 import { Onboarding } from "./Onboarding";
 import { BottomNav } from "./BottomNav";
 import { AddExpenseModal } from "./AddExpenseModal";
+import { FaceIdGate } from "./FaceIdGate";
 
 const UiContext = createContext<{ openAdd: () => void }>({ openAdd: () => {} });
 export const useUi = () => useContext(UiContext);
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { state, loaded, account } = useApp();
+  const { state, loaded, account, offlinePending } = useApp();
   const [addOpen, setAddOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
-  const isAuthRoute =
-    pathname.startsWith("/auth") || pathname.startsWith("/reset-password");
+  const isAuthRoute = pathname.startsWith("/auth") || pathname.startsWith("/reset-password");
 
   // Senza account si accede prima di tutto: nessun onboarding, nessun dato.
   useEffect(() => {
@@ -33,16 +34,31 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!state.profilo.onboardingCompletato) return <Onboarding />;
+  const locked = isFaceIdEnabled(account.id);
+
+  if (!state.profilo.onboardingCompletato) {
+    return locked ? (
+      <FaceIdGate userId={account.id}>
+        <Onboarding />
+      </FaceIdGate>
+    ) : (
+      <Onboarding />
+    );
+  }
 
   const showFab = pathname === "/" || pathname.startsWith("/storico");
 
-  return (
+  const app = (
     <UiContext.Provider value={{ openAdd: () => setAddOpen(true) }}>
+      {offlinePending && (
+        <div className="fixed inset-x-0 top-0 z-50 bg-warn px-4 py-2 text-center text-xs font-medium text-background">
+          Sei offline: le modifiche sono salvate sul telefono e si sincronizzano da sole al ritorno
+          della connessione
+        </div>
+      )}
       <div className="mx-auto w-full max-w-[430px] px-4 pt-[calc(env(safe-area-inset-top,0px)+28px)] pb-32">
         {children}
       </div>
-
 
       {showFab && (
         <button
@@ -58,4 +74,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       <AddExpenseModal open={addOpen} onClose={() => setAddOpen(false)} />
     </UiContext.Provider>
   );
+
+  return locked ? <FaceIdGate userId={account.id}>{app}</FaceIdGate> : app;
 }
