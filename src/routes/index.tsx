@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Lightbulb, TrendingUp } from "lucide-react";
@@ -6,7 +6,6 @@ import { sum, totalsByCategory, txInMonth, useApp } from "@/lib/store";
 import { buildTips, type TipAction } from "@/lib/advice";
 import { currentMonth, eur, lastMonths, monthLabel, pct, barTone, uid } from "@/lib/format";
 import { iconFor } from "@/lib/icons";
-import { isPushEnabled, sendPush } from "@/lib/push";
 import { ProgressBar } from "@/components/ProgressBar";
 import { TrendBars } from "@/components/TrendBars";
 import { Donut } from "@/components/Donut";
@@ -31,7 +30,7 @@ export const Route = createFileRoute("/")({
 });
 
 function HomePage() {
-  const { state, update, dismissTip, account } = useApp();
+  const { state, update, dismissTip } = useApp();
   const navigate = useNavigate();
   const [mese, setMese] = useState(currentMonth());
   const [catSel, setCatSel] = useState<string | "all">("all");
@@ -47,23 +46,6 @@ function HomePage() {
   const perc = pct(speso, budgetRif);
   const totali = totalsByCategory(txMese);
   const tips = useMemo(() => buildTips(state), [state]);
-
-  // Notifica push reale per i consigli più urgenti ("danger"), una sola volta ciascuno.
-  useEffect(() => {
-    if (!account) return;
-    const dangerosi = tips.filter((t) => t.tono === "danger");
-    if (dangerosi.length === 0) return;
-    void (async () => {
-      const enabled = await isPushEnabled();
-      if (!enabled) return;
-      const key = `pushed-tips:${account.id}`;
-      const già = JSON.parse(localStorage.getItem(key) ?? "[]") as string[];
-      const nuovi = dangerosi.filter((t) => !già.includes(t.id));
-      if (nuovi.length === 0) return;
-      for (const t of nuovi) await sendPush(t.titolo, t.testo);
-      localStorage.setItem(key, JSON.stringify([...già, ...nuovi.map((t) => t.id)]));
-    })();
-  }, [tips, account]);
 
   const applica = (action: TipAction) => {
     if (action.kind === "setBudget") {
