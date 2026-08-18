@@ -25,6 +25,8 @@ type Account = { id: string; email: string | null } | null;
 type Ctx = {
   state: AppState;
   loaded: boolean;
+  loadError: boolean;
+  retryLoad: () => void;
   account: Account;
   syncing: boolean;
   offlinePending: boolean;
@@ -72,6 +74,7 @@ function runRecurring(s: AppState): { next: AppState; created: number } {
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>(() => initialState());
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [account, setAccount] = useState<Account>(null);
   const [syncing, setSyncing] = useState(false);
   const [offlinePending, setOfflinePending] = useState(false);
@@ -90,6 +93,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       baseline.current = remote;
       setState(next);
       setLoaded(true);
+      setLoadError(false);
       if (created > 0) {
         setTimeout(
           () =>
@@ -102,14 +106,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
         );
       }
     } catch {
-      baseline.current = null;
-      setState(initialState());
+      // Non tocchiamo lo stato locale né lo confermiamo come "vuoto": potrebbe
+      // essere solo un problema di rete temporaneo, non un account senza dati.
+      // baseline resta null, quindi nessuna sincronizzazione può scattare finché
+      // non riusciamo a leggere davvero cosa c'è sul database.
       setLoaded(true);
-      toast.error("Non riesco a leggere i tuoi dati, riprova più tardi");
+      setLoadError(true);
     } finally {
       setSyncing(false);
     }
   }, []);
+
+  const retryLoad = useCallback(() => {
+    const acc = accountRef.current;
+    if (acc) void loadFor(acc.id);
+  }, [loadFor]);
 
   useEffect(() => {
     let cancelled = false;
@@ -126,6 +137,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         baseline.current = null;
         setState(initialState());
         setLoaded(true);
+        setLoadError(false);
       }
     });
 
@@ -147,6 +159,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setAccount(null);
         setState(initialState());
         setLoaded(true);
+        setLoadError(false);
       }
     });
 
@@ -227,6 +240,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     () => ({
       state,
       loaded,
+      loadError,
+      retryLoad,
       account,
       syncing,
       offlinePending,
@@ -286,7 +301,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setState(initialState());
       },
     }),
-    [state, loaded, account, syncing, offlinePending, signOut, update],
+    [state, loaded, loadError, retryLoad, account, syncing, offlinePending, signOut, update],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
