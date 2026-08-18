@@ -1,12 +1,14 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Download, FileDown, LogIn, LogOut, Upload } from "lucide-react";
+import { BellRing, Download, FileDown, Fingerprint, LogIn, LogOut, Upload } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { eur, formatDay, uid } from "@/lib/format";
 import { HOUSING_OPTIONS, PALETTE, type Housing } from "@/lib/types";
 import { exportTemplate, exportTransactions, parseImportFile } from "@/lib/excel";
 import { suggestBudgets } from "@/lib/budget-suggest";
+import { disableFaceId, enrollFaceId, faceIdSupported, isFaceIdEnabled } from "@/lib/webauthn";
+import { disablePush, enablePush, isPushEnabled, pushSupported, sendPush } from "@/lib/push";
 
 export const Route = createFileRoute("/profilo")({
   head: () => ({
@@ -33,7 +35,54 @@ function ProfiloPage() {
   const [nome, setNome] = useState(state.profilo.nome);
   const [resetStep, setResetStep] = useState(0);
   const [confirmRicalcolo, setConfirmRicalcolo] = useState(false);
+  const [faceIdOn, setFaceIdOn] = useState(false);
+  const [faceIdBusy, setFaceIdBusy] = useState(false);
+  const [pushOn, setPushOn] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (account) setFaceIdOn(isFaceIdEnabled(account.id));
+    void isPushEnabled().then(setPushOn);
+  }, [account]);
+
+  const togglePush = async () => {
+    if (!account) return;
+    setPushBusy(true);
+    if (pushOn) {
+      await disablePush(account.id);
+      setPushOn(false);
+      toast.success("Notifiche disattivate");
+    } else {
+      const ok = await enablePush(account.id);
+      if (ok) {
+        setPushOn(true);
+        toast.success("Notifiche attivate");
+      } else {
+        toast.error("Permesso negato o non supportato su questo dispositivo");
+      }
+    }
+    setPushBusy(false);
+  };
+
+  const toggleFaceId = async () => {
+    if (!account) return;
+    setFaceIdBusy(true);
+    if (faceIdOn) {
+      disableFaceId(account.id);
+      setFaceIdOn(false);
+      toast.success("Face ID disattivato");
+    } else {
+      const ok = await enrollFaceId(account.id, account.email ?? "");
+      if (ok) {
+        setFaceIdOn(true);
+        toast.success("Face ID attivato: da ora ti servirà per aprire l'app");
+      } else {
+        toast.error("Non riesco ad attivare Face ID su questo dispositivo");
+      }
+    }
+    setFaceIdBusy(false);
+  };
 
   const salvaNome = () => {
     update((s) => ({ ...s, profilo: { ...s.profilo, nome: nome.trim() } }));
@@ -150,6 +199,67 @@ function ProfiloPage() {
           </>
         )}
       </section>
+
+      {account && faceIdSupported() && (
+        <section className="card-surface p-5">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-2 text-primary">
+              <Fingerprint size={17} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm font-semibold">Sblocco con Face ID</h2>
+              <p className="text-xs text-muted-foreground">
+                {faceIdOn ? "Attivo su questo dispositivo" : "Aggiungi un livello in più, solo qui"}
+              </p>
+            </div>
+            <button
+              onClick={() => void toggleFaceId()}
+              disabled={faceIdBusy}
+              className={`rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-60 ${
+                faceIdOn ? "bg-surface-2 text-muted-foreground" : "lime-fill"
+              }`}
+            >
+              {faceIdOn ? "Disattiva" : "Attiva"}
+            </button>
+          </div>
+        </section>
+      )}
+
+      {account && pushSupported() && (
+        <section className="card-surface p-5">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-2 text-primary">
+              <BellRing size={17} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm font-semibold">Notifiche</h2>
+              <p className="text-xs text-muted-foreground">
+                {pushOn ? "Attive su questo dispositivo" : "Avviso quando il ritmo di spesa è alto"}
+              </p>
+            </div>
+            <button
+              onClick={() => void togglePush()}
+              disabled={pushBusy}
+              className={`rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-60 ${
+                pushOn ? "bg-surface-2 text-muted-foreground" : "lime-fill"
+              }`}
+            >
+              {pushOn ? "Disattiva" : "Attiva"}
+            </button>
+          </div>
+          {pushOn && (
+            <button
+              onClick={() => {
+                void sendPush("Conti in Tasca", "Le notifiche funzionano correttamente.");
+                toast.success("Notifica di prova inviata");
+              }}
+              className="mt-3 w-full rounded-xl bg-surface-2 py-2.5 text-xs font-medium text-muted-foreground"
+            >
+              Invia notifica di prova
+            </button>
+          )}
+        </section>
+      )}
 
       <section className="card-surface p-5">
         <label className="mb-1 block text-xs text-muted-foreground">Nome</label>
@@ -283,8 +393,10 @@ function ProfiloPage() {
         <h2 className="mb-2 text-sm font-semibold">Excel</h2>
         <button
           onClick={() => {
-            const n = exportTransactions(state.transazioni, state.categorie);
-            toast.success(`${n} transazioni esportate`);
+            void (async () => {
+              const n = await exportTransactions(state.transazioni, state.categorie);
+              toast.success(`${n} transazioni esportate`);
+            })();
           }}
           className="flex w-full items-center gap-3 rounded-xl bg-surface px-4 py-3 text-sm"
         >
@@ -309,8 +421,10 @@ function ProfiloPage() {
         />
         <button
           onClick={() => {
-            exportTemplate();
-            toast.success("Modello scaricato");
+            void (async () => {
+              await exportTemplate();
+              toast.success("Modello scaricato");
+            })();
           }}
           className="flex w-full items-center gap-3 rounded-xl bg-surface px-4 py-3 text-sm"
         >
