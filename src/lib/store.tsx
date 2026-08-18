@@ -27,6 +27,7 @@ type Ctx = {
   loaded: boolean;
   account: Account;
   syncing: boolean;
+  offlinePending: boolean;
   signOut: () => Promise<void>;
   update: (fn: (s: AppState) => AppState) => void;
   addTransaction: (t: Omit<Transaction, "id">) => void;
@@ -73,8 +74,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [loaded, setLoaded] = useState(false);
   const [account, setAccount] = useState<Account>(null);
   const [syncing, setSyncing] = useState(false);
+  const [offlinePending, setOfflinePending] = useState(false);
   const accountRef = useRef<Account>(null);
+  // baseline = ultimo stato confermato come salvato con successo sul database.
   const baseline = useRef<AppState | null>(null);
+  // pending = stato più recente non ancora confermato, presente solo mentre si è offline.
+  const pending = useRef<AppState | null>(null);
   const queue = useRef<Promise<void>>(Promise.resolve());
 
   const loadFor = useCallback(async (userId: string) => {
@@ -137,6 +142,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } else {
         accountRef.current = null;
         baseline.current = null;
+        pending.current = null;
+        setOfflinePending(false);
         setAccount(null);
         setState(initialState());
         setLoaded(true);
@@ -150,24 +157,59 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [loadFor]);
 
   // Ogni modifica dello stato viene sincronizzata come differenza sulle tabelle.
-  // Se la scrittura fallisce, si torna all'ultimo stato salvato con successo:
-  // non deve mai sembrare salvato in locale qualcosa che sul database non c'è.
+  // - Se il server rifiuta davvero la scrittura, si torna all'ultimo stato salvato:
+  //   non deve mai sembrare salvato in locale qualcosa che sul database non c'è.
+  // - Se invece manca solo la connessione, la modifica resta in locale in coda
+  //   e riparte da sola non appena la rete torna disponibile (vedi effect sotto).
   useEffect(() => {
     const acc = accountRef.current;
     const prev = baseline.current;
     if (!loaded || !acc || !prev || prev === state) return;
     const attempted = state;
-    baseline.current = attempted;
     setSyncing(true);
     queue.current = queue.current
       .then(() => persistDiff(prev, attempted, acc.id))
+      .then(() => {
+        baseline.current = attempted;
+        pending.current = null;
+        setOfflinePending(false);
+      })
       .catch(() => {
-        baseline.current = prev;
-        setState(prev);
-        toast.error("Connessione assente: la modifica non è stata salvata, riprova");
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          pending.current = attempted;
+          setOfflinePending(true);
+        } else {
+          setState(prev);
+          toast.error("Connessione assente: la modifica non è stata salvata, riprova");
+        }
       })
       .finally(() => setSyncing(false));
   }, [state, loaded]);
+
+  // Non appena la connessione torna disponibile, riprova a salvare la modifica in coda.
+  useEffect(() => {
+    function retry() {
+      const acc = accountRef.current;
+      const prev = baseline.current;
+      const attempted = pending.current;
+      if (!acc || !prev || !attempted) return;
+      setSyncing(true);
+      queue.current = queue.current
+        .then(() => persistDiff(prev, attempted, acc.id))
+        .then(() => {
+          baseline.current = attempted;
+          pending.current = null;
+          setOfflinePending(false);
+          toast.success("Connessione tornata: modifiche sincronizzate");
+        })
+        .catch(() => {
+          toast.error("Ancora offline: riproverò più tardi");
+        })
+        .finally(() => setSyncing(false));
+    }
+    window.addEventListener("online", retry);
+    return () => window.removeEventListener("online", retry);
+  }, []);
 
   const update = useCallback((fn: (s: AppState) => AppState) => setState((s) => fn(s)), []);
 
@@ -175,6 +217,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await db.auth.signOut();
     accountRef.current = null;
     baseline.current = null;
+    pending.current = null;
+    setOfflinePending(false);
     setAccount(null);
     setState(initialState());
   }, []);
@@ -185,6 +229,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       loaded,
       account,
       syncing,
+      offlinePending,
       signOut,
       update,
       addTransaction: (t) =>
@@ -236,10 +281,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
             .finally(() => setSyncing(false));
         }
         baseline.current = initialState();
+        pending.current = null;
+        setOfflinePending(false);
         setState(initialState());
       },
     }),
-    [state, loaded, account, syncing, signOut, update],
+    [state, loaded, account, syncing, offlinePending, signOut, update],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

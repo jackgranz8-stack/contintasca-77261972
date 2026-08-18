@@ -1,18 +1,18 @@
-import * as XLSX from "xlsx";
 import type { Category, Transaction } from "./types";
 import { formatDay } from "./format";
 
 type Row = { Data: string; Categoria: string; Importo: number; Nota: string };
 
-function download(wb: XLSX.WorkBook, filename: string) {
+function download(XLSX: typeof import("xlsx"), wb: import("xlsx").WorkBook, filename: string) {
   XLSX.writeFile(wb, filename);
 }
 
-export function exportTransactions(
+export async function exportTransactions(
   txs: Transaction[],
   categorie: Category[],
   filename = "conti-in-tasca.xlsx",
 ) {
+  const XLSX = await import("xlsx");
   const name = (id: string) => categorie.find((c) => c.id === id)?.nome ?? "Altro";
   const rows: Row[] = [...txs]
     .sort((a, b) => (a.data < b.data ? 1 : -1))
@@ -26,11 +26,12 @@ export function exportTransactions(
   ws["!cols"] = [{ wch: 12 }, { wch: 18 }, { wch: 12 }, { wch: 30 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Transazioni");
-  download(wb, filename);
+  download(XLSX, wb, filename);
   return rows.length;
 }
 
-export function exportTemplate() {
+export async function exportTemplate() {
+  const XLSX = await import("xlsx");
   const ws = XLSX.utils.json_to_sheet(
     [{ Data: "2026-01-15", Categoria: "Cibo", Importo: 42.5, Nota: "Spesa settimanale" }],
     { header: ["Data", "Categoria", "Importo", "Nota"] },
@@ -38,7 +39,7 @@ export function exportTemplate() {
   ws["!cols"] = [{ wch: 12 }, { wch: 18 }, { wch: 12 }, { wch: 30 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Transazioni");
-  download(wb, "modello-conti-in-tasca.xlsx");
+  download(XLSX, wb, "modello-conti-in-tasca.xlsx");
 }
 
 function parseDate(v: unknown): string | null {
@@ -76,6 +77,7 @@ export type ImportResult = {
 };
 
 export async function parseImportFile(file: File, categorie: Category[]): Promise<ImportResult> {
+  const XLSX = await import("xlsx");
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { cellDates: true });
   const sheetName = wb.SheetNames[0];
