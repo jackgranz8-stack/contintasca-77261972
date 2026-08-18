@@ -4,8 +4,9 @@ import { toast } from "sonner";
 import { Download, FileDown, LogIn, LogOut, Upload } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { eur, formatDay, uid } from "@/lib/format";
-import { PALETTE } from "@/lib/types";
+import { HOUSING_OPTIONS, PALETTE, type Housing } from "@/lib/types";
 import { exportTemplate, exportTransactions, parseImportFile } from "@/lib/excel";
+import { suggestBudgets } from "@/lib/budget-suggest";
 
 export const Route = createFileRoute("/profilo")({
   head: () => ({
@@ -31,11 +32,44 @@ function ProfiloPage() {
   const navigate = useNavigate();
   const [nome, setNome] = useState(state.profilo.nome);
   const [resetStep, setResetStep] = useState(0);
+  const [confirmRicalcolo, setConfirmRicalcolo] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const salvaNome = () => {
     update((s) => ({ ...s, profilo: { ...s.profilo, nome: nome.trim() } }));
     toast.success("Nome aggiornato");
+  };
+
+  const setAbitazione = (abitazione: Housing) =>
+    update((s) => ({ ...s, profilo: { ...s.profilo, abitazione } }));
+  const setAuto = (auto: boolean) => update((s) => ({ ...s, profilo: { ...s.profilo, auto } }));
+  const setPersone = (persone: number) =>
+    update((s) => ({ ...s, profilo: { ...s.profilo, persone } }));
+
+  const ricalcolaBudget = () => {
+    const totale = state.categorie.reduce((a, c) => a + c.budget, 0);
+    if (totale <= 0) {
+      toast.error("Imposta prima almeno un budget nelle categorie");
+      setConfirmRicalcolo(false);
+      return;
+    }
+    const draft = state.categorie.map((c) => ({ ...c, attiva: true }));
+    const proposte = suggestBudgets(
+      draft,
+      totale,
+      state.profilo.abitazione,
+      state.profilo.auto,
+      state.profilo.persone,
+    );
+    update((s) => ({
+      ...s,
+      categorie: s.categorie.map((c) => {
+        const p = proposte.find((x) => x.id === c.id);
+        return p ? { ...c, budget: p.budget } : c;
+      }),
+    }));
+    setConfirmRicalcolo(false);
+    toast.success("Budget ricalcolati in base al profilo");
   };
 
   const importa = async (file: File) => {
@@ -117,8 +151,6 @@ function ProfiloPage() {
         )}
       </section>
 
-
-
       <section className="card-surface p-5">
         <label className="mb-1 block text-xs text-muted-foreground">Nome</label>
         <div className="flex gap-2">
@@ -128,13 +160,100 @@ function ProfiloPage() {
             placeholder="Il tuo nome"
             className="flex-1 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
           />
-          <button
-            onClick={salvaNome}
-            className="lime-fill rounded-xl px-4 text-sm font-semibold"
-          >
+          <button onClick={salvaNome} className="lime-fill rounded-xl px-4 text-sm font-semibold">
             Salva
           </button>
         </div>
+      </section>
+
+      <section className="card-surface p-5">
+        <h2 className="text-sm font-semibold">Il mio profilo</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Usati per calcolare i budget suggeriti. Aggiornali se cambia la tua situazione.
+        </p>
+
+        <p className="mt-5 mb-2 text-xs text-muted-foreground">Situazione abitativa</p>
+        <div className="grid grid-cols-2 gap-2">
+          {HOUSING_OPTIONS.map((h) => (
+            <button
+              key={h.id}
+              onClick={() => setAbitazione(h.id)}
+              className={`rounded-2xl border px-3 py-3 text-sm ${
+                state.profilo.abitazione === h.id
+                  ? "border-primary bg-surface-2"
+                  : "border-border bg-surface text-muted-foreground"
+              }`}
+            >
+              {h.label}
+            </button>
+          ))}
+        </div>
+
+        <p className="mt-5 mb-2 text-xs text-muted-foreground">Hai un&apos;auto?</p>
+        <div className="grid grid-cols-2 gap-2">
+          {[true, false].map((v) => (
+            <button
+              key={String(v)}
+              onClick={() => setAuto(v)}
+              className={`rounded-2xl border px-3 py-3 text-sm ${
+                state.profilo.auto === v
+                  ? "border-primary bg-surface-2"
+                  : "border-border bg-surface text-muted-foreground"
+              }`}
+            >
+              {v ? "Sì" : "No"}
+            </button>
+          ))}
+        </div>
+
+        <p className="mt-5 mb-2 text-xs text-muted-foreground">Persone in famiglia</p>
+        <div className="flex items-center gap-4 rounded-2xl border border-border bg-surface px-4 py-3">
+          <button
+            onClick={() => setPersone(Math.max(1, state.profilo.persone - 1))}
+            className="h-9 w-9 rounded-full bg-surface-2 text-lg"
+            aria-label="Diminuisci"
+          >
+            −
+          </button>
+          <span className="flex-1 text-center text-lg font-semibold">{state.profilo.persone}</span>
+          <button
+            onClick={() => setPersone(Math.min(12, state.profilo.persone + 1))}
+            className="h-9 w-9 rounded-full bg-surface-2 text-lg"
+            aria-label="Aumenta"
+          >
+            +
+          </button>
+        </div>
+
+        {!confirmRicalcolo ? (
+          <button
+            onClick={() => setConfirmRicalcolo(true)}
+            className="mt-5 w-full rounded-xl bg-surface-2 py-2.5 text-sm font-medium"
+          >
+            Ricalcola budget suggeriti in base al profilo
+          </button>
+        ) : (
+          <div className="mt-5">
+            <p className="mb-2 text-xs text-muted-foreground">
+              Sostituisce il budget attuale di ogni categoria con una nuova proposta, mantenendo lo
+              stesso totale. Puoi comunque modificarli dopo dalla scheda Budget.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmRicalcolo(false)}
+                className="flex-1 rounded-xl bg-surface-2 py-2.5 text-sm"
+              >
+                Annulla
+              </button>
+              <button
+                onClick={ricalcolaBudget}
+                className="lime-fill flex-1 rounded-xl py-2.5 text-sm font-semibold"
+              >
+                Ricalcola
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="card-hero grid grid-cols-2 gap-4 p-5">
@@ -253,7 +372,8 @@ function ProfiloPage() {
       </section>
 
       <p className="pb-2 text-center text-[11px] text-muted-foreground">
-        Conti in Tasca · i dati sono legati al tuo account e disponibili su ogni dispositivo dopo il login
+        Conti in Tasca · i dati sono legati al tuo account e disponibili su ogni dispositivo dopo il
+        login
       </p>
     </div>
   );

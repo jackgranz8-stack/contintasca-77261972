@@ -2,50 +2,17 @@ import { useMemo, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Plus } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { ICON_KEYS, iconFor } from "@/lib/icons";
-import { DEFAULT_CATEGORIES, PALETTE, type Category, type Housing } from "@/lib/types";
+import {
+  DEFAULT_CATEGORIES,
+  HOUSING_OPTIONS,
+  PALETTE,
+  type Category,
+  type Housing,
+} from "@/lib/types";
 import { eur, uid } from "@/lib/format";
+import { suggestBudgets } from "@/lib/budget-suggest";
 
 type Draft = Category & { attiva: boolean };
-
-const HOUSING: { id: Housing; label: string }[] = [
-  { id: "affitto", label: "In affitto" },
-  { id: "mutuo", label: "Mutuo" },
-  { id: "proprieta", label: "Casa di proprietà" },
-  { id: "famiglia", label: "Vivo in famiglia" },
-];
-
-/** Pesi per categoria in base alle risposte del profilo. */
-function suggestBudgets(
-  cats: Draft[],
-  totale: number,
-  abitazione: Housing,
-  auto: boolean,
-  persone: number,
-): Draft[] {
-  const attive = cats.filter((c) => c.attiva);
-  const casaPeso = abitazione === "affitto" ? 42 : abitazione === "mutuo" ? 38 : abitazione === "proprieta" ? 18 : 6;
-  const cibo = 22 + Math.max(0, persone - 1) * 6;
-  const bollette = (abitazione === "famiglia" ? 4 : 12) + Math.max(0, persone - 1) * 2;
-  const pesi = new Map<string, number>();
-  for (const c of attive) {
-    const n = c.nome.toLowerCase();
-    let w = 8;
-    if (n.includes("casa") || n.includes("affitto") || n.includes("mutuo")) w = casaPeso;
-    else if (n.includes("cibo") || n.includes("spesa") || n.includes("aliment")) w = cibo;
-    else if (n.includes("auto") || n.includes("trasport")) w = auto ? 14 : 4;
-    else if (n.includes("bollett") || n.includes("utenz")) w = bollette;
-    else if (n.includes("medic") || n.includes("salute")) w = 6 + Math.max(0, persone - 1) * 2;
-    else if (n.includes("svago") || n.includes("tempo")) w = 10;
-    else if (n.includes("altro")) w = 8;
-    pesi.set(c.id, w);
-  }
-  const somma = [...pesi.values()].reduce((a, b) => a + b, 0) || 1;
-  return cats.map((c) =>
-    c.attiva
-      ? { ...c, budget: Math.max(5, Math.round(((pesi.get(c.id) ?? 8) / somma) * totale / 5) * 5) }
-      : { ...c, budget: 0 },
-  );
-}
 
 export function Onboarding() {
   const { update } = useApp();
@@ -124,8 +91,8 @@ export function Onboarding() {
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">Conti in Tasca</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Tieni le spese sotto controllo in pochi tap. I tuoi dati sono salvati nel tuo account e
-              disponibili su ogni dispositivo.
+              Tieni le spese sotto controllo in pochi tap. I tuoi dati sono salvati nel tuo account
+              e disponibili su ogni dispositivo.
             </p>
             <label className="mt-8 mb-1 block text-xs text-muted-foreground">
               Come ti chiami? (opzionale)
@@ -167,7 +134,7 @@ export function Onboarding() {
             </p>
             <p className="mt-6 mb-2 text-xs text-muted-foreground">Situazione abitativa</p>
             <div className="grid grid-cols-2 gap-2">
-              {HOUSING.map((h) => (
+              {HOUSING_OPTIONS.map((h) => (
                 <button
                   key={h.id}
                   onClick={() => setAbitazione(h.id)}
@@ -299,10 +266,7 @@ export function Onboarding() {
               {attive.map((c) => {
                 const Icon = iconFor(c.icona);
                 return (
-                  <div
-                    key={c.id}
-                    className="card-surface flex items-center gap-3 px-4 py-3"
-                  >
+                  <div key={c.id} className="card-surface flex items-center gap-3 px-4 py-3">
                     <span
                       className="flex h-9 w-9 items-center justify-center rounded-full"
                       style={{ backgroundColor: `${c.colore}22`, color: c.colore }}
@@ -348,7 +312,7 @@ export function Onboarding() {
               <p className="text-3xl font-semibold tracking-tight">{eur(sommaBudget)}</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {attive.length} categorie · {persone} {persone === 1 ? "persona" : "persone"} ·{" "}
-                {HOUSING.find((h) => h.id === abitazione)?.label.toLowerCase()}
+                {HOUSING_OPTIONS.find((h) => h.id === abitazione)?.label.toLowerCase()}
                 {auto ? " · con auto" : ""}
               </p>
             </div>

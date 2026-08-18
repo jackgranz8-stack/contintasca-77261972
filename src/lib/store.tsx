@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
 import { db } from "@/integrations/external/client";
@@ -142,16 +150,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [loadFor]);
 
   // Ogni modifica dello stato viene sincronizzata come differenza sulle tabelle.
+  // Se la scrittura fallisce, si torna all'ultimo stato salvato con successo:
+  // non deve mai sembrare salvato in locale qualcosa che sul database non c'è.
   useEffect(() => {
     const acc = accountRef.current;
     const prev = baseline.current;
     if (!loaded || !acc || !prev || prev === state) return;
-    baseline.current = state;
+    const attempted = state;
+    baseline.current = attempted;
     setSyncing(true);
     queue.current = queue.current
-      .then(() => persistDiff(prev, state, acc.id))
+      .then(() => persistDiff(prev, attempted, acc.id))
       .catch(() => {
-        toast.error("Salvataggio non riuscito, controlla la connessione");
+        baseline.current = prev;
+        setState(prev);
+        toast.error("Connessione assente: la modifica non è stata salvata, riprova");
       })
       .finally(() => setSyncing(false));
   }, [state, loaded]);
@@ -210,8 +223,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         })),
       deleteRecurring: (id) =>
         update((s) => ({ ...s, ricorrenti: s.ricorrenti.filter((r) => r.id !== id) })),
-      dismissTip: (id) =>
-        update((s) => ({ ...s, consigliIgnorati: [...s.consigliIgnorati, id] })),
+      dismissTip: (id) => update((s) => ({ ...s, consigliIgnorati: [...s.consigliIgnorati, id] })),
       reset: () => {
         const acc = accountRef.current;
         if (acc) {

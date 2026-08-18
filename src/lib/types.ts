@@ -27,6 +27,13 @@ export type Recurring = {
 
 export type Housing = "affitto" | "mutuo" | "proprieta" | "famiglia";
 
+export const HOUSING_OPTIONS: { id: Housing; label: string }[] = [
+  { id: "affitto", label: "In affitto" },
+  { id: "mutuo", label: "Mutuo" },
+  { id: "proprieta", label: "Casa di proprietà" },
+  { id: "famiglia", label: "Vivo in famiglia" },
+];
+
 export type Profile = {
   nome: string;
   onboardingCompletato: boolean;

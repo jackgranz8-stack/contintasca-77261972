@@ -88,9 +88,7 @@ function HomePage() {
   return (
     <div className="space-y-4">
       <header className="mb-1">
-        <p className="text-xs text-muted-foreground">
-          {nome ? `Ciao ${nome}` : "Bentornato"}
-        </p>
+        <p className="text-xs text-muted-foreground">{nome ? `Ciao ${nome}` : "Bentornato"}</p>
         <h1 className="text-2xl font-semibold tracking-tight">Conti in Tasca</h1>
       </header>
 
@@ -131,7 +129,9 @@ function HomePage() {
                         ? "var(--danger)"
                         : t.tono === "warn"
                           ? "var(--warn)"
-                          : "var(--accent-lime)",
+                          : t.tono === "neutral"
+                            ? "var(--muted-foreground)"
+                            : "var(--accent-lime)",
                   }}
                 />
                 <div className="min-w-0">
@@ -140,18 +140,29 @@ function HomePage() {
                 </div>
               </div>
               <div className="mt-3 flex gap-2">
-                <button
-                  onClick={() => applica(t.action)}
-                  className="lime-fill flex-1 rounded-xl py-2 text-xs font-semibold"
-                >
-                  {t.azione}
-                </button>
-                <button
-                  onClick={() => dismissTip(t.id)}
-                  className="rounded-xl bg-surface-2 px-4 py-2 text-xs text-muted-foreground"
-                >
-                  Ignora
-                </button>
+                {t.action.kind === "ack" ? (
+                  <button
+                    onClick={() => dismissTip(t.id)}
+                    className="w-full rounded-xl bg-surface-2 py-2 text-xs font-semibold"
+                  >
+                    Ho capito
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => applica(t.action)}
+                      className="lime-fill flex-1 rounded-xl py-2 text-xs font-semibold"
+                    >
+                      {t.azione}
+                    </button>
+                    <button
+                      onClick={() => dismissTip(t.id)}
+                      className="rounded-xl bg-surface-2 px-4 py-2 text-xs text-muted-foreground"
+                    >
+                      Ignora
+                    </button>
+                  </>
+                )}
               </div>
             </article>
           ))}
@@ -198,7 +209,9 @@ function HomePage() {
               key={c.id}
               onClick={() => setCatSel(catSel === c.id ? "all" : c.id)}
               className={`shrink-0 rounded-full border px-3.5 py-2 text-xs ${
-                catSel === c.id ? "border-primary text-primary" : "border-border text-muted-foreground"
+                catSel === c.id
+                  ? "border-primary text-primary"
+                  : "border-border text-muted-foreground"
               }`}
             >
               {c.nome}
@@ -257,4 +270,3 @@ function HomePage() {
     </div>
   );
 }
-

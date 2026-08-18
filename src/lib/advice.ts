@@ -1,14 +1,15 @@
 import type { AppState } from "./types";
-import { currentMonth, monthKey, shiftMonth } from "./format";
+import { currentMonth, monthKey, monthLabel, shiftMonth } from "./format";
 
 export type TipAction =
   | { kind: "setBudget"; categoria: string; importo: number }
   | { kind: "activateRecurring"; nome: string; categoria: string; importo: number; giorno: number }
-  | { kind: "openBudget" };
+  | { kind: "openBudget" }
+  | { kind: "ack" };
 
 export type Tip = {
   id: string;
-  tono: "info" | "warn" | "danger" | "good";
+  tono: "info" | "warn" | "danger" | "good" | "neutral";
   titolo: string;
   testo: string;
   azione: string;
@@ -54,6 +55,25 @@ export function buildTips(state: AppState): Tip[] {
         action: { kind: "openBudget" },
       });
     }
+  }
+
+  // riepilogo del mese appena chiuso: consuntivo neutro, non un avviso, mostrato una sola volta
+  const meseChiuso = shiftMonth(mk, -1);
+  const txMeseChiuso = inMonth(meseChiuso);
+  if (txMeseChiuso.length > 0) {
+    const sommaChiusa = total(txMeseChiuso);
+    const percChiusa = budgetTotale > 0 ? Math.round((sommaChiusa / budgetTotale) * 100) : null;
+    tips.push({
+      id: `monthly-summary:${meseChiuso}`,
+      tono: "neutral",
+      titolo: `Riepilogo di ${monthLabel(meseChiuso)}`,
+      testo:
+        percChiusa != null
+          ? `A ${monthLabel(meseChiuso)} hai speso ${Math.round(sommaChiusa)}€, il ${percChiusa}% del budget di quel mese.`
+          : `A ${monthLabel(meseChiuso)} hai speso ${Math.round(sommaChiusa)}€.`,
+      azione: "",
+      action: { kind: "ack" },
+    });
   }
 
   for (const cat of state.categorie) {
