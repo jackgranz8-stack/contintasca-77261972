@@ -94,7 +94,7 @@ function AuthPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-[430px] px-5 pt-[calc(env(safe-area-inset-top,0px)+56px)] pb-16">
+    <div className="app-frame mx-auto w-full max-w-[430px] px-5 pt-[calc(env(safe-area-inset-top,0px)+56px)] pb-16">
       <span className="lime-fill flex h-14 w-14 items-center justify-center rounded-2xl">
         <Wallet size={26} />
       </span>
