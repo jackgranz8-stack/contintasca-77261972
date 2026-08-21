@@ -29,7 +29,7 @@ export function FaceIdGate({ userId, children }: { userId: string; children: Rea
   if (unlocked) return <>{children}</>;
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
+    <div className="app-frame flex min-h-screen flex-col items-center justify-center px-6 text-center">
       <span className="flex h-16 w-16 items-center justify-center rounded-full bg-surface-2 text-primary">
         <Fingerprint size={28} />
       </span>
