@@ -102,6 +102,7 @@
   html {
     -webkit-text-size-adjust: 100%;
     background-color: var(--color-background);
+    overflow-x: hidden;
   }
 
   body {
@@ -110,6 +111,7 @@
     font-family: var(--font-sans);
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior-y: none;
+    overflow-x: hidden;
   }
 
   input,
@@ -177,5 +179,30 @@
   & option {
     background-color: var(--color-surface);
     color: var(--color-foreground);
+  }
+}
+
+/*
+ * Su schermi da tablet/computer in su, l'app non resta una colonna stretta
+ * persa nel resto della pagina: prende l'aspetto di un pannello a sé stante,
+ * centrato, con la stessa larghezza pensata per iPhone.
+ */
+@media (min-width: 640px) {
+  body {
+    background-color: #000;
+  }
+
+  .app-frame {
+    transform: translateZ(0);
+    margin-inline: auto;
+    margin-block: 2.5rem;
+    max-width: 430px;
+    min-height: 0 !important;
+    max-height: calc(100vh - 5rem);
+    overflow-y: auto;
+    border-radius: 32px;
+    border: 1px solid var(--color-border);
+    box-shadow: 0 40px 90px -20px oklch(0 0 0 / 0.6);
+    background-color: var(--color-background);
   }
 }
