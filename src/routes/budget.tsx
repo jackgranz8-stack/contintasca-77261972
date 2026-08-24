@@ -8,7 +8,6 @@ import { useScrollLock } from "@/hooks/use-scroll-lock";
 import { currentMonth, eur, monthLabel } from "@/lib/format";
 import { ICON_KEYS, iconFor } from "@/lib/icons";
 import { CATEGORY_COLORS, PALETTE, type Category } from "@/lib/types";
-import { Donut } from "@/components/Donut";
 import { ProgressBar } from "@/components/ProgressBar";
 import { EditRecurringModal } from "@/components/EditRecurringModal";
 import { EditCategoryModal } from "@/components/EditCategoryModal";
@@ -71,15 +70,6 @@ function BudgetPage() {
   const mese = currentMonth();
   const spesiMese = totalsByCategory(txInMonth(state.transazioni, mese));
   const spesoTotale = sum(txInMonth(state.transazioni, mese));
-  const slicesBudget = state.categorie
-    .map((c) => ({ id: c.id, label: c.nome, value: c.budget, color: c.colore }))
-    .filter((s) => s.value > 0);
-
-  const vaiAlCampo = (id: string) => {
-    setFocusCat(id);
-    const row = document.getElementById(`cat-row-${id}`);
-    row?.scrollIntoView({ behavior: "smooth", block: "center" });
-  };
 
   const creaCategoria = () => {
     const n = nuovaCat.trim();
@@ -128,18 +118,11 @@ function BudgetPage() {
         </p>
       </section>
 
-      {slicesBudget.length > 0 && (
+      {totale > 0 && (
         <section className="card-surface p-5">
           <h2 className="text-sm font-semibold">Budget pianificato vs speso</h2>
           <p className="mt-1 text-[11px] capitalize text-muted-foreground">{monthLabel(mese)}</p>
-          <Donut
-            slices={slicesBudget}
-            total={totale}
-            selected={focusCat}
-            onSelect={vaiAlCampo}
-            centerLabel="Pianificato"
-          />
-          <div className="mt-1 flex items-center justify-between text-xs">
+          <div className="mt-3 flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Speso questo mese</span>
             <span className="font-semibold">
               {eur(spesoTotale)} / {eur(totale)}
