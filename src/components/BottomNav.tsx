@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Home, List, PieChart, User } from "lucide-react";
 
@@ -71,13 +71,23 @@ export function BottomNav() {
 
   const shownIndex = dragIndex ?? (activeIndex === -1 ? 0 : activeIndex);
 
+  const [moving, setMoving] = useState(false);
+  const prevShownRef = useRef(shownIndex);
+  useEffect(() => {
+    if (prevShownRef.current === shownIndex) return;
+    prevShownRef.current = shownIndex;
+    setMoving(true);
+    const timer = window.setTimeout(() => setMoving(false), 500);
+    return () => window.clearTimeout(timer);
+  }, [shownIndex]);
+
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),16px)]">
       <div className="relative w-full max-w-[320px]">
         {/* Solo questo sfondo si schiaccia leggermente al tocco: icone e indicatore restano fissi */}
         <div
           aria-hidden
-          className={`float-shadow pointer-events-none absolute inset-0 rounded-full border border-white/10 bg-black/55 backdrop-blur-2xl transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+          className={`float-shadow pointer-events-none absolute -inset-1 rounded-full border border-white/10 bg-black/55 backdrop-blur-2xl transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
             pressed ? "scale-x-[1.035] scale-y-[0.88]" : "scale-100"
           }`}
         />
@@ -90,7 +100,9 @@ export function BottomNav() {
           className="relative z-10 flex touch-none items-center py-2 select-none"
         >
           <span
-            className="pointer-events-none absolute top-1.5 bottom-1.5 rounded-full bg-white/15 transition-[left] duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+            className={`pointer-events-none absolute rounded-full bg-white/15 transition-[left,top,bottom] duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+              moving ? "-top-1 -bottom-1" : "top-1.5 bottom-1.5"
+            }`}
             style={{
               width: `${100 / items.length}%`,
               left: `${(100 / items.length) * shownIndex}%`,
