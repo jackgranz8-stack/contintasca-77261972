@@ -73,45 +73,52 @@ export function BottomNav() {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),16px)]">
-      <ul
-        ref={trackRef}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-        className={`float-shadow relative flex w-full max-w-[320px] touch-none items-center rounded-full border border-white/10 bg-black/55 py-2 backdrop-blur-2xl transition-transform duration-150 ease-out select-none ${
-          pressed ? "scale-x-[1.035] scale-y-[0.88]" : "scale-100"
-        }`}
-      >
-        <span
-          className="pointer-events-none absolute top-1.5 bottom-1.5 rounded-full bg-white/15 transition-[left] duration-200 ease-out"
-          style={{
-            width: `${100 / items.length}%`,
-            left: `${(100 / items.length) * shownIndex}%`,
-          }}
+      <div className="relative w-full max-w-[320px]">
+        {/* Solo questo sfondo si schiaccia leggermente al tocco: icone e indicatore restano fissi */}
+        <div
+          aria-hidden
+          className={`float-shadow pointer-events-none absolute inset-0 rounded-full border border-white/10 bg-black/55 backdrop-blur-2xl transition-transform duration-150 ease-out ${
+            pressed ? "scale-x-[1.035] scale-y-[0.88]" : "scale-100"
+          }`}
         />
-        {items.map(({ to, label, icon: Icon }, i) => {
-          const active = i === shownIndex;
-          return (
-            <li key={to} className="relative z-10 flex-1">
-              <Link
-                to={to}
-                aria-label={label}
-                onClick={(e) => {
-                  if (draggingRef.current) e.preventDefault();
-                }}
-                className="flex items-center justify-center py-2"
-              >
-                <Icon
-                  size={22}
-                  strokeWidth={active ? 2.2 : 1.8}
-                  className={active ? "text-white" : "text-white/55"}
-                />
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+        <ul
+          ref={trackRef}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+          className="relative z-10 flex touch-none items-center py-2 select-none"
+        >
+          <span
+            className="pointer-events-none absolute top-1.5 bottom-1.5 rounded-full bg-white/15 transition-[left] duration-200 ease-out"
+            style={{
+              width: `${100 / items.length}%`,
+              left: `${(100 / items.length) * shownIndex}%`,
+            }}
+          />
+          {items.map(({ to, label, icon: Icon }, i) => {
+            const active = i === shownIndex;
+            return (
+              <li key={to} className="relative z-10 flex-1">
+                <Link
+                  to={to}
+                  aria-label={label}
+                  onClick={(e) => {
+                    if (draggingRef.current) e.preventDefault();
+                  }}
+                  className="flex items-center justify-center py-2"
+                >
+                  <Icon
+                    size={22}
+                    strokeWidth={active ? 2.2 : 1.8}
+                    className={active ? "text-white" : "text-white/55"}
+                  />
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     </nav>
   );
 }
