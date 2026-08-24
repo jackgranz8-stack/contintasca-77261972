@@ -63,6 +63,28 @@ export const PALETTE = [
   "#9AA6A0",
 ];
 
+// Gamma estesa di colori selezionabili per le categorie: stessa "firma" (saturazione/luminosità)
+// della PALETTE esistente, così ogni colore aggiuntivo resta coerente con lo stile dell'app.
+export const CATEGORY_COLORS = [
+  "#8CE562",
+  "#62D5E5",
+  "#E5C462",
+  "#E58A62",
+  "#B98CE5",
+  "#62E5A8",
+  "#E56287",
+  "#9AA6A0",
+  "#E56161",
+  "#E57761",
+  "#E5E561",
+  "#B9E561",
+  "#61E577",
+  "#61AEE5",
+  "#6177E5",
+  "#CF61E5",
+  "#E561B9",
+];
+
 export const DEFAULT_CATEGORIES: Omit<Category, "budget">[] = [
   { id: "casa", nome: "Casa", icona: "home", colore: "#8CE562" },
   { id: "cibo", nome: "Cibo", icona: "utensils", colore: "#62D5E5" },
