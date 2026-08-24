@@ -52,6 +52,8 @@ function ProfiloPage() {
   const [nome, setNome] = useState(state.profilo.nome);
   const [resetStep, setResetStep] = useState(0);
   const [ricalcoloAperto, setRicalcoloAperto] = useState(false);
+  const [preferenzeAperto, setPreferenzeAperto] = useState(false);
+  const [excelAperto, setExcelAperto] = useState(false);
   const budgetAttuale = state.categorie.reduce((a, c) => a + c.budget, 0);
   const [nuovoTotale, setNuovoTotale] = useState(String(budgetAttuale));
   const [faceIdOn, setFaceIdOn] = useState(false);
@@ -186,137 +188,155 @@ function ProfiloPage() {
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold tracking-tight">Profilo</h1>
 
-      <section className="card-surface divide-y divide-border p-5">
-        <h2 className="pb-4 text-sm font-semibold">Preferenze profilo</h2>
+      <section className="card-surface overflow-hidden p-0">
+        <button
+          onClick={() => setPreferenzeAperto((v) => !v)}
+          className="flex w-full items-center gap-3 p-5 text-left"
+        >
+          <span className="min-w-0 flex-1 text-sm font-semibold">Preferenze profilo</span>
+          <ChevronDown
+            size={18}
+            className={`shrink-0 text-muted-foreground transition-transform duration-200 ${
+              preferenzeAperto ? "rotate-180" : ""
+            }`}
+          />
+        </button>
 
-        {/* Account */}
-        <div className="py-4 first:pt-0 last:pb-0">
-          {account ? (
-            <>
-              <p className="text-xs text-muted-foreground">
-                {account.email ?? "Account collegato"} — spese sincronizzate
-                {syncing ? " (sincronizzazione…)" : ""}
-              </p>
-              <button
-                onClick={() => {
-                  void signOut();
-                  toast.success("Disconnesso");
-                }}
-                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-border py-2.5 text-sm font-medium"
-              >
-                <LogOut size={16} /> Esci
-              </button>
-            </>
-          ) : (
-            <>
-              <p className="text-xs text-muted-foreground">
-                Accedi per ritrovare le tue spese su telefono e computer.
-              </p>
-              <button
-                onClick={() => void navigate({ to: "/auth" })}
-                className="lime-fill mt-3 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold"
-              >
-                <LogIn size={16} /> Accedi o registrati
-              </button>
-            </>
-          )}
-        </div>
-
-        {/* Face ID */}
-        {account && faceIdSupported() && (
-          <div className="py-4 first:pt-0 last:pb-0">
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-primary">
-                <Fingerprint size={17} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-medium">Sblocco con Face ID</h3>
-                <p className="text-xs text-muted-foreground">
-                  {faceIdOn
-                    ? "Attivo su questo dispositivo"
-                    : "Aggiungi un livello in più, solo qui"}
-                </p>
-              </div>
-              <button
-                onClick={() => void toggleFaceId()}
-                disabled={faceIdBusy}
-                className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-60 ${
-                  faceIdOn ? "bg-surface-2 text-muted-foreground" : "lime-fill"
-                }`}
-              >
-                {faceIdOn ? "Disattiva" : "Attiva"}
-              </button>
+        {preferenzeAperto && (
+          <div className="divide-y divide-border px-5 pb-5">
+            {/* Account */}
+            <div className="py-4 first:pt-0 last:pb-0">
+              {account ? (
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    {account.email ?? "Account collegato"} — spese sincronizzate
+                    {syncing ? " (sincronizzazione…)" : ""}
+                  </p>
+                  <button
+                    onClick={() => {
+                      void signOut();
+                      toast.success("Disconnesso");
+                    }}
+                    className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-border py-2.5 text-sm font-medium"
+                  >
+                    <LogOut size={16} /> Esci
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    Accedi per ritrovare le tue spese su telefono e computer.
+                  </p>
+                  <button
+                    onClick={() => void navigate({ to: "/auth" })}
+                    className="lime-fill mt-3 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold"
+                  >
+                    <LogIn size={16} /> Accedi o registrati
+                  </button>
+                </>
+              )}
             </div>
-          </div>
-        )}
 
-        {/* Notifiche */}
-        {account && pushSupported() && (
-          <div className="py-4 first:pt-0 last:pb-0">
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-primary">
-                <BellRing size={17} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-medium">Notifiche</h3>
-                <p className="text-xs text-muted-foreground">
-                  {pushOn
-                    ? "Attive su questo dispositivo"
-                    : "Avviso quando il ritmo di spesa è alto"}
-                </p>
+            {/* Face ID */}
+            {account && faceIdSupported() && (
+              <div className="py-4 first:pt-0 last:pb-0">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-primary">
+                    <Fingerprint size={17} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-sm font-medium">Sblocco con Face ID</h3>
+                    <p className="text-xs text-muted-foreground">
+                      {faceIdOn
+                        ? "Attivo su questo dispositivo"
+                        : "Aggiungi un livello in più, solo qui"}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => void toggleFaceId()}
+                    disabled={faceIdBusy}
+                    className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-60 ${
+                      faceIdOn ? "bg-surface-2 text-muted-foreground" : "lime-fill"
+                    }`}
+                  >
+                    {faceIdOn ? "Disattiva" : "Attiva"}
+                  </button>
+                </div>
               </div>
-              <button
-                onClick={() => void togglePush()}
-                disabled={pushBusy}
-                className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-60 ${
-                  pushOn ? "bg-surface-2 text-muted-foreground" : "lime-fill"
-                }`}
-              >
-                {pushOn ? "Disattiva" : "Attiva"}
-              </button>
-            </div>
-            {pushOn && (
-              <button
-                onClick={() => {
-                  void (async () => {
-                    const res: SendPushResult = await sendPush(
-                      "Conti in Tasca",
-                      "Le notifiche funzionano correttamente.",
-                    );
-                    if (res.ok) {
-                      toast.success(
-                        res.sent === 1
-                          ? "Notifica inviata a 1 dispositivo"
-                          : `Notifica inviata a ${res.sent} dispositivi`,
-                      );
-                    } else {
-                      toast.error(`Invio non riuscito: ${res.reason}`);
-                    }
-                  })();
-                }}
-                className="mt-3 w-full rounded-xl bg-surface-2 py-2.5 text-xs font-medium text-muted-foreground"
-              >
-                Invia notifica di prova
-              </button>
             )}
+
+            {/* Notifiche */}
+            {account && pushSupported() && (
+              <div className="py-4 first:pt-0 last:pb-0">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-primary">
+                    <BellRing size={17} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-sm font-medium">Notifiche</h3>
+                    <p className="text-xs text-muted-foreground">
+                      {pushOn
+                        ? "Attive su questo dispositivo"
+                        : "Avviso quando il ritmo di spesa è alto"}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => void togglePush()}
+                    disabled={pushBusy}
+                    className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-60 ${
+                      pushOn ? "bg-surface-2 text-muted-foreground" : "lime-fill"
+                    }`}
+                  >
+                    {pushOn ? "Disattiva" : "Attiva"}
+                  </button>
+                </div>
+                {pushOn && (
+                  <button
+                    onClick={() => {
+                      void (async () => {
+                        const res: SendPushResult = await sendPush(
+                          "Conti in Tasca",
+                          "Le notifiche funzionano correttamente.",
+                        );
+                        if (res.ok) {
+                          toast.success(
+                            res.sent === 1
+                              ? "Notifica inviata a 1 dispositivo"
+                              : `Notifica inviata a ${res.sent} dispositivi`,
+                          );
+                        } else {
+                          toast.error(`Invio non riuscito: ${res.reason}`);
+                        }
+                      })();
+                    }}
+                    className="mt-3 w-full rounded-xl bg-surface-2 py-2.5 text-xs font-medium text-muted-foreground"
+                  >
+                    Invia notifica di prova
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Nome */}
+            <div className="py-4 first:pt-0 last:pb-0">
+              <label className="mb-1 block text-xs text-muted-foreground">Nome</label>
+              <div className="flex gap-2">
+                <input
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                  placeholder="Il tuo nome"
+                  className="flex-1 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
+                />
+                <button
+                  onClick={salvaNome}
+                  className="lime-fill rounded-xl px-4 text-sm font-semibold"
+                >
+                  Salva
+                </button>
+              </div>
+            </div>
           </div>
         )}
-
-        {/* Nome */}
-        <div className="py-4 first:pt-0 last:pb-0">
-          <label className="mb-1 block text-xs text-muted-foreground">Nome</label>
-          <div className="flex gap-2">
-            <input
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              placeholder="Il tuo nome"
-              className="flex-1 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
-            />
-            <button onClick={salvaNome} className="lime-fill rounded-xl px-4 text-sm font-semibold">
-              Salva
-            </button>
-          </div>
-        </div>
       </section>
 
       {/* Ricalcola budget: compatta, si apre solo se serve */}
@@ -428,50 +448,67 @@ function ProfiloPage() {
         )}
       </section>
 
-      <section className="card-surface space-y-2 p-5">
-        <h2 className="mb-2 text-sm font-semibold">Excel</h2>
+      <section className="card-surface overflow-hidden p-0">
         <button
-          onClick={() => {
-            void (async () => {
-              const n = await exportTransactions(state.transazioni, state.categorie);
-              toast.success(`${n} transazioni esportate`);
-            })();
-          }}
-          className="flex w-full items-center gap-3 rounded-xl bg-surface px-4 py-3 text-sm"
+          onClick={() => setExcelAperto((v) => !v)}
+          className="flex w-full items-center gap-3 p-5 text-left"
         >
-          <Download size={16} className="text-primary" /> Esporta tutte le transazioni
+          <span className="min-w-0 flex-1 text-sm font-semibold">Import/export file</span>
+          <ChevronDown
+            size={18}
+            className={`shrink-0 text-muted-foreground transition-transform duration-200 ${
+              excelAperto ? "rotate-180" : ""
+            }`}
+          />
         </button>
-        <button
-          onClick={() => fileRef.current?.click()}
-          className="flex w-full items-center gap-3 rounded-xl bg-surface px-4 py-3 text-sm"
-        >
-          <Upload size={16} className="text-primary" /> Importa da file .xlsx
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".xlsx,.xls"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) void importa(f);
-            e.target.value = "";
-          }}
-        />
-        <button
-          onClick={() => {
-            void (async () => {
-              await exportTemplate();
-              toast.success("Modello scaricato");
-            })();
-          }}
-          className="flex w-full items-center gap-3 rounded-xl bg-surface px-4 py-3 text-sm"
-        >
-          <FileDown size={16} className="text-primary" /> Scarica modello vuoto
-        </button>
-        <p className="pt-1 text-[11px] text-muted-foreground">
-          Colonne richieste: Data, Categoria, Importo, Nota. Le righe non valide vengono ignorate.
-        </p>
+
+        {excelAperto && (
+          <div className="space-y-2 px-5 pb-5">
+            <button
+              onClick={() => {
+                void (async () => {
+                  const n = await exportTransactions(state.transazioni, state.categorie);
+                  toast.success(`${n} transazioni esportate`);
+                })();
+              }}
+              className="flex w-full items-center gap-3 rounded-xl bg-surface px-4 py-3 text-sm"
+            >
+              <Download size={16} className="text-primary" /> Esporta tutte le transazioni
+            </button>
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="flex w-full items-center gap-3 rounded-xl bg-surface px-4 py-3 text-sm"
+            >
+              <Upload size={16} className="text-primary" /> Importa da file .xlsx
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void importa(f);
+                e.target.value = "";
+              }}
+            />
+            <button
+              onClick={() => {
+                void (async () => {
+                  await exportTemplate();
+                  toast.success("Modello scaricato");
+                })();
+              }}
+              className="flex w-full items-center gap-3 rounded-xl bg-surface px-4 py-3 text-sm"
+            >
+              <FileDown size={16} className="text-primary" /> Scarica modello vuoto
+            </button>
+            <p className="pt-1 text-[11px] text-muted-foreground">
+              Colonne richieste: Data, Categoria, Importo, Nota. Le righe non valide vengono
+              ignorate.
+            </p>
+          </div>
+        )}
       </section>
 
       <section className="card-surface p-5">
