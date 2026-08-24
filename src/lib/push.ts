@@ -74,15 +74,25 @@ export async function disablePush(userId: string): Promise<void> {
   }
 }
 
+export type SendPushResult = { ok: true; sent: number } | { ok: false; reason: string };
+
 /**
  * Chiede alla Edge Function di inviare una notifica push a tutti i dispositivi
  * dell'utente attualmente autenticato (la funzione ignora qualsiasi altro id:
- * invia sempre e solo a chi ha fatto la richiesta).
+ * invia sempre e solo a chi ha fatto la richiesta). Restituisce l'esito reale,
+ * non lo nasconde: utile per capire se qualcosa non va (funzione non deployata,
+ * secret mancanti, nessuna sottoscrizione salvata, ecc.).
  */
-export async function sendPush(title: string, body: string, url = "/"): Promise<void> {
+export async function sendPush(title: string, body: string, url = "/"): Promise<SendPushResult> {
   try {
-    await db.functions.invoke("send-push", { body: { title, body, url } });
-  } catch {
-    // Invio best-effort: se fallisce non blocchiamo l'uso dell'app.
+    const { data, error } = await db.functions.invoke("send-push", {
+      body: { title, body, url },
+    });
+    if (error) return { ok: false, reason: error.message ?? "Errore sconosciuto" };
+    const sent = typeof data?.sent === "number" ? data.sent : 0;
+    if (sent === 0) return { ok: false, reason: "Nessun dispositivo sottoscritto trovato" };
+    return { ok: true, sent };
+  } catch (err) {
+    return { ok: false, reason: err instanceof Error ? err.message : String(err) };
   }
 }
