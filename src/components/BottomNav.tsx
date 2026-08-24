@@ -16,6 +16,7 @@ export function BottomNav() {
   const draggingRef = useRef(false);
   const dragIndexRef = useRef<number | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [pressed, setPressed] = useState(false);
 
   const activeIndex = items.findIndex(({ to }) =>
     to === "/" ? pathname === "/" : pathname.startsWith(to),
@@ -40,6 +41,7 @@ export function BottomNav() {
   const handlePointerDown = (e: React.PointerEvent<HTMLUListElement>) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     draggingRef.current = true;
+    setPressed(true);
     trackRef.current?.setPointerCapture(e.pointerId);
     const idx = indexFromX(e.clientX);
     dragIndexRef.current = idx;
@@ -61,6 +63,7 @@ export function BottomNav() {
   const endDrag = () => {
     if (!draggingRef.current) return;
     draggingRef.current = false;
+    setPressed(false);
     if (dragIndexRef.current !== null) goTo(dragIndexRef.current);
     dragIndexRef.current = null;
     setDragIndex(null);
@@ -76,7 +79,9 @@ export function BottomNav() {
         onPointerMove={handlePointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
-        className="float-shadow relative flex w-full max-w-[320px] touch-none items-center rounded-full border border-white/10 bg-black/55 py-2 backdrop-blur-2xl select-none"
+        className={`float-shadow relative flex w-full max-w-[320px] touch-none items-center rounded-full border border-white/10 bg-black/55 py-2 backdrop-blur-2xl transition-transform duration-150 ease-out select-none ${
+          pressed ? "scale-x-[1.035] scale-y-[0.88]" : "scale-100"
+        }`}
       >
         <span
           className="pointer-events-none absolute top-1.5 bottom-1.5 rounded-full bg-white/15 transition-[left] duration-200 ease-out"
