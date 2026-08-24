@@ -1,4 +1,5 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { useCallback, useRef, useState } from "react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Home, List, PieChart, User } from "lucide-react";
 
 const items = [
@@ -10,29 +11,102 @@ const items = [
 
 export function BottomNav() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
+  const trackRef = useRef<HTMLUListElement | null>(null);
+  const draggingRef = useRef(false);
+  const dragIndexRef = useRef<number | null>(null);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+
+  const activeIndex = items.findIndex(({ to }) =>
+    to === "/" ? pathname === "/" : pathname.startsWith(to),
+  );
+
+  const indexFromX = useCallback((clientX: number) => {
+    const el = trackRef.current;
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    const clamped = Math.min(rect.right - 1, Math.max(rect.left, clientX));
+    const ratio = (clamped - rect.left) / rect.width;
+    return Math.min(items.length - 1, Math.max(0, Math.floor(ratio * items.length)));
+  }, []);
+
+  const goTo = (index: number) => {
+    const target = items[index];
+    if (!target) return;
+    const already = target.to === "/" ? pathname === "/" : pathname.startsWith(target.to);
+    if (!already) void navigate({ to: target.to });
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLUListElement>) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    draggingRef.current = true;
+    trackRef.current?.setPointerCapture(e.pointerId);
+    const idx = indexFromX(e.clientX);
+    dragIndexRef.current = idx;
+    setDragIndex(idx);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLUListElement>) => {
+    if (!draggingRef.current) return;
+    const idx = indexFromX(e.clientX);
+    if (idx !== null && idx !== dragIndexRef.current) {
+      dragIndexRef.current = idx;
+      setDragIndex(idx);
+      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+        navigator.vibrate?.(3);
+      }
+    }
+  };
+
+  const endDrag = () => {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
+    if (dragIndexRef.current !== null) goTo(dragIndexRef.current);
+    dragIndexRef.current = null;
+    setDragIndex(null);
+  };
+
+  const shownIndex = dragIndex ?? (activeIndex === -1 ? 0 : activeIndex);
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 flex justify-center bg-background/85 backdrop-blur-xl">
-      <div className="w-full max-w-[430px] border-t border-border px-2 pt-1.5 pb-[max(env(safe-area-inset-bottom),10px)]">
-        <ul className="flex items-stretch justify-between">
-          {items.map(({ to, label, icon: Icon }) => {
-            const active = to === "/" ? pathname === "/" : pathname.startsWith(to);
-            return (
-              <li key={to} className="flex-1">
-                <Link
-                  to={to}
-                  className={`flex flex-col items-center gap-1 rounded-xl py-1.5 text-[10px] font-medium transition-colors ${
-                    active ? "text-primary" : "text-muted-foreground"
-                  }`}
-                >
-                  <Icon size={21} strokeWidth={active ? 2.4 : 1.8} />
-                  {label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+    <nav className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),16px)]">
+      <ul
+        ref={trackRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        className="float-shadow relative flex w-full max-w-[320px] touch-none items-center rounded-full border border-white/10 bg-black/55 py-2 backdrop-blur-2xl select-none"
+      >
+        <span
+          className="pointer-events-none absolute top-1.5 bottom-1.5 rounded-full bg-white/15 transition-[left] duration-200 ease-out"
+          style={{
+            width: `${100 / items.length}%`,
+            left: `${(100 / items.length) * shownIndex}%`,
+          }}
+        />
+        {items.map(({ to, label, icon: Icon }, i) => {
+          const active = i === shownIndex;
+          return (
+            <li key={to} className="relative z-10 flex-1">
+              <Link
+                to={to}
+                aria-label={label}
+                onClick={(e) => {
+                  if (draggingRef.current) e.preventDefault();
+                }}
+                className="flex items-center justify-center py-2"
+              >
+                <Icon
+                  size={22}
+                  strokeWidth={active ? 2.2 : 1.8}
+                  className={active ? "text-white" : "text-white/55"}
+                />
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
     </nav>
   );
 }
