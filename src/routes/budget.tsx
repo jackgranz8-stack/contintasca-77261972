@@ -1,18 +1,17 @@
 import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Pause, Pencil, Play, Plus, Trash2 } from "lucide-react";
+import { Check, ChevronDown, Pause, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import { sum, totalsByCategory, txInMonth, useApp } from "@/lib/store";
 import { useScrollLock } from "@/hooks/use-scroll-lock";
 
 import { currentMonth, eur, monthLabel } from "@/lib/format";
 import { ICON_KEYS, iconFor } from "@/lib/icons";
-import { PALETTE } from "@/lib/types";
+import { CATEGORY_COLORS, PALETTE, type Category } from "@/lib/types";
 import { Donut } from "@/components/Donut";
 import { ProgressBar } from "@/components/ProgressBar";
 import { EditRecurringModal } from "@/components/EditRecurringModal";
-
-
+import { EditCategoryModal } from "@/components/EditCategoryModal";
 
 export const Route = createFileRoute("/budget")({
   head: () => ({
@@ -44,8 +43,11 @@ function BudgetPage() {
     deleteRecurring,
   } = useApp();
 
+  const [formCat, setFormCat] = useState(false);
   const [nuovaCat, setNuovaCat] = useState("");
   const [nuovaIcona, setNuovaIcona] = useState("cart");
+  const [nuovaColore, setNuovaColore] = useState<string | null>(null);
+  const [catEdit, setCatEdit] = useState<string | null>(null);
   const [formRic, setFormRic] = useState(false);
   const [ric, setRic] = useState({
     nome: "",
@@ -62,8 +64,6 @@ function BudgetPage() {
   useScrollLock(editing !== null);
   useScrollLock(ricDaEliminare !== null);
 
-
-
   const totale = state.categorie.reduce((a, c) => a + c.budget, 0);
   const mese = currentMonth();
   const spesiMese = totalsByCategory(txInMonth(state.transazioni, mese));
@@ -78,17 +78,19 @@ function BudgetPage() {
     row?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
-
   const creaCategoria = () => {
     const n = nuovaCat.trim();
     if (!n) return;
     addCategory({
       nome: n,
       icona: nuovaIcona,
-      colore: PALETTE[state.categorie.length % PALETTE.length] ?? "#8CE562",
+      colore: nuovaColore ?? PALETTE[state.categorie.length % PALETTE.length] ?? "#8CE562",
       budget: 0,
     });
     setNuovaCat("");
+    setNuovaIcona("cart");
+    setNuovaColore(null);
+    setFormCat(false);
     toast.success("Categoria aggiunta");
   };
 
@@ -205,6 +207,13 @@ function BudgetPage() {
                   <span className="text-xs text-muted-foreground">€</span>
                 </div>
                 <button
+                  onClick={() => setCatEdit(c.id)}
+                  className="shrink-0 text-muted-foreground"
+                  aria-label={`Modifica ${c.nome}`}
+                >
+                  <Pencil size={16} />
+                </button>
+                <button
                   onClick={() => {
                     if (!deleteCategory(c.id))
                       toast.error("Categoria in uso: non può essere eliminata");
@@ -221,44 +230,97 @@ function BudgetPage() {
               </div>
             </div>
           );
-
-
         })}
       </section>
 
-      <section className="card-surface p-4">
-        <p className="mb-2 text-xs text-muted-foreground">Nuova categoria</p>
-        <input
-          value={nuovaCat}
-          onChange={(e) => setNuovaCat(e.target.value)}
-          placeholder="Es. Abbonamenti"
-          className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
-        />
-        <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto pb-1">
-          {ICON_KEYS.map((k) => {
-            const Icon = iconFor(k);
-            return (
-              <button
-                key={k}
-                onClick={() => setNuovaIcona(k)}
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border ${
-                  nuovaIcona === k
-                    ? "border-primary text-primary"
-                    : "border-border text-muted-foreground"
-                }`}
-              >
-                <Icon size={17} />
-              </button>
-            );
-          })}
-        </div>
+      <section className="card-surface overflow-hidden">
         <button
-          onClick={creaCategoria}
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-surface-2 py-2.5 text-sm font-medium"
+          type="button"
+          onClick={() => setFormCat((v) => !v)}
+          className="flex w-full items-center justify-between px-4 py-3.5 text-sm font-medium"
+          aria-expanded={formCat}
         >
-          <Plus size={15} /> Aggiungi categoria
+          <span className="flex items-center gap-2">
+            <Plus size={15} /> Aggiungi Categoria
+          </span>
+          <ChevronDown
+            size={16}
+            className={`text-muted-foreground transition-transform ${formCat ? "rotate-180" : ""}`}
+          />
         </button>
+
+        {formCat && (
+          <div className="border-t border-border p-4 pt-3.5">
+            <input
+              value={nuovaCat}
+              onChange={(e) => setNuovaCat(e.target.value)}
+              placeholder="Es. Abbonamenti"
+              autoFocus
+              className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
+            />
+
+            <p className="mb-2 mt-3 text-xs text-muted-foreground">Icona</p>
+            <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+              {ICON_KEYS.map((k) => {
+                const Icon = iconFor(k);
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setNuovaIcona(k)}
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border ${
+                      nuovaIcona === k
+                        ? "border-primary text-primary"
+                        : "border-border text-muted-foreground"
+                    }`}
+                  >
+                    <Icon size={17} />
+                  </button>
+                );
+              })}
+            </div>
+
+            <p className="mb-2 mt-3 text-xs text-muted-foreground">Colore</p>
+            <div className="grid grid-cols-6 gap-2.5 sm:grid-cols-8">
+              {CATEGORY_COLORS.map((col) => {
+                const attivo =
+                  nuovaColore === col ||
+                  (!nuovaColore &&
+                    col === (PALETTE[state.categorie.length % PALETTE.length] ?? "#8CE562"));
+                return (
+                  <button
+                    key={col}
+                    type="button"
+                    onClick={() => setNuovaColore(col)}
+                    className="flex h-10 w-10 items-center justify-center rounded-full transition-transform"
+                    style={{
+                      backgroundColor: col,
+                      boxShadow: attivo ? `0 0 0 2px var(--surface), 0 0 0 4px ${col}` : undefined,
+                      transform: attivo ? "scale(1.08)" : undefined,
+                    }}
+                    aria-label={`Colore ${col}`}
+                  >
+                    {attivo && <Check size={16} color="#fff" strokeWidth={3} />}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={creaCategoria}
+              className="lime-fill mt-4 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold"
+            >
+              <Plus size={15} /> Aggiungi categoria
+            </button>
+          </div>
+        )}
       </section>
+
+      <EditCategoryModal
+        open={catEdit !== null}
+        onClose={() => setCatEdit(null)}
+        edit={state.categorie.find((c) => c.id === catEdit) ?? null}
+      />
 
       <section className="space-y-2">
         <div className="flex items-center justify-between">
@@ -419,7 +481,6 @@ function BudgetPage() {
           </div>
         </div>
       )}
-
     </div>
   );
 }
