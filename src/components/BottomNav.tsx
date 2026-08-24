@@ -77,7 +77,7 @@ export function BottomNav() {
         {/* Solo questo sfondo si schiaccia leggermente al tocco: icone e indicatore restano fissi */}
         <div
           aria-hidden
-          className={`float-shadow pointer-events-none absolute inset-0 rounded-full border border-white/10 bg-black/55 backdrop-blur-2xl transition-transform duration-150 ease-out ${
+          className={`float-shadow pointer-events-none absolute inset-0 rounded-full border border-white/10 bg-black/55 backdrop-blur-2xl transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
             pressed ? "scale-x-[1.035] scale-y-[0.88]" : "scale-100"
           }`}
         />
@@ -90,7 +90,7 @@ export function BottomNav() {
           className="relative z-10 flex touch-none items-center py-2 select-none"
         >
           <span
-            className="pointer-events-none absolute top-1.5 bottom-1.5 rounded-full bg-white/15 transition-[left] duration-200 ease-out"
+            className="pointer-events-none absolute top-1.5 bottom-1.5 rounded-full bg-white/15 transition-[left] duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
             style={{
               width: `${100 / items.length}%`,
               left: `${(100 / items.length) * shownIndex}%`,
@@ -110,7 +110,8 @@ export function BottomNav() {
                 >
                   <Icon
                     size={22}
-                    strokeWidth={active ? 2.2 : 1.8}
+                    fill={active ? "currentColor" : "none"}
+                    strokeWidth={active ? 1.6 : 1.8}
                     className={active ? "text-white" : "text-white/55"}
                   />
                 </Link>
