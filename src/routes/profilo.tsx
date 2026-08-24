@@ -1,14 +1,31 @@
 import { useEffect, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { BellRing, Download, FileDown, Fingerprint, LogIn, LogOut, Upload } from "lucide-react";
+import {
+  BellRing,
+  ChevronDown,
+  Download,
+  FileDown,
+  Fingerprint,
+  LogIn,
+  LogOut,
+  Upload,
+  Wallet,
+} from "lucide-react";
 import { useApp } from "@/lib/store";
-import { eur, formatDay, uid } from "@/lib/format";
+import { uid } from "@/lib/format";
 import { HOUSING_OPTIONS, PALETTE, type Housing } from "@/lib/types";
 import { exportTemplate, exportTransactions, parseImportFile } from "@/lib/excel";
-import { suggestBudgets } from "@/lib/budget-suggest";
+import { suggestBudgetsWithHistory } from "@/lib/budget-suggest";
 import { disableFaceId, enrollFaceId, faceIdSupported, isFaceIdEnabled } from "@/lib/webauthn";
-import { disablePush, enablePush, isPushEnabled, pushSupported, sendPush } from "@/lib/push";
+import {
+  disablePush,
+  enablePush,
+  isPushEnabled,
+  pushSupported,
+  sendPush,
+  type SendPushResult,
+} from "@/lib/push";
 
 export const Route = createFileRoute("/profilo")({
   head: () => ({
@@ -34,7 +51,9 @@ function ProfiloPage() {
   const navigate = useNavigate();
   const [nome, setNome] = useState(state.profilo.nome);
   const [resetStep, setResetStep] = useState(0);
-  const [confirmRicalcolo, setConfirmRicalcolo] = useState(false);
+  const [ricalcoloAperto, setRicalcoloAperto] = useState(false);
+  const budgetAttuale = state.categorie.reduce((a, c) => a + c.budget, 0);
+  const [nuovoTotale, setNuovoTotale] = useState(String(budgetAttuale));
   const [faceIdOn, setFaceIdOn] = useState(false);
   const [faceIdBusy, setFaceIdBusy] = useState(false);
   const [pushOn, setPushOn] = useState(false);
@@ -96,19 +115,19 @@ function ProfiloPage() {
     update((s) => ({ ...s, profilo: { ...s.profilo, persone } }));
 
   const ricalcolaBudget = () => {
-    const totale = state.categorie.reduce((a, c) => a + c.budget, 0);
-    if (totale <= 0) {
-      toast.error("Imposta prima almeno un budget nelle categorie");
-      setConfirmRicalcolo(false);
+    const totale = parseFloat(nuovoTotale.replace(",", "."));
+    if (!(totale > 0)) {
+      toast.error("Inserisci un totale valido");
       return;
     }
     const draft = state.categorie.map((c) => ({ ...c, attiva: true }));
-    const proposte = suggestBudgets(
+    const proposte = suggestBudgetsWithHistory(
       draft,
       totale,
       state.profilo.abitazione,
       state.profilo.auto,
       state.profilo.persone,
+      state.transazioni,
     );
     update((s) => ({
       ...s,
@@ -117,8 +136,8 @@ function ProfiloPage() {
         return p ? { ...c, budget: p.budget } : c;
       }),
     }));
-    setConfirmRicalcolo(false);
-    toast.success("Budget ricalcolati in base al profilo");
+    setRicalcoloAperto(false);
+    toast.success("Budget ridistribuito in base a preferenze e spese passate");
   };
 
   const importa = async (file: File) => {
@@ -167,226 +186,246 @@ function ProfiloPage() {
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold tracking-tight">Profilo</h1>
 
-      <section className="card-surface p-5">
-        <h2 className="text-sm font-semibold">Account</h2>
-        {account ? (
-          <>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {account.email ?? "Account collegato"} — spese sincronizzate
-              {syncing ? " (sincronizzazione…)" : ""}
-            </p>
-            <button
-              onClick={() => {
-                void signOut();
-                toast.success("Disconnesso");
-              }}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-border py-2.5 text-sm font-medium"
-            >
-              <LogOut size={16} /> Esci
-            </button>
-          </>
-        ) : (
-          <>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Accedi per ritrovare le tue spese su telefono e computer.
-            </p>
-            <button
-              onClick={() => void navigate({ to: "/auth" })}
-              className="lime-fill mt-3 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold"
-            >
-              <LogIn size={16} /> Accedi o registrati
-            </button>
-          </>
-        )}
-      </section>
+      <section className="card-surface divide-y divide-border p-5">
+        <h2 className="pb-4 text-sm font-semibold">Preferenze profilo</h2>
 
-      {account && faceIdSupported() && (
-        <section className="card-surface p-5">
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-2 text-primary">
-              <Fingerprint size={17} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <h2 className="text-sm font-semibold">Sblocco con Face ID</h2>
+        {/* Account */}
+        <div className="py-4 first:pt-0 last:pb-0">
+          {account ? (
+            <>
               <p className="text-xs text-muted-foreground">
-                {faceIdOn ? "Attivo su questo dispositivo" : "Aggiungi un livello in più, solo qui"}
+                {account.email ?? "Account collegato"} — spese sincronizzate
+                {syncing ? " (sincronizzazione…)" : ""}
               </p>
-            </div>
-            <button
-              onClick={() => void toggleFaceId()}
-              disabled={faceIdBusy}
-              className={`rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-60 ${
-                faceIdOn ? "bg-surface-2 text-muted-foreground" : "lime-fill"
-              }`}
-            >
-              {faceIdOn ? "Disattiva" : "Attiva"}
-            </button>
-          </div>
-        </section>
-      )}
-
-      {account && pushSupported() && (
-        <section className="card-surface p-5">
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-2 text-primary">
-              <BellRing size={17} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <h2 className="text-sm font-semibold">Notifiche</h2>
+              <button
+                onClick={() => {
+                  void signOut();
+                  toast.success("Disconnesso");
+                }}
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-border py-2.5 text-sm font-medium"
+              >
+                <LogOut size={16} /> Esci
+              </button>
+            </>
+          ) : (
+            <>
               <p className="text-xs text-muted-foreground">
-                {pushOn ? "Attive su questo dispositivo" : "Avviso quando il ritmo di spesa è alto"}
+                Accedi per ritrovare le tue spese su telefono e computer.
               </p>
-            </div>
-            <button
-              onClick={() => void togglePush()}
-              disabled={pushBusy}
-              className={`rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-60 ${
-                pushOn ? "bg-surface-2 text-muted-foreground" : "lime-fill"
-              }`}
-            >
-              {pushOn ? "Disattiva" : "Attiva"}
-            </button>
-          </div>
-          {pushOn && (
-            <button
-              onClick={() => {
-                void sendPush("Conti in Tasca", "Le notifiche funzionano correttamente.");
-                toast.success("Notifica di prova inviata");
-              }}
-              className="mt-3 w-full rounded-xl bg-surface-2 py-2.5 text-xs font-medium text-muted-foreground"
-            >
-              Invia notifica di prova
-            </button>
+              <button
+                onClick={() => void navigate({ to: "/auth" })}
+                className="lime-fill mt-3 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold"
+              >
+                <LogIn size={16} /> Accedi o registrati
+              </button>
+            </>
           )}
-        </section>
-      )}
-
-      <section className="card-surface p-5">
-        <label className="mb-1 block text-xs text-muted-foreground">Nome</label>
-        <div className="flex gap-2">
-          <input
-            value={nome}
-            onChange={(e) => setNome(e.target.value)}
-            placeholder="Il tuo nome"
-            className="flex-1 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
-          />
-          <button onClick={salvaNome} className="lime-fill rounded-xl px-4 text-sm font-semibold">
-            Salva
-          </button>
-        </div>
-      </section>
-
-      <section className="card-surface p-5">
-        <h2 className="text-sm font-semibold">Il mio profilo</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Usati per calcolare i budget suggeriti. Aggiornali se cambia la tua situazione.
-        </p>
-
-        <p className="mt-5 mb-2 text-xs text-muted-foreground">Situazione abitativa</p>
-        <div className="grid grid-cols-2 gap-2">
-          {HOUSING_OPTIONS.map((h) => (
-            <button
-              key={h.id}
-              onClick={() => setAbitazione(h.id)}
-              className={`rounded-2xl border px-3 py-3 text-sm ${
-                state.profilo.abitazione === h.id
-                  ? "border-primary bg-surface-2"
-                  : "border-border bg-surface text-muted-foreground"
-              }`}
-            >
-              {h.label}
-            </button>
-          ))}
         </div>
 
-        <p className="mt-5 mb-2 text-xs text-muted-foreground">Hai un&apos;auto?</p>
-        <div className="grid grid-cols-2 gap-2">
-          {[true, false].map((v) => (
-            <button
-              key={String(v)}
-              onClick={() => setAuto(v)}
-              className={`rounded-2xl border px-3 py-3 text-sm ${
-                state.profilo.auto === v
-                  ? "border-primary bg-surface-2"
-                  : "border-border bg-surface text-muted-foreground"
-              }`}
-            >
-              {v ? "Sì" : "No"}
-            </button>
-          ))}
-        </div>
-
-        <p className="mt-5 mb-2 text-xs text-muted-foreground">Persone in famiglia</p>
-        <div className="flex items-center gap-4 rounded-2xl border border-border bg-surface px-4 py-3">
-          <button
-            onClick={() => setPersone(Math.max(1, state.profilo.persone - 1))}
-            className="h-9 w-9 rounded-full bg-surface-2 text-lg"
-            aria-label="Diminuisci"
-          >
-            −
-          </button>
-          <span className="flex-1 text-center text-lg font-semibold">{state.profilo.persone}</span>
-          <button
-            onClick={() => setPersone(Math.min(12, state.profilo.persone + 1))}
-            className="h-9 w-9 rounded-full bg-surface-2 text-lg"
-            aria-label="Aumenta"
-          >
-            +
-          </button>
-        </div>
-
-        {!confirmRicalcolo ? (
-          <button
-            onClick={() => setConfirmRicalcolo(true)}
-            className="mt-5 w-full rounded-xl bg-surface-2 py-2.5 text-sm font-medium"
-          >
-            Ricalcola budget suggeriti in base al profilo
-          </button>
-        ) : (
-          <div className="mt-5">
-            <p className="mb-2 text-xs text-muted-foreground">
-              Sostituisce il budget attuale di ogni categoria con una nuova proposta, mantenendo lo
-              stesso totale. Puoi comunque modificarli dopo dalla scheda Budget.
-            </p>
-            <div className="flex gap-2">
+        {/* Face ID */}
+        {account && faceIdSupported() && (
+          <div className="py-4 first:pt-0 last:pb-0">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-primary">
+                <Fingerprint size={17} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-medium">Sblocco con Face ID</h3>
+                <p className="text-xs text-muted-foreground">
+                  {faceIdOn
+                    ? "Attivo su questo dispositivo"
+                    : "Aggiungi un livello in più, solo qui"}
+                </p>
+              </div>
               <button
-                onClick={() => setConfirmRicalcolo(false)}
-                className="flex-1 rounded-xl bg-surface-2 py-2.5 text-sm"
+                onClick={() => void toggleFaceId()}
+                disabled={faceIdBusy}
+                className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-60 ${
+                  faceIdOn ? "bg-surface-2 text-muted-foreground" : "lime-fill"
+                }`}
               >
-                Annulla
-              </button>
-              <button
-                onClick={ricalcolaBudget}
-                className="lime-fill flex-1 rounded-xl py-2.5 text-sm font-semibold"
-              >
-                Ricalcola
+                {faceIdOn ? "Disattiva" : "Attiva"}
               </button>
             </div>
           </div>
         )}
+
+        {/* Notifiche */}
+        {account && pushSupported() && (
+          <div className="py-4 first:pt-0 last:pb-0">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-primary">
+                <BellRing size={17} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-medium">Notifiche</h3>
+                <p className="text-xs text-muted-foreground">
+                  {pushOn
+                    ? "Attive su questo dispositivo"
+                    : "Avviso quando il ritmo di spesa è alto"}
+                </p>
+              </div>
+              <button
+                onClick={() => void togglePush()}
+                disabled={pushBusy}
+                className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-60 ${
+                  pushOn ? "bg-surface-2 text-muted-foreground" : "lime-fill"
+                }`}
+              >
+                {pushOn ? "Disattiva" : "Attiva"}
+              </button>
+            </div>
+            {pushOn && (
+              <button
+                onClick={() => {
+                  void (async () => {
+                    const res: SendPushResult = await sendPush(
+                      "Conti in Tasca",
+                      "Le notifiche funzionano correttamente.",
+                    );
+                    if (res.ok) {
+                      toast.success(
+                        res.sent === 1
+                          ? "Notifica inviata a 1 dispositivo"
+                          : `Notifica inviata a ${res.sent} dispositivi`,
+                      );
+                    } else {
+                      toast.error(`Invio non riuscito: ${res.reason}`);
+                    }
+                  })();
+                }}
+                className="mt-3 w-full rounded-xl bg-surface-2 py-2.5 text-xs font-medium text-muted-foreground"
+              >
+                Invia notifica di prova
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Nome */}
+        <div className="py-4 first:pt-0 last:pb-0">
+          <label className="mb-1 block text-xs text-muted-foreground">Nome</label>
+          <div className="flex gap-2">
+            <input
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              placeholder="Il tuo nome"
+              className="flex-1 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
+            />
+            <button onClick={salvaNome} className="lime-fill rounded-xl px-4 text-sm font-semibold">
+              Salva
+            </button>
+          </div>
+        </div>
       </section>
 
-      <section className="card-hero grid grid-cols-2 gap-4 p-5">
-        <div>
-          <p className="text-xs text-muted-foreground">Transazioni totali</p>
-          <p className="text-2xl font-semibold tracking-tight">{state.transazioni.length}</p>
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Primo utilizzo</p>
-          <p className="text-sm font-medium">
-            {formatDay(state.profilo.primoUtilizzo.slice(0, 10))}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Categorie</p>
-          <p className="text-2xl font-semibold tracking-tight">{state.categorie.length}</p>
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Speso in totale</p>
-          <p className="text-lg font-semibold tracking-tight">
-            {eur(state.transazioni.reduce((a, t) => a + t.importo, 0))}
-          </p>
-        </div>
+      {/* Ricalcola budget: compatta, si apre solo se serve */}
+      <section className="card-surface overflow-hidden p-0">
+        <button
+          onClick={() =>
+            setRicalcoloAperto((v) => {
+              const next = !v;
+              if (next) setNuovoTotale(String(budgetAttuale));
+              return next;
+            })
+          }
+          className="flex w-full items-center gap-3 p-5 text-left"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-primary">
+            <Wallet size={17} />
+          </span>
+          <span className="min-w-0 flex-1 text-sm font-semibold">Ricalcola budget</span>
+          <ChevronDown
+            size={18}
+            className={`shrink-0 text-muted-foreground transition-transform duration-200 ${
+              ricalcoloAperto ? "rotate-180" : ""
+            }`}
+          />
+        </button>
+
+        {ricalcoloAperto && (
+          <div className="px-5 pb-5">
+            <p className="mb-4 text-xs text-muted-foreground">
+              Ridistribuisce il budget tra le categorie in base alle tue preferenze e a quanto hai
+              speso davvero negli ultimi mesi. Puoi comunque modificarlo dopo dalla scheda Budget.
+            </p>
+
+            <label className="mb-1 block text-xs text-muted-foreground">Nuovo totale budget</label>
+            <div className="mb-4 flex items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3">
+              <input
+                type="number"
+                inputMode="decimal"
+                value={nuovoTotale}
+                onChange={(e) => setNuovoTotale(e.target.value)}
+                onFocus={(e) => e.target.select()}
+                className="w-full bg-transparent text-lg font-semibold outline-none"
+              />
+              <span className="text-sm text-muted-foreground">€</span>
+            </div>
+
+            <p className="mb-2 text-xs text-muted-foreground">Situazione abitativa</p>
+            <div className="grid grid-cols-2 gap-2">
+              {HOUSING_OPTIONS.map((h) => (
+                <button
+                  key={h.id}
+                  onClick={() => setAbitazione(h.id)}
+                  className={`rounded-2xl border px-3 py-3 text-sm ${
+                    state.profilo.abitazione === h.id
+                      ? "border-primary bg-surface-2"
+                      : "border-border bg-surface text-muted-foreground"
+                  }`}
+                >
+                  {h.label}
+                </button>
+              ))}
+            </div>
+
+            <p className="mt-5 mb-2 text-xs text-muted-foreground">Hai un&apos;auto?</p>
+            <div className="grid grid-cols-2 gap-2">
+              {[true, false].map((v) => (
+                <button
+                  key={String(v)}
+                  onClick={() => setAuto(v)}
+                  className={`rounded-2xl border px-3 py-3 text-sm ${
+                    state.profilo.auto === v
+                      ? "border-primary bg-surface-2"
+                      : "border-border bg-surface text-muted-foreground"
+                  }`}
+                >
+                  {v ? "Sì" : "No"}
+                </button>
+              ))}
+            </div>
+
+            <p className="mt-5 mb-2 text-xs text-muted-foreground">Persone in famiglia</p>
+            <div className="flex items-center gap-4 rounded-2xl border border-border bg-surface px-4 py-3">
+              <button
+                onClick={() => setPersone(Math.max(1, state.profilo.persone - 1))}
+                className="h-9 w-9 rounded-full bg-surface-2 text-lg"
+                aria-label="Diminuisci"
+              >
+                −
+              </button>
+              <span className="flex-1 text-center text-lg font-semibold">
+                {state.profilo.persone}
+              </span>
+              <button
+                onClick={() => setPersone(Math.min(12, state.profilo.persone + 1))}
+                className="h-9 w-9 rounded-full bg-surface-2 text-lg"
+                aria-label="Aumenta"
+              >
+                +
+              </button>
+            </div>
+
+            <button
+              onClick={ricalcolaBudget}
+              className="lime-fill mt-5 w-full rounded-xl py-2.5 text-sm font-semibold"
+            >
+              Ricalcola budget
+            </button>
+          </div>
+        )}
       </section>
 
       <section className="card-surface space-y-2 p-5">
