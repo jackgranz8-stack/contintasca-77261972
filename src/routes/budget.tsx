@@ -58,10 +58,13 @@ function BudgetPage() {
 
   const [focusCat, setFocusCat] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  const [editingNomeCat, setEditingNomeCat] = useState(false);
   const [ricEdit, setRicEdit] = useState<string | null>(null);
   const [ricDaEliminare, setRicDaEliminare] = useState<string | null>(null);
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const nomeCatRef = useRef<HTMLInputElement | null>(null);
   useScrollLock(editing !== null);
+  useScrollLock(editingNomeCat);
   useScrollLock(ricDaEliminare !== null);
 
   const totale = state.categorie.reduce((a, c) => a + c.budget, 0);
@@ -91,6 +94,7 @@ function BudgetPage() {
     setNuovaIcona("cart");
     setNuovaColore(null);
     setFormCat(false);
+    setEditingNomeCat(false);
     toast.success("Categoria aggiunta");
   };
 
@@ -152,6 +156,15 @@ function BudgetPage() {
           type="button"
           aria-label="Conferma importo"
           onClick={() => inputRefs.current[editing]?.blur()}
+          className="fixed inset-0 z-30 bg-background/70 backdrop-blur-sm"
+        />
+      )}
+
+      {editingNomeCat && (
+        <button
+          type="button"
+          aria-label="Conferma nome categoria"
+          onClick={() => nomeCatRef.current?.blur()}
           className="fixed inset-0 z-30 bg-background/70 backdrop-blur-sm"
         />
       )}
@@ -233,7 +246,7 @@ function BudgetPage() {
         })}
       </section>
 
-      <section className="card-surface overflow-hidden">
+      <section className={`card-surface overflow-hidden ${editingNomeCat ? "relative z-40" : ""}`}>
         <button
           type="button"
           onClick={() => setFormCat((v) => !v)}
@@ -252,10 +265,15 @@ function BudgetPage() {
         {formCat && (
           <div className="border-t border-border p-4 pt-3.5">
             <input
+              ref={nomeCatRef}
               value={nuovaCat}
               onChange={(e) => setNuovaCat(e.target.value)}
+              onFocus={() => setEditingNomeCat(true)}
+              onBlur={() => setEditingNomeCat(false)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+              }}
               placeholder="Es. Abbonamenti"
-              autoFocus
               className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
             />
 
