@@ -191,7 +191,10 @@ function BudgetPage() {
                       setEditing(c.id);
                       e.target.select();
                     }}
-                    onBlur={() => setEditing((v) => (v === c.id ? null : v))}
+                    onBlur={() => {
+                      setEditing((v) => (v === c.id ? null : v));
+                      setFocusCat((v) => (v === c.id ? null : v));
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") e.currentTarget.blur();
                     }}

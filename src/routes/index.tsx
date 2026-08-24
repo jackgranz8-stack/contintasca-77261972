@@ -1,10 +1,19 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Lightbulb, TrendingUp } from "lucide-react";
+import { Lightbulb, TrendingUp, X } from "lucide-react";
 import { sum, totalsByCategory, txInMonth, useApp } from "@/lib/store";
 import { buildTips, type TipAction } from "@/lib/advice";
-import { currentMonth, eur, lastMonths, monthLabel, pct, barTone, uid } from "@/lib/format";
+import {
+  currentMonth,
+  eur,
+  formatDay,
+  lastMonths,
+  monthLabel,
+  pct,
+  barTone,
+  uid,
+} from "@/lib/format";
 import { iconFor } from "@/lib/icons";
 import { ProgressBar } from "@/components/ProgressBar";
 import { TrendBars } from "@/components/TrendBars";
@@ -226,40 +235,95 @@ function HomePage() {
               selected={catSel === "all" ? null : catSel}
               onSelect={(id) => setCatSel((v) => (v === id ? "all" : id))}
             />
-            <ul className="mt-2 space-y-4 border-t border-border pt-4">
-              {state.categorie.map((c) => {
-                const val = totali.get(c.id) ?? 0;
+            {catSel === "all" ? (
+              <ul className="mt-2 space-y-4 border-t border-border pt-4">
+                {state.categorie.map((c) => {
+                  const val = totali.get(c.id) ?? 0;
+                  const Icon = iconFor(c.icona);
+                  return (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        onClick={() => setCatSel(c.id)}
+                        className="w-full text-left"
+                      >
+                        <div className="mb-1.5 flex items-center gap-2">
+                          <span
+                            className="flex h-7 w-7 items-center justify-center rounded-full"
+                            style={{ backgroundColor: `${c.colore}22`, color: c.colore }}
+                          >
+                            <Icon size={14} />
+                          </span>
+                          <span className="flex-1 text-sm">{c.nome}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {eur(val)} / {eur(c.budget)}
+                          </span>
+                        </div>
+                        <ProgressBar value={val} max={c.budget} height={8} />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              (() => {
+                const c = state.categorie.find((x) => x.id === catSel);
+                if (!c) return null;
                 const Icon = iconFor(c.icona);
-                const attiva = catSel === c.id;
+                const val = totali.get(c.id) ?? 0;
+                const txCat = txMese
+                  .filter((t) => t.categoria === catSel)
+                  .sort((a, b) => (a.data < b.data ? 1 : -1));
                 return (
-                  <li key={c.id}>
-                    <button
-                      type="button"
-                      onClick={() => setCatSel(attiva ? "all" : c.id)}
-                      className="w-full text-left"
-                    >
-                      <div className="mb-1.5 flex items-center gap-2">
-                        <span
-                          className="flex h-7 w-7 items-center justify-center rounded-full"
-                          style={{ backgroundColor: `${c.colore}22`, color: c.colore }}
-                        >
-                          <Icon size={14} />
-                        </span>
-                        <span
-                          className={`flex-1 text-sm ${attiva ? "font-semibold text-primary" : ""}`}
-                        >
-                          {c.nome}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {eur(val)} / {eur(c.budget)}
-                        </span>
-                      </div>
+                  <div className="mt-2 border-t border-border pt-4">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+                        style={{ backgroundColor: `${c.colore}22`, color: c.colore }}
+                      >
+                        <Icon size={15} />
+                      </span>
+                      <span className="flex-1 text-sm font-semibold">{c.nome}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {eur(val)} / {eur(c.budget)}
+                      </span>
+                      <button
+                        onClick={() => setCatSel("all")}
+                        className="shrink-0 rounded-full bg-surface-2 p-1.5 text-muted-foreground"
+                        aria-label="Deseleziona categoria, mostra tutte"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <div className="mt-2.5">
                       <ProgressBar value={val} max={c.budget} height={8} />
-                    </button>
-                  </li>
+                    </div>
+                    <div className="mt-4 space-y-2">
+                      {txCat.length === 0 ? (
+                        <p className="py-4 text-center text-xs text-muted-foreground">
+                          Nessuna transazione in {c.nome} in {monthLabel(mese)}
+                        </p>
+                      ) : (
+                        txCat.map((t) => (
+                          <div
+                            key={t.id}
+                            className="flex items-center gap-3 rounded-xl bg-surface px-3 py-2.5"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm">{t.nota || c.nome}</p>
+                              <p className="text-[11px] text-muted-foreground">
+                                {formatDay(t.data)}
+                              </p>
+                            </div>
+                            <span className="text-sm font-semibold">{eur(t.importo)}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 );
-              })}
-            </ul>
+              })()
+            )}
           </>
         ) : (
           <p className="py-8 text-center text-sm text-muted-foreground">
