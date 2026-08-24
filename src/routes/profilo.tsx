@@ -241,6 +241,25 @@ function ProfiloPage() {
               )}
             </div>
 
+            {/* Nome */}
+            <div className="py-4 first:pt-0 last:pb-0">
+              <label className="mb-1 block text-xs text-muted-foreground">Nome</label>
+              <div className="flex gap-2">
+                <input
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                  placeholder="Il tuo nome"
+                  className="flex-1 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
+                />
+                <button
+                  onClick={salvaNome}
+                  className="lime-fill rounded-xl px-4 text-sm font-semibold"
+                >
+                  Salva
+                </button>
+              </div>
+            </div>
+
             {/* Face ID */}
             {account && faceIdSupported() && (
               <div className="py-4 first:pt-0 last:pb-0">
@@ -320,25 +339,6 @@ function ProfiloPage() {
                 )}
               </div>
             )}
-
-            {/* Nome */}
-            <div className="py-4 first:pt-0 last:pb-0">
-              <label className="mb-1 block text-xs text-muted-foreground">Nome</label>
-              <div className="flex gap-2">
-                <input
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value)}
-                  placeholder="Il tuo nome"
-                  className="flex-1 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
-                />
-                <button
-                  onClick={salvaNome}
-                  className="lime-fill rounded-xl px-4 text-sm font-semibold"
-                >
-                  Salva
-                </button>
-              </div>
-            </div>
           </div>
         )}
       </section>
