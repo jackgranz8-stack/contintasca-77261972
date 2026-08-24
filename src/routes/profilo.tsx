@@ -6,6 +6,7 @@ import {
   ChevronDown,
   Download,
   FileDown,
+  FileSpreadsheet,
   Fingerprint,
   LogIn,
   LogOut,
@@ -193,6 +194,9 @@ function ProfiloPage() {
           onClick={() => setPreferenzeAperto((v) => !v)}
           className="flex w-full items-center gap-3 p-5 text-left"
         >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-sm font-semibold text-primary">
+            {(state.profilo.nome.trim().charAt(0) || "?").toUpperCase()}
+          </span>
           <span className="min-w-0 flex-1 text-sm font-semibold">Preferenze profilo</span>
           <ChevronDown
             size={18}
@@ -453,6 +457,9 @@ function ProfiloPage() {
           onClick={() => setExcelAperto((v) => !v)}
           className="flex w-full items-center gap-3 p-5 text-left"
         >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-primary">
+            <FileSpreadsheet size={17} />
+          </span>
           <span className="min-w-0 flex-1 text-sm font-semibold">Import/export file</span>
           <ChevronDown
             size={18}
