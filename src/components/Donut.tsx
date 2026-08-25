@@ -12,7 +12,7 @@ export function Donut({
 }: {
   slices: Slice[];
   total: number;
-  selected?: string | null;
+  selected?: string | string[] | null;
   onSelect?: (id: string) => void;
   centerLabel?: string;
 }) {
@@ -20,6 +20,7 @@ export function Donut({
   const visible = slices.filter((s) => s.value > 0);
   const sum = visible.reduce((a, s) => a + s.value, 0);
   let offset = 0;
+  const selectedIds = Array.isArray(selected) ? selected : selected ? [selected] : [];
 
   const activeSlice = visible.find((s) => (s.id ?? s.label) === active);
 
@@ -31,7 +32,7 @@ export function Donut({
           {sum > 0 &&
             visible.map((s) => {
               const key = s.id ?? s.label;
-              const isSel = selected != null && selected === s.id;
+              const isSel = s.id != null && selectedIds.includes(s.id);
               const isActive = active === key;
               const r = isSel || isActive ? 56 : 54;
               const c = 2 * Math.PI * r;
@@ -49,8 +50,12 @@ export function Donut({
                   strokeLinecap="round"
                   strokeDasharray={dash}
                   strokeDashoffset={-((offset / (2 * Math.PI * 54)) * c)}
-                  opacity={selected && !isSel ? 0.4 : 1}
-                  className={onSelect ? "cursor-pointer transition-all duration-200" : "transition-all duration-200"}
+                  opacity={selectedIds.length > 0 && !isSel ? 0.4 : 1}
+                  className={
+                    onSelect
+                      ? "cursor-pointer transition-all duration-200"
+                      : "transition-all duration-200"
+                  }
                   onPointerEnter={() => setActive(key)}
                   onPointerLeave={() => setActive((v) => (v === key ? null : v))}
                   onPointerDown={() => setActive(key)}
@@ -79,9 +84,7 @@ export function Donut({
         </div>
       </div>
       {onSelect && visible.length > 0 && (
-        <p className="mt-1 text-[11px] text-muted-foreground">
-          Tocca uno spicchio per filtrare
-        </p>
+        <p className="mt-1 text-[11px] text-muted-foreground">Tocca uno spicchio per filtrare</p>
       )}
     </div>
   );

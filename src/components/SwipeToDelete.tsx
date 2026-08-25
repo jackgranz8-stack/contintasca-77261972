@@ -7,19 +7,28 @@ const REVEAL = 76;
  * Wrapper che aggiunge lo swipe-to-delete in stile iOS a una singola riga/card.
  * Lo scorrimento verso sinistra rivela un pannello rosso con l'icona del cestino,
  * confinato esclusivamente al riquadro di questa riga (non influenza le altre).
+ *
+ * È un componente controllato: `openId`/`onOpenChange` sono condivisi tra tutte le
+ * righe di una stessa lista, così aprendone una tutte le altre si richiudono da sole.
  */
 export function SwipeToDelete({
+  id,
+  openId,
+  onOpenChange,
   onDelete,
   label = "Elimina",
   className = "",
   children,
 }: {
+  id: string;
+  openId: string | null;
+  onOpenChange: (id: string | null) => void;
   onDelete: () => void;
   label?: string;
   className?: string;
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
+  const open = openId === id;
   const [offset, setOffset] = useState(0);
   const draggingRef = useRef(false);
   const startRef = useRef({ x: 0, y: 0, base: 0 });
@@ -52,7 +61,8 @@ export function SwipeToDelete({
     draggingRef.current = false;
     if (axisRef.current === "x") {
       const shouldOpen = offset < -REVEAL / 2;
-      setOpen(shouldOpen);
+      if (shouldOpen) onOpenChange(id);
+      else if (open) onOpenChange(null);
       setOffset(shouldOpen ? -REVEAL : 0);
     }
     axisRef.current = "none";
@@ -67,7 +77,7 @@ export function SwipeToDelete({
           type="button"
           aria-label={label}
           onClick={() => {
-            setOpen(false);
+            onOpenChange(null);
             setOffset(0);
             onDelete();
           }}
@@ -85,7 +95,7 @@ export function SwipeToDelete({
           if (open) {
             e.preventDefault();
             e.stopPropagation();
-            setOpen(false);
+            onOpenChange(null);
             setOffset(0);
           }
         }}

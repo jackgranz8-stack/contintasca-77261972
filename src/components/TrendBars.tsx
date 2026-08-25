@@ -9,16 +9,17 @@ export function TrendBars({
   onSelect,
 }: {
   data: BarDatum[];
-  selected?: string;
+  selected?: string | string[];
   onSelect?: (key: string) => void;
 }) {
   const [hover, setHover] = useState<string | null>(null);
   const max = Math.max(1, ...data.map((d) => d.value));
+  const selectedKeys = Array.isArray(selected) ? selected : selected ? [selected] : [];
 
   return (
     <div className="relative flex items-end justify-between gap-1.5">
       {data.map((d) => {
-        const active = d.key === selected;
+        const active = selectedKeys.includes(d.key);
         const shown = hover === d.key;
         const h = Math.max(6, (d.value / max) * 96);
         return (
@@ -43,7 +44,9 @@ export function TrendBars({
             )}
             <span
               className={
-                active ? "text-[10px] font-semibold text-primary" : "text-[10px] text-muted-foreground"
+                active
+                  ? "text-[10px] font-semibold text-primary"
+                  : "text-[10px] text-muted-foreground"
               }
             >
               {d.value > 0 ? Math.round(d.value) : ""}
