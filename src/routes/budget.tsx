@@ -11,6 +11,7 @@ import { CATEGORY_COLORS, PALETTE, type Category } from "@/lib/types";
 import { ProgressBar } from "@/components/ProgressBar";
 import { EditRecurringModal } from "@/components/EditRecurringModal";
 import { EditCategoryModal } from "@/components/EditCategoryModal";
+import { SwipeToDelete } from "@/components/SwipeToDelete";
 
 export const Route = createFileRoute("/budget")({
   head: () => ({
@@ -152,85 +153,81 @@ function BudgetPage() {
         />
       )}
 
-      <section className="card-surface divide-y divide-border">
+      <div className="space-y-2">
         {state.categorie.map((c) => {
           const Icon = iconFor(c.icona);
           const speso = spesiMese.get(c.id) ?? 0;
           const evidenzia = focusCat === c.id;
           const inModifica = editing === c.id;
           return (
-            <div
-              id={`cat-row-${c.id}`}
+            <SwipeToDelete
               key={c.id}
-              className={`px-4 py-3 transition-colors ${evidenzia ? "bg-surface-2 ring-1 ring-primary/40" : ""} ${
-                inModifica ? "relative z-40 rounded-2xl bg-surface-2 ring-2 ring-primary" : ""
+              label={`Elimina ${c.nome}`}
+              onDelete={() => {
+                if (!deleteCategory(c.id))
+                  toast.error("Categoria in uso: non può essere eliminata");
+                else toast.success("Categoria eliminata");
+              }}
+              className={`card-surface transition-colors ${evidenzia ? "ring-1 ring-primary/40" : ""} ${
+                inModifica ? "relative z-40 ring-2 ring-primary" : ""
               }`}
             >
-              <div className="flex items-center gap-3">
-                <span
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
-                  style={{ backgroundColor: `${c.colore}22`, color: c.colore }}
-                >
-                  <Icon size={16} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm">{c.nome}</p>
-                  <p className="text-[11px] text-muted-foreground">speso {eur(speso)}</p>
+              <div id={`cat-row-${c.id}`} className="px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <span
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                    style={{ backgroundColor: `${c.colore}22`, color: c.colore }}
+                  >
+                    <Icon size={16} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm">{c.nome}</p>
+                    <p className="text-[11px] text-muted-foreground">speso {eur(speso)}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1 rounded-xl bg-surface px-2.5 py-1.5">
+                    <input
+                      ref={(el) => {
+                        inputRefs.current[c.id] = el;
+                      }}
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      value={c.budget}
+                      onFocus={(e) => {
+                        setFocusCat(c.id);
+                        setEditing(c.id);
+                        e.target.select();
+                      }}
+                      onBlur={() => {
+                        setEditing((v) => (v === c.id ? null : v));
+                        setFocusCat((v) => (v === c.id ? null : v));
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") e.currentTarget.blur();
+                      }}
+                      onChange={(e) =>
+                        updateCategory(c.id, { budget: Math.max(0, Number(e.target.value) || 0) })
+                      }
+                      className="w-[72px] bg-transparent py-1 text-right text-base font-semibold outline-none"
+                    />
+                    <span className="text-xs text-muted-foreground">€</span>
+                  </div>
+                  <button
+                    onClick={() => setCatEdit(c.id)}
+                    className="shrink-0 text-muted-foreground"
+                    aria-label={`Modifica ${c.nome}`}
+                  >
+                    <Pencil size={16} />
+                  </button>
                 </div>
-                <div className="flex shrink-0 items-center gap-1 rounded-xl bg-surface px-2.5 py-1.5">
-                  <input
-                    ref={(el) => {
-                      inputRefs.current[c.id] = el;
-                    }}
-                    type="number"
-                    inputMode="decimal"
-                    min={0}
-                    value={c.budget}
-                    onFocus={(e) => {
-                      setFocusCat(c.id);
-                      setEditing(c.id);
-                      e.target.select();
-                    }}
-                    onBlur={() => {
-                      setEditing((v) => (v === c.id ? null : v));
-                      setFocusCat((v) => (v === c.id ? null : v));
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") e.currentTarget.blur();
-                    }}
-                    onChange={(e) =>
-                      updateCategory(c.id, { budget: Math.max(0, Number(e.target.value) || 0) })
-                    }
-                    className="w-[72px] bg-transparent py-1 text-right text-base font-semibold outline-none"
-                  />
-                  <span className="text-xs text-muted-foreground">€</span>
+                <div className="mt-2">
+                  <ProgressBar value={speso} max={c.budget} height={6} />
                 </div>
-                <button
-                  onClick={() => setCatEdit(c.id)}
-                  className="shrink-0 text-muted-foreground"
-                  aria-label={`Modifica ${c.nome}`}
-                >
-                  <Pencil size={16} />
-                </button>
-                <button
-                  onClick={() => {
-                    if (!deleteCategory(c.id))
-                      toast.error("Categoria in uso: non può essere eliminata");
-                    else toast.success("Categoria eliminata");
-                  }}
-                  className="shrink-0 p-1 text-muted-foreground"
-                  aria-label={`Elimina ${c.nome}`}
-                >
-                  <Trash2 size={16} />
-                </button>
               </div>
-              <div className="mt-2">
-                <ProgressBar value={speso} max={c.budget} height={6} />
-              </div>
-            </div>
+            </SwipeToDelete>
           );
         })}
-      </section>
+      </div>
 
       <section className={`card-surface overflow-hidden ${editingNomeCat ? "relative z-40" : ""}`}>
         <button
