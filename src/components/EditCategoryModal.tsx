@@ -16,11 +16,13 @@ export function EditCategoryModal({
   edit: Category | null;
 }) {
   const { updateCategory } = useApp();
+  const [nome, setNome] = useState("");
   const [icona, setIcona] = useState("wallet");
   const [colore, setColore] = useState("#8CE562");
 
   useEffect(() => {
     if (!open || !edit) return;
+    setNome(edit.nome);
     setIcona(edit.icona);
     setColore(edit.colore);
   }, [open, edit]);
@@ -32,7 +34,12 @@ export function EditCategoryModal({
   const Icon = iconFor(icona);
 
   const salva = () => {
-    updateCategory(edit.id, { icona, colore });
+    const n = nome.trim();
+    if (!n) {
+      toast.error("Il nome non può essere vuoto");
+      return;
+    }
+    updateCategory(edit.id, { nome: n, icona, colore });
     toast.success("Categoria aggiornata");
     onClose();
   };
@@ -59,7 +66,15 @@ export function EditCategoryModal({
           >
             <Icon size={22} />
           </span>
-          <p className="truncate text-sm font-medium">{edit.nome}</p>
+          <input
+            value={nome}
+            onChange={(e) => setNome(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+            placeholder="Nome categoria"
+            className="min-w-0 flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-muted-foreground"
+          />
         </div>
 
         <p className="mb-2 text-xs text-muted-foreground">Icona</p>
