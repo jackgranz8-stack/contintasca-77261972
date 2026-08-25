@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Copy, FileSpreadsheet, Pencil, Repeat, Search, Trash2 } from "lucide-react";
+import { Copy, FileSpreadsheet, Pencil, Repeat, Search } from "lucide-react";
 import { sum, totalsByCategory, txInMonth, useApp } from "@/lib/store";
 import { useScrollLock } from "@/hooks/use-scroll-lock";
+import { SwipeToDelete } from "@/components/SwipeToDelete";
 
 import { eur, formatDay, lastMonths, monthLabel, monthKey } from "@/lib/format";
 import { iconFor } from "@/lib/icons";
@@ -40,9 +41,10 @@ function StoricoPage() {
   useScrollLock(daEliminare !== null);
 
   const [daModificare, setDaModificare] = useState<Transaction | null>(null);
-  const [daDuplicare, setDaDuplicare] = useState<
-    Pick<Transaction, "importo" | "categoria" | "nota"> | null
-  >(null);
+  const [daDuplicare, setDaDuplicare] = useState<Pick<
+    Transaction,
+    "importo" | "categoria" | "nota"
+  > | null>(null);
   const [ricerca, setRicerca] = useState("");
 
   const mesiDisponibili = useMemo(() => {
@@ -52,7 +54,6 @@ function StoricoPage() {
   }, [state.transazioni]);
 
   const mesiGrafico = useMemo(() => lastMonths(6), []);
-
 
   const base = txInMonth(state.transazioni, mese);
   const q = ricerca.trim().toLowerCase();
@@ -89,19 +90,9 @@ function StoricoPage() {
         />
       </div>
 
-      {/* Grafico a barre: unico pilota del filtro mese */}
+      {/* Grafico a barre: seleziona il mese toccando una barra */}
       <section className="card-surface p-5">
-        <div className="mb-4 flex items-center gap-2">
-          <h2 className="text-sm font-semibold">Andamento nel tempo</h2>
-          <button
-            onClick={() => setMese("all")}
-            className={`ml-auto shrink-0 rounded-full border px-3 py-1.5 text-xs ${
-              mese === "all" ? "border-primary text-primary" : "border-border text-muted-foreground"
-            }`}
-          >
-            Tutto
-          </button>
-        </div>
+        <h2 className="mb-4 text-sm font-semibold">Andamento nel tempo</h2>
         <TrendBars
           data={mesiGrafico.map((m) => ({
             key: m,
@@ -112,19 +103,6 @@ function StoricoPage() {
           selected={mese === "all" ? "" : mese}
           onSelect={setMese}
         />
-        <div className="no-scrollbar -mx-1 mt-4 flex gap-2 overflow-x-auto px-1 pb-1">
-          {mesiDisponibili.map((m) => (
-            <button
-              key={m}
-              onClick={() => setMese(m)}
-              className={`shrink-0 rounded-full border px-3.5 py-2 text-xs capitalize ${
-                mese === m ? "border-primary text-primary" : "border-border text-muted-foreground"
-              }`}
-            >
-              {monthLabel(m)}
-            </button>
-          ))}
-        </div>
       </section>
 
       <section className="card-hero p-5">
@@ -138,30 +116,9 @@ function StoricoPage() {
         </p>
       </section>
 
-      {/* Pillole categoria + donut */}
+      {/* Donut: seleziona la categoria toccando una fetta */}
       <section className="card-surface p-5">
         <h2 className="mb-3 text-sm font-semibold">Ripartizione per categoria</h2>
-        <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-          <button
-            onClick={() => setCat("all")}
-            className={`shrink-0 rounded-full border px-3.5 py-2 text-xs ${
-              cat === "all" ? "border-primary text-primary" : "border-border text-muted-foreground"
-            }`}
-          >
-            Tutte
-          </button>
-          {state.categorie.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setCat(cat === c.id ? "all" : c.id)}
-              className={`shrink-0 rounded-full border px-3.5 py-2 text-xs ${
-                cat === c.id ? "border-primary text-primary" : "border-border text-muted-foreground"
-              }`}
-            >
-              {c.nome}
-            </button>
-          ))}
-        </div>
         {slices.length > 0 ? (
           <Donut
             slices={slices}
@@ -176,6 +133,51 @@ function StoricoPage() {
         )}
       </section>
 
+      {/* Filtri rapidi: mese e categoria, subito sopra ai risultati */}
+      <div className="space-y-2">
+        <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1">
+          <button
+            onClick={() => setMese("all")}
+            className={`shrink-0 rounded-full border px-3.5 py-2 text-xs ${
+              mese === "all" ? "border-primary text-primary" : "border-border text-muted-foreground"
+            }`}
+          >
+            Tutti i mesi
+          </button>
+          {mesiDisponibili.map((m) => (
+            <button
+              key={m}
+              onClick={() => setMese(m)}
+              className={`shrink-0 rounded-full border px-3.5 py-2 text-xs capitalize ${
+                mese === m ? "border-primary text-primary" : "border-border text-muted-foreground"
+              }`}
+            >
+              {monthLabel(m)}
+            </button>
+          ))}
+        </div>
+        <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1">
+          <button
+            onClick={() => setCat("all")}
+            className={`shrink-0 rounded-full border px-3.5 py-2 text-xs ${
+              cat === "all" ? "border-primary text-primary" : "border-border text-muted-foreground"
+            }`}
+          >
+            Tutte le categorie
+          </button>
+          {state.categorie.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setCat(cat === c.id ? "all" : c.id)}
+              className={`shrink-0 rounded-full border px-3.5 py-2 text-xs ${
+                cat === c.id ? "border-primary text-primary" : "border-border text-muted-foreground"
+              }`}
+            >
+              {c.nome}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <section className="space-y-2">
         {filtrate.length === 0 && (
@@ -187,58 +189,58 @@ function StoricoPage() {
           const c = state.categorie.find((x) => x.id === t.categoria);
           const Icon = iconFor(c?.icona ?? "wallet");
           return (
-            <div key={t.id} className="card-surface flex items-center gap-3 px-4 py-3">
-              <span
-                className="flex h-9 w-9 items-center justify-center rounded-full"
-                style={{
-                  backgroundColor: `${c?.colore ?? "#9AA6A0"}22`,
-                  color: c?.colore ?? "#9AA6A0",
-                }}
-              >
-                <Icon size={16} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="flex items-center gap-1.5 truncate text-sm">
-                  <span className="truncate">{t.nota || (c?.nome ?? "Spesa")}</span>
-                  {t.ricorrenteId && (
-                    <span
-                      title="Generata da una spesa ricorrente"
-                      aria-label="Generata da una spesa ricorrente"
-                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary"
-                    >
-                      <Repeat size={10} />
-                    </span>
-                  )}
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  {formatDay(t.data)} · {c?.nome ?? "Categoria eliminata"}
-                </p>
+            <SwipeToDelete
+              key={t.id}
+              className="card-surface"
+              label={`Elimina ${t.nota || c?.nome || "transazione"}`}
+              onDelete={() => setDaEliminare(t.id)}
+            >
+              <div className="flex items-center gap-3 px-4 py-3">
+                <span
+                  className="flex h-9 w-9 items-center justify-center rounded-full"
+                  style={{
+                    backgroundColor: `${c?.colore ?? "#9AA6A0"}22`,
+                    color: c?.colore ?? "#9AA6A0",
+                  }}
+                >
+                  <Icon size={16} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="flex items-center gap-1.5 truncate text-sm">
+                    <span className="truncate">{t.nota || (c?.nome ?? "Spesa")}</span>
+                    {t.ricorrenteId && (
+                      <span
+                        title="Generata da una spesa ricorrente"
+                        aria-label="Generata da una spesa ricorrente"
+                        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary"
+                      >
+                        <Repeat size={10} />
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {formatDay(t.data)} · {c?.nome ?? "Categoria eliminata"}
+                  </p>
+                </div>
+                <span className="text-sm font-semibold">{eur(t.importo)}</span>
+                <button
+                  onClick={() =>
+                    setDaDuplicare({ importo: t.importo, categoria: t.categoria, nota: t.nota })
+                  }
+                  className="p-1.5 text-muted-foreground"
+                  aria-label="Duplica"
+                >
+                  <Copy size={16} />
+                </button>
+                <button
+                  onClick={() => setDaModificare(t)}
+                  className="p-1.5 text-muted-foreground"
+                  aria-label="Modifica"
+                >
+                  <Pencil size={16} />
+                </button>
               </div>
-              <span className="text-sm font-semibold">{eur(t.importo)}</span>
-              <button
-                onClick={() =>
-                  setDaDuplicare({ importo: t.importo, categoria: t.categoria, nota: t.nota })
-                }
-                className="p-1.5 text-muted-foreground"
-                aria-label="Duplica"
-              >
-                <Copy size={16} />
-              </button>
-              <button
-                onClick={() => setDaModificare(t)}
-                className="p-1.5 text-muted-foreground"
-                aria-label="Modifica"
-              >
-                <Pencil size={16} />
-              </button>
-              <button
-                onClick={() => setDaEliminare(t.id)}
-                className="p-1.5 text-muted-foreground"
-                aria-label="Elimina"
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
+            </SwipeToDelete>
           );
         })}
       </section>
@@ -268,7 +270,9 @@ function StoricoPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-6 backdrop-blur-sm">
           <div className="card-surface w-full max-w-[340px] p-5">
             <h3 className="text-base font-semibold">Eliminare la transazione?</h3>
-            <p className="mt-1 text-xs text-muted-foreground">L&apos;operazione non è annullabile.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              L&apos;operazione non è annullabile.
+            </p>
             <div className="mt-4 flex gap-2">
               <button
                 onClick={() => setDaEliminare(null)}
