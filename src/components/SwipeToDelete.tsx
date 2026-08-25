@@ -62,7 +62,7 @@ export function SwipeToDelete({
 
   return (
     <div className={`relative overflow-hidden ${className}`}>
-      <div className="absolute inset-y-0 right-0" style={{ width: REVEAL }}>
+      <div className="absolute inset-y-0 right-0 z-0" style={{ width: REVEAL }}>
         <button
           type="button"
           aria-label={label}
@@ -89,9 +89,12 @@ export function SwipeToDelete({
             setOffset(0);
           }
         }}
+        className="relative z-10 bg-[image:var(--gradient-card)]"
         style={{
           transform: `translateX(${shown}px)`,
-          transition: draggingRef.current ? "none" : "transform 260ms cubic-bezier(0.22,1,0.36,1)",
+          transition: draggingRef.current
+            ? "none"
+            : "transform 500ms cubic-bezier(0.34,1.56,0.64,1)",
           touchAction: "pan-y",
         }}
       >
