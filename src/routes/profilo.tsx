@@ -14,6 +14,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { useApp } from "@/lib/store";
+import { useScrollLock } from "@/hooks/use-scroll-lock";
 import { uid } from "@/lib/format";
 import { HOUSING_OPTIONS, PALETTE, type Housing } from "@/lib/types";
 import { exportTemplate, exportTransactions, parseImportFile } from "@/lib/excel";
@@ -51,7 +52,9 @@ function ProfiloPage() {
   const { state, update, reset, account, syncing, signOut } = useApp();
   const navigate = useNavigate();
   const [nome, setNome] = useState(state.profilo.nome);
-  const [resetStep, setResetStep] = useState(0);
+  const [confermaEsci, setConfermaEsci] = useState(false);
+  const [confermaReset, setConfermaReset] = useState(false);
+  useScrollLock(confermaEsci || confermaReset);
   const [ricalcoloAperto, setRicalcoloAperto] = useState(false);
   const [preferenzeAperto, setPreferenzeAperto] = useState(false);
   const [excelAperto, setExcelAperto] = useState(false);
@@ -217,13 +220,10 @@ function ProfiloPage() {
                     {syncing ? " (sincronizzazione…)" : ""}
                   </p>
                   <button
-                    onClick={() => {
-                      void signOut();
-                      toast.success("Disconnesso");
-                    }}
-                    className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-border py-2.5 text-sm font-medium"
+                    onClick={() => setConfermaEsci(true)}
+                    className="mx-auto mt-3 flex w-auto items-center justify-center gap-1.5 rounded-full border border-destructive px-4 py-2 text-xs font-medium text-destructive"
                   >
-                    <LogOut size={16} /> Esci
+                    <LogOut size={14} /> Esci
                   </button>
                 </>
               ) : (
@@ -523,55 +523,87 @@ function ProfiloPage() {
         <p className="mt-1 text-xs text-muted-foreground">
           Cancella spese, categorie, ricorrenti e profilo dal tuo account.
         </p>
-        {resetStep === 0 && (
-          <button
-            onClick={() => setResetStep(1)}
-            className="mt-3 w-full rounded-xl border border-destructive py-2.5 text-sm font-medium text-destructive"
-          >
-            Reimposta app
-          </button>
-        )}
-        {resetStep === 1 && (
-          <div className="mt-3 flex gap-2">
-            <button
-              onClick={() => setResetStep(0)}
-              className="flex-1 rounded-xl bg-surface-2 py-2.5 text-sm"
-            >
-              Annulla
-            </button>
-            <button
-              onClick={() => setResetStep(2)}
-              className="flex-1 rounded-xl border border-destructive py-2.5 text-sm text-destructive"
-            >
-              Sei sicuro?
-            </button>
-          </div>
-        )}
-        {resetStep === 2 && (
-          <div className="mt-3 flex gap-2">
-            <button
-              onClick={() => setResetStep(0)}
-              className="flex-1 rounded-xl bg-surface-2 py-2.5 text-sm"
-            >
-              No, torna indietro
-            </button>
-            <button
-              onClick={() => {
-                reset();
-                toast.success("App reimpostata");
-              }}
-              className="flex-1 rounded-xl bg-destructive py-2.5 text-sm font-semibold text-destructive-foreground"
-            >
-              Cancella tutto
-            </button>
-          </div>
-        )}
+        <button
+          onClick={() => setConfermaReset(true)}
+          className="mt-3 w-full rounded-xl border border-destructive py-2.5 text-sm font-medium text-destructive"
+        >
+          Reimposta app
+        </button>
       </section>
 
       <p className="pb-2 text-center text-[11px] text-muted-foreground">
         Conti in Tasca · i dati sono legati al tuo account e disponibili su ogni dispositivo dopo il
         login
       </p>
+
+      {confermaEsci && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overscroll-none bg-background/70 px-6 backdrop-blur-sm">
+          <button
+            className="absolute inset-0"
+            aria-label="Annulla"
+            onClick={() => setConfermaEsci(false)}
+          />
+          <div className="relative z-10 w-full max-w-[340px] rounded-3xl border border-border bg-popover p-5">
+            <p className="text-sm font-semibold">Sei sicuro di voler uscire?</p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Dovrai accedere di nuovo per ritrovare le tue spese sincronizzate.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => setConfermaEsci(false)}
+                className="flex-1 rounded-xl bg-surface-2 py-2.5 text-sm font-medium"
+              >
+                Annulla
+              </button>
+              <button
+                onClick={() => {
+                  setConfermaEsci(false);
+                  void signOut();
+                  toast.success("Disconnesso");
+                }}
+                className="flex-1 rounded-xl bg-destructive py-2.5 text-sm font-semibold text-destructive-foreground"
+              >
+                Esci
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confermaReset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overscroll-none bg-background/70 px-6 backdrop-blur-sm">
+          <button
+            className="absolute inset-0"
+            aria-label="Annulla"
+            onClick={() => setConfermaReset(false)}
+          />
+          <div className="relative z-10 w-full max-w-[340px] rounded-3xl border border-border bg-popover p-5">
+            <p className="text-sm font-semibold">Sei sicuro di voler reimpostare l'app?</p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Cancella spese, categorie, ricorrenti e profilo dal tuo account. L'operazione non è
+              reversibile.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => setConfermaReset(false)}
+                className="flex-1 rounded-xl bg-surface-2 py-2.5 text-sm font-medium"
+              >
+                Annulla
+              </button>
+              <button
+                onClick={() => {
+                  setConfermaReset(false);
+                  reset();
+                  toast.success("App reimpostata");
+                }}
+                className="flex-1 rounded-xl bg-destructive py-2.5 text-sm font-semibold text-destructive-foreground"
+              >
+                Reimposta
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
