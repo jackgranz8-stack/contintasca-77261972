@@ -1,0 +1,102 @@
+import { useRef, useState } from "react";
+import { Trash2 } from "lucide-react";
+
+const REVEAL = 76;
+
+/**
+ * Wrapper che aggiunge lo swipe-to-delete in stile iOS a una singola riga/card.
+ * Lo scorrimento verso sinistra rivela un pannello rosso con l'icona del cestino,
+ * confinato esclusivamente al riquadro di questa riga (non influenza le altre).
+ */
+export function SwipeToDelete({
+  onDelete,
+  label = "Elimina",
+  className = "",
+  children,
+}: {
+  onDelete: () => void;
+  label?: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const draggingRef = useRef(false);
+  const startRef = useRef({ x: 0, y: 0, base: 0 });
+  const axisRef = useRef<"none" | "x" | "y">("none");
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    draggingRef.current = true;
+    axisRef.current = "none";
+    startRef.current = { x: e.clientX, y: e.clientY, base: open ? -REVEAL : 0 };
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) return;
+    const dx = e.clientX - startRef.current.x;
+    const dy = e.clientY - startRef.current.y;
+    if (axisRef.current === "none") {
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+      axisRef.current = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+      if (axisRef.current === "x") e.currentTarget.setPointerCapture(e.pointerId);
+    }
+    if (axisRef.current !== "x") return;
+    e.preventDefault();
+    const next = Math.min(4, Math.max(-REVEAL - 14, startRef.current.base + dx));
+    setOffset(next);
+  };
+
+  const finish = () => {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
+    if (axisRef.current === "x") {
+      const shouldOpen = offset < -REVEAL / 2;
+      setOpen(shouldOpen);
+      setOffset(shouldOpen ? -REVEAL : 0);
+    }
+    axisRef.current = "none";
+  };
+
+  const shown = draggingRef.current ? offset : open ? -REVEAL : 0;
+
+  return (
+    <div className={`relative overflow-hidden ${className}`}>
+      <div className="absolute inset-y-0 right-0" style={{ width: REVEAL }}>
+        <button
+          type="button"
+          aria-label={label}
+          onClick={() => {
+            setOpen(false);
+            setOffset(0);
+            onDelete();
+          }}
+          className="flex h-full w-full items-center justify-center bg-destructive text-destructive-foreground"
+        >
+          <Trash2 size={18} />
+        </button>
+      </div>
+      <div
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={finish}
+        onPointerCancel={finish}
+        onClickCapture={(e) => {
+          if (open) {
+            e.preventDefault();
+            e.stopPropagation();
+            setOpen(false);
+            setOffset(0);
+          }
+        }}
+        style={{
+          transform: `translateX(${shown}px)`,
+          transition: draggingRef.current ? "none" : "transform 260ms cubic-bezier(0.22,1,0.36,1)",
+          touchAction: "pan-y",
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
