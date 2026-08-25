@@ -61,6 +61,7 @@ function BudgetPage() {
   const [editingNomeCat, setEditingNomeCat] = useState(false);
   const [ricEdit, setRicEdit] = useState<string | null>(null);
   const [ricDaEliminare, setRicDaEliminare] = useState<string | null>(null);
+  const [openSwipeCatId, setOpenSwipeCatId] = useState<string | null>(null);
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const nomeCatRef = useRef<HTMLInputElement | null>(null);
   useScrollLock(editing !== null);
@@ -162,6 +163,9 @@ function BudgetPage() {
           return (
             <SwipeToDelete
               key={c.id}
+              id={c.id}
+              openId={openSwipeCatId}
+              onOpenChange={setOpenSwipeCatId}
               label={`Elimina ${c.nome}`}
               onDelete={() => {
                 if (!deleteCategory(c.id))

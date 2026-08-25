@@ -33,11 +33,18 @@ export const Route = createFileRoute("/storico")({
   component: StoricoPage,
 });
 
+function chipClass(active: boolean) {
+  return `shrink-0 rounded-full border px-3.5 py-2 text-xs ${
+    active ? "border-primary text-primary" : "border-border text-muted-foreground"
+  }`;
+}
+
 function StoricoPage() {
   const { state, deleteTransaction } = useApp();
-  const [mese, setMese] = useState<string | "all">(monthKey(new Date()));
-  const [cat, setCat] = useState<string | "all">("all");
+  const [meseSel, setMeseSel] = useState<Set<string>>(() => new Set([monthKey(new Date())]));
+  const [catSel, setCatSel] = useState<Set<string>>(new Set());
   const [daEliminare, setDaEliminare] = useState<string | null>(null);
+  const [openSwipeId, setOpenSwipeId] = useState<string | null>(null);
   useScrollLock(daEliminare !== null);
 
   const [daModificare, setDaModificare] = useState<Transaction | null>(null);
@@ -55,23 +62,56 @@ function StoricoPage() {
 
   const mesiGrafico = useMemo(() => lastMonths(6), []);
 
-  const base = txInMonth(state.transazioni, mese);
+  const toggleMese = (m: string) =>
+    setMeseSel((prev) => {
+      const next = new Set(prev);
+      if (next.has(m)) next.delete(m);
+      else next.add(m);
+      return next;
+    });
+
+  const toggleCat = (id: string) =>
+    setCatSel((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const base =
+    meseSel.size === 0
+      ? state.transazioni
+      : state.transazioni.filter((t) => meseSel.has(monthKey(t.data)));
   const q = ricerca.trim().toLowerCase();
-  const filtrate = (cat === "all" ? base : base.filter((t) => t.categoria === cat))
+  const scoped = catSel.size === 0 ? base : base.filter((t) => catSel.has(t.categoria));
+  const filtrate = scoped
     .filter((t) => (q ? (t.nota ?? "").toLowerCase().includes(q) : true))
     .sort((a, b) => (a.data < b.data ? 1 : -1));
-  const totali = totalsByCategory(cat === "all" ? base : base.filter((t) => t.categoria === cat));
+  const totali = totalsByCategory(scoped);
   const slices = state.categorie
     .map((c) => ({ id: c.id, label: c.nome, value: totali.get(c.id) ?? 0, color: c.colore }))
     .filter((s) => s.value > 0)
     .sort((a, b) => b.value - a.value);
 
+  const meseArr = [...meseSel].sort();
+  const catArr = [...catSel];
+  const meseLabel =
+    meseSel.size === 0
+      ? "di tutti i mesi"
+      : meseSel.size === 1
+        ? monthLabel(meseArr[0] ?? "")
+        : `di ${meseSel.size} mesi selezionati`;
+  const catLabel =
+    catSel.size === 0
+      ? ""
+      : catSel.size === 1
+        ? ` · ${state.categorie.find((c) => c.id === catArr[0])?.nome ?? ""}`
+        : ` · ${catSel.size} categorie selezionate`;
+
   const esporta = () => {
-    const n = exportTransactions(
-      filtrate,
-      state.categorie,
-      `spese-${mese === "all" ? "tutto" : mese}${cat === "all" ? "" : "-" + cat}.xlsx`,
-    );
+    const nomeMese = meseSel.size === 0 ? "tutto" : meseSel.size === 1 ? meseArr[0] : "multi-mese";
+    const nomeCat = catSel.size === 1 ? "-" + catArr[0] : catSel.size > 1 ? "-multi-categoria" : "";
+    const n = exportTransactions(filtrate, state.categorie, `spese-${nomeMese}${nomeCat}.xlsx`);
     toast.success(`${n} transazioni esportate`);
   };
 
@@ -90,25 +130,59 @@ function StoricoPage() {
         />
       </div>
 
-      {/* Grafico a barre: seleziona il mese toccando una barra */}
+      {/* Filtri rapidi: mese e categoria, selezionabili insieme per filtri personalizzati */}
+      <div className="space-y-2">
+        <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1">
+          <button onClick={() => setMeseSel(new Set())} className={chipClass(meseSel.size === 0)}>
+            Tutti i mesi
+          </button>
+          {mesiDisponibili.map((m) => (
+            <button
+              key={m}
+              onClick={() => toggleMese(m)}
+              className={`${chipClass(meseSel.has(m))} capitalize`}
+            >
+              {monthLabel(m)}
+            </button>
+          ))}
+        </div>
+        <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1">
+          <button onClick={() => setCatSel(new Set())} className={chipClass(catSel.size === 0)}>
+            Tutte le categorie
+          </button>
+          {state.categorie.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => toggleCat(c.id)}
+              className={chipClass(catSel.has(c.id))}
+            >
+              {c.nome}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Grafico a barre: seleziona/deseleziona un mese toccando una barra */}
       <section className="card-surface p-5">
         <h2 className="mb-4 text-sm font-semibold">Andamento nel tempo</h2>
         <TrendBars
           data={mesiGrafico.map((m) => ({
             key: m,
             value: sum(
-              txInMonth(state.transazioni, m).filter((t) => cat === "all" || t.categoria === cat),
+              txInMonth(state.transazioni, m).filter(
+                (t) => catSel.size === 0 || catSel.has(t.categoria),
+              ),
             ),
           }))}
-          selected={mese === "all" ? "" : mese}
-          onSelect={setMese}
+          selected={meseArr}
+          onSelect={toggleMese}
         />
       </section>
 
       <section className="card-hero p-5">
         <p className="text-xs text-muted-foreground">
-          Totale {mese === "all" ? "di tutti i mesi" : monthLabel(mese)}
-          {cat !== "all" && ` · ${state.categorie.find((c) => c.id === cat)?.nome}`}
+          Totale {meseLabel}
+          {catLabel}
         </p>
         <p className="mt-1 text-3xl font-semibold tracking-tight">{eur(sum(filtrate))}</p>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -116,68 +190,17 @@ function StoricoPage() {
         </p>
       </section>
 
-      {/* Donut: seleziona la categoria toccando una fetta */}
+      {/* Donut: seleziona/deseleziona una categoria toccando una fetta */}
       <section className="card-surface p-5">
         <h2 className="mb-3 text-sm font-semibold">Ripartizione per categoria</h2>
         {slices.length > 0 ? (
-          <Donut
-            slices={slices}
-            total={sum(filtrate)}
-            selected={cat === "all" ? null : cat}
-            onSelect={(id) => setCat((v) => (v === id ? "all" : id))}
-          />
+          <Donut slices={slices} total={sum(filtrate)} selected={catArr} onSelect={toggleCat} />
         ) : (
           <p className="py-8 text-center text-sm text-muted-foreground">
             Nessuna spesa con questi filtri
           </p>
         )}
       </section>
-
-      {/* Filtri rapidi: mese e categoria, subito sopra ai risultati */}
-      <div className="space-y-2">
-        <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1">
-          <button
-            onClick={() => setMese("all")}
-            className={`shrink-0 rounded-full border px-3.5 py-2 text-xs ${
-              mese === "all" ? "border-primary text-primary" : "border-border text-muted-foreground"
-            }`}
-          >
-            Tutti i mesi
-          </button>
-          {mesiDisponibili.map((m) => (
-            <button
-              key={m}
-              onClick={() => setMese(m)}
-              className={`shrink-0 rounded-full border px-3.5 py-2 text-xs capitalize ${
-                mese === m ? "border-primary text-primary" : "border-border text-muted-foreground"
-              }`}
-            >
-              {monthLabel(m)}
-            </button>
-          ))}
-        </div>
-        <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1">
-          <button
-            onClick={() => setCat("all")}
-            className={`shrink-0 rounded-full border px-3.5 py-2 text-xs ${
-              cat === "all" ? "border-primary text-primary" : "border-border text-muted-foreground"
-            }`}
-          >
-            Tutte le categorie
-          </button>
-          {state.categorie.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setCat(cat === c.id ? "all" : c.id)}
-              className={`shrink-0 rounded-full border px-3.5 py-2 text-xs ${
-                cat === c.id ? "border-primary text-primary" : "border-border text-muted-foreground"
-              }`}
-            >
-              {c.nome}
-            </button>
-          ))}
-        </div>
-      </div>
 
       <section className="space-y-2">
         {filtrate.length === 0 && (
@@ -191,6 +214,9 @@ function StoricoPage() {
           return (
             <SwipeToDelete
               key={t.id}
+              id={t.id}
+              openId={openSwipeId}
+              onOpenChange={setOpenSwipeId}
               className="card-surface"
               label={`Elimina ${t.nota || c?.nome || "transazione"}`}
               onDelete={() => setDaEliminare(t.id)}
