@@ -193,7 +193,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const attempted = state;
     setSyncing(true);
     queue.current = queue.current
-      .then(() => persistDiff(prev, attempted, acc.id))
+      .then(async () => {
+        const maxAttempts = 3;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          try {
+            await persistDiff(prev, attempted, acc.id);
+            return;
+          } catch (err) {
+            const stillOnline = typeof navigator === "undefined" || navigator.onLine;
+            if (attempt < maxAttempts && stillOnline) {
+              // Il browser dice di essere online, ma la richiesta è comunque fallita:
+              // spesso è solo un intoppo di rete momentaneo. Riprova in silenzio
+              // prima di considerarlo un vero fallimento e annullare la modifica.
+              await sleep(500 * attempt);
+              continue;
+            }
+            throw err;
+          }
+        }
+      })
       .then(() => {
         baseline.current = attempted;
         pending.current = null;
