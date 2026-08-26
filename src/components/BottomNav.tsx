@@ -118,7 +118,8 @@ export function BottomNav() {
                   onClick={(e) => {
                     if (draggingRef.current) e.preventDefault();
                   }}
-                  className="flex items-center justify-center py-2"
+                  className="flex touch-none items-center justify-center py-2 [-webkit-touch-callout:none]"
+                  draggable={false}
                 >
                   <Icon
                     size={22}
