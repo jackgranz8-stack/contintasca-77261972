@@ -109,6 +109,7 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
+    font-variant-numeric: tabular-nums;
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior-y: none;
     overflow-x: hidden;
