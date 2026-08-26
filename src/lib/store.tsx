@@ -20,6 +20,8 @@ import {
 } from "./types";
 import { currentMonth, monthKey, uid } from "./format";
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 type Account = { id: string; email: string | null } | null;
 
 type Ctx = {
@@ -87,34 +89,44 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const loadFor = useCallback(async (userId: string) => {
     setSyncing(true);
-    try {
-      const remote = await loadRemoteState(userId);
-      const { next, created } = runRecurring(remote);
-      baseline.current = remote;
-      setState(next);
-      setLoaded(true);
-      setLoadError(false);
-      if (created > 0) {
-        setTimeout(
-          () =>
-            toast.success(
-              created === 1
-                ? "1 spesa ricorrente registrata"
-                : `${created} spese ricorrenti registrate`,
-            ),
-          400,
-        );
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const remote = await loadRemoteState(userId);
+        const { next, created } = runRecurring(remote);
+        baseline.current = remote;
+        setState(next);
+        setLoaded(true);
+        setLoadError(false);
+        if (created > 0) {
+          setTimeout(
+            () =>
+              toast.success(
+                created === 1
+                  ? "1 spesa ricorrente registrata"
+                  : `${created} spese ricorrenti registrate`,
+              ),
+            400,
+          );
+        }
+        break;
+      } catch {
+        if (attempt < maxAttempts) {
+          // Primo tentativo fallito subito dopo l'apertura: spesso è solo la rete
+          // non ancora pronta (avvio a freddo). Riprova in silenzio prima di
+          // disturbare l'utente con l'errore.
+          await sleep(600 * attempt);
+          continue;
+        }
+        // Non tocchiamo lo stato locale né lo confermiamo come "vuoto": potrebbe
+        // essere solo un problema di rete temporaneo, non un account senza dati.
+        // baseline resta null, quindi nessuna sincronizzazione può scattare finché
+        // non riusciamo a leggere davvero cosa c'è sul database.
+        setLoaded(true);
+        setLoadError(true);
       }
-    } catch {
-      // Non tocchiamo lo stato locale né lo confermiamo come "vuoto": potrebbe
-      // essere solo un problema di rete temporaneo, non un account senza dati.
-      // baseline resta null, quindi nessuna sincronizzazione può scattare finché
-      // non riusciamo a leggere davvero cosa c'è sul database.
-      setLoaded(true);
-      setLoadError(true);
-    } finally {
-      setSyncing(false);
     }
+    setSyncing(false);
   }, []);
 
   const retryLoad = useCallback(() => {
