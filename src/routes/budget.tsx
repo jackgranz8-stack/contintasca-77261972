@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Check, ChevronDown, Pause, Pencil, Play, Plus, Trash2 } from "lucide-react";
+import { Check, ChevronDown, Pause, Pencil, Play, Plus } from "lucide-react";
 import { sum, totalsByCategory, txInMonth, useApp } from "@/lib/store";
 import { useScrollLock } from "@/hooks/use-scroll-lock";
 
@@ -62,6 +62,7 @@ function BudgetPage() {
   const [ricEdit, setRicEdit] = useState<string | null>(null);
   const [ricDaEliminare, setRicDaEliminare] = useState<string | null>(null);
   const [openSwipeCatId, setOpenSwipeCatId] = useState<string | null>(null);
+  const [openSwipeRicId, setOpenSwipeRicId] = useState<string | null>(null);
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const nomeCatRef = useRef<HTMLInputElement | null>(null);
   useScrollLock(editing !== null);
@@ -401,47 +402,50 @@ function BudgetPage() {
           const c = state.categorie.find((x) => x.id === r.categoria);
           const Icon = iconFor(c?.icona ?? "wallet");
           return (
-            <div key={r.id} className="card-surface flex items-center gap-3 px-4 py-3">
-              <span
-                className="flex h-9 w-9 items-center justify-center rounded-full"
-                style={{
-                  backgroundColor: `${c?.colore ?? "#9AA6A0"}22`,
-                  color: c?.colore ?? "#9AA6A0",
-                }}
-              >
-                <Icon size={16} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className={`truncate text-sm ${r.attiva ? "" : "text-muted-foreground"}`}>
-                  {r.nome}
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  {eur(r.importo)} · giorno {r.giorno} · {c?.nome ?? "—"}
-                  {r.attiva ? "" : " · in pausa"}
-                </p>
+            <SwipeToDelete
+              key={r.id}
+              id={r.id}
+              openId={openSwipeRicId}
+              onOpenChange={setOpenSwipeRicId}
+              className="card-surface"
+              label={`Elimina ${r.nome}`}
+              onDelete={() => setRicDaEliminare(r.id)}
+            >
+              <div className="flex items-center gap-3 px-4 py-3">
+                <span
+                  className="flex h-9 w-9 items-center justify-center rounded-full"
+                  style={{
+                    backgroundColor: `${c?.colore ?? "#9AA6A0"}22`,
+                    color: c?.colore ?? "#9AA6A0",
+                  }}
+                >
+                  <Icon size={16} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className={`truncate text-sm ${r.attiva ? "" : "text-muted-foreground"}`}>
+                    {r.nome}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {eur(r.importo)} · giorno {r.giorno} · {c?.nome ?? "—"}
+                    {r.attiva ? "" : " · in pausa"}
+                  </p>
+                </div>
+                <button
+                  onClick={() => updateRecurring(r.id, { attiva: !r.attiva })}
+                  className="text-muted-foreground"
+                  aria-label={r.attiva ? "Metti in pausa" : "Riattiva"}
+                >
+                  {r.attiva ? <Pause size={16} /> : <Play size={16} />}
+                </button>
+                <button
+                  onClick={() => setRicEdit(r.id)}
+                  className="text-muted-foreground"
+                  aria-label={`Modifica ${r.nome}`}
+                >
+                  <Pencil size={16} />
+                </button>
               </div>
-              <button
-                onClick={() => updateRecurring(r.id, { attiva: !r.attiva })}
-                className="text-muted-foreground"
-                aria-label={r.attiva ? "Metti in pausa" : "Riattiva"}
-              >
-                {r.attiva ? <Pause size={16} /> : <Play size={16} />}
-              </button>
-              <button
-                onClick={() => setRicEdit(r.id)}
-                className="text-muted-foreground"
-                aria-label={`Modifica ${r.nome}`}
-              >
-                <Pencil size={16} />
-              </button>
-              <button
-                onClick={() => setRicDaEliminare(r.id)}
-                className="text-muted-foreground"
-                aria-label="Elimina"
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
+            </SwipeToDelete>
           );
         })}
       </section>
