@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { eur } from "@/lib/format";
 
 export type Slice = { id?: string; label: string; value: number; color: string };
+
+const R = 54;
+const CIRC = 2 * Math.PI * R;
 
 export function Donut({
   slices,
@@ -17,6 +20,7 @@ export function Donut({
   centerLabel?: string;
 }) {
   const [active, setActive] = useState<string | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
   const visible = slices.filter((s) => s.value > 0);
   const sum = visible.reduce((a, s) => a + s.value, 0);
   let offset = 0;
@@ -24,45 +28,73 @@ export function Donut({
 
   const activeSlice = visible.find((s) => (s.id ?? s.label) === active);
 
+  // Determina lo spicchio sotto il dito/puntatore in base all'angolo rispetto al
+  // centro del grafico, per poterlo scorrere con il dito (non solo toccare).
+  const scrubAt = (clientX: number, clientY: number) => {
+    const svg = svgRef.current;
+    if (!svg || sum <= 0 || visible.length === 0) return;
+    const rect = svg.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = clientX - cx;
+    const dy = clientY - cy;
+    let screenDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
+    if (screenDeg < 0) screenDeg += 360;
+    // Il grafico è ruotato di -90° via CSS per far partire lo spicchio dalle ore 12:
+    // qui si annulla quella rotazione per ritrovare l'angolo "reale" nel cerchio.
+    const localFrac = ((((screenDeg + 90) % 360) + 360) % 360) / 360;
+    let acc = 0;
+    for (const [i, s] of visible.entries()) {
+      const frac = s.value / sum;
+      if (localFrac < acc + frac || i === visible.length - 1) {
+        setActive(s.id ?? s.label);
+        return;
+      }
+      acc += frac;
+    }
+  };
+
   return (
     <div className="flex flex-col items-center justify-center py-2">
-      <div className="relative h-[170px] w-[170px]">
-        <svg viewBox="0 0 140 140" className="h-full w-full -rotate-90">
-          <circle cx="70" cy="70" r={54} fill="none" stroke="var(--surface-2)" strokeWidth="16" />
+      <div
+        className="relative h-[170px] w-[170px]"
+        onPointerMove={(e) => scrubAt(e.clientX, e.clientY)}
+        onPointerDown={(e) => scrubAt(e.clientX, e.clientY)}
+        onPointerLeave={() => setActive(null)}
+        onPointerUp={() => setActive(null)}
+        onPointerCancel={() => setActive(null)}
+      >
+        <svg ref={svgRef} viewBox="0 0 140 140" className="h-full w-full -rotate-90">
+          <circle cx="70" cy="70" r={R} fill="none" stroke="var(--surface-2)" strokeWidth="16" />
           {sum > 0 &&
             visible.map((s) => {
               const key = s.id ?? s.label;
               const isSel = s.id != null && selectedIds.includes(s.id);
               const isActive = active === key;
-              const r = isSel || isActive ? 56 : 54;
-              const c = 2 * Math.PI * r;
-              const len = (s.value / sum) * c;
-              const dash = `${Math.max(0, len - 2)} ${c - Math.max(0, len - 2)}`;
+              const len = (s.value / sum) * CIRC;
+              const dash = `${Math.max(0, len - 2)} ${CIRC - Math.max(0, len - 2)}`;
               const el = (
                 <circle
                   key={key}
                   cx="70"
                   cy="70"
-                  r={r}
+                  r={R}
                   fill="none"
                   stroke={s.color}
                   strokeWidth={isSel || isActive ? 20 : 16}
                   strokeLinecap="round"
                   strokeDasharray={dash}
-                  strokeDashoffset={-((offset / (2 * Math.PI * 54)) * c)}
+                  strokeDashoffset={-offset}
                   opacity={selectedIds.length > 0 && !isSel ? 0.4 : 1}
                   className={
                     onSelect
                       ? "cursor-pointer transition-all duration-200"
                       : "transition-all duration-200"
                   }
-                  onPointerEnter={() => setActive(key)}
-                  onPointerLeave={() => setActive((v) => (v === key ? null : v))}
-                  onPointerDown={() => setActive(key)}
                   onClick={() => s.id && onSelect?.(s.id)}
                 />
               );
-              offset += (s.value / sum) * (2 * Math.PI * 54);
+              offset += (s.value / sum) * CIRC;
               return el;
             })}
         </svg>
@@ -84,7 +116,9 @@ export function Donut({
         </div>
       </div>
       {onSelect && visible.length > 0 && (
-        <p className="mt-1 text-[11px] text-muted-foreground">Tocca uno spicchio per filtrare</p>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          Scorri con il dito per vedere il dettaglio, tocca per filtrare
+        </p>
       )}
     </div>
   );
