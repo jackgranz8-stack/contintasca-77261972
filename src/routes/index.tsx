@@ -227,19 +227,25 @@ function HomePage() {
           >
             Tutte
           </button>
-          {state.categorie.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setCatSel(catSel === c.id ? "all" : c.id)}
-              className={`shrink-0 rounded-full border px-3.5 py-2 text-xs ${
-                catSel === c.id
-                  ? "border-primary text-primary"
-                  : "border-border text-muted-foreground"
-              }`}
-            >
-              {c.nome}
-            </button>
-          ))}
+          {state.categorie.map((c) => {
+            const attiva = catSel === c.id;
+            return (
+              <button
+                key={c.id}
+                onClick={() => setCatSel(catSel === c.id ? "all" : c.id)}
+                className={`shrink-0 rounded-full border px-3.5 py-2 text-xs ${
+                  attiva ? "font-medium" : "border-border text-muted-foreground"
+                }`}
+                style={
+                  attiva
+                    ? { borderColor: c.colore, color: c.colore, backgroundColor: `${c.colore}15` }
+                    : undefined
+                }
+              >
+                {c.nome}
+              </button>
+            );
+          })}
         </div>
         {slices.length > 0 ? (
           <>
