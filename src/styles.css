@@ -203,8 +203,19 @@
     font-family: var(--font-sans);
     font-variant-numeric: tabular-nums;
     -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
     overscroll-behavior-y: none;
     overflow-x: hidden;
+  }
+
+  input,
+  textarea,
+  [contenteditable="true"] {
+    -webkit-touch-callout: default;
+    -webkit-user-select: text;
+    user-select: text;
   }
 
   input,
