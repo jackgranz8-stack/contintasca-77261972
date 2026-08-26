@@ -2,13 +2,12 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Copy, FileSpreadsheet, Pencil, Repeat, Search } from "lucide-react";
-import { sum, totalsByCategory, txInMonth, useApp } from "@/lib/store";
+import { sum, txInMonth, useApp } from "@/lib/store";
 import { SwipeToDelete } from "@/components/SwipeToDelete";
 
 import { eur, formatDay, lastMonths, monthLabel, monthKey } from "@/lib/format";
 import { iconFor } from "@/lib/icons";
 import { TrendBars } from "@/components/TrendBars";
-import { Donut } from "@/components/Donut";
 import { exportTransactions } from "@/lib/excel";
 import { AddExpenseModal } from "@/components/AddExpenseModal";
 import { ConfirmPopup } from "@/components/ConfirmPopup";
@@ -45,6 +44,7 @@ function StoricoPage() {
   const [catSel, setCatSel] = useState<Set<string>>(new Set());
   const [daEliminare, setDaEliminare] = useState<string | null>(null);
   const [openSwipeId, setOpenSwipeId] = useState<string | null>(null);
+  const [confermaExport, setConfermaExport] = useState(false);
 
   const [daModificare, setDaModificare] = useState<Transaction | null>(null);
   const [daDuplicare, setDaDuplicare] = useState<Pick<
@@ -86,12 +86,6 @@ function StoricoPage() {
   const filtrate = scoped
     .filter((t) => (q ? (t.nota ?? "").toLowerCase().includes(q) : true))
     .sort((a, b) => (a.data < b.data ? 1 : -1));
-  const totali = totalsByCategory(scoped);
-  const slices = state.categorie
-    .map((c) => ({ id: c.id, label: c.nome, value: totali.get(c.id) ?? 0, color: c.colore }))
-    .filter((s) => s.value > 0)
-    .sort((a, b) => b.value - a.value);
-
   const meseArr = [...meseSel].sort();
   const catArr = [...catSel];
   const meseLabel =
@@ -161,18 +155,30 @@ function StoricoPage() {
         </div>
       </div>
 
-      {/* Grafico a barre: seleziona/deseleziona un mese toccando una barra */}
+      {/* Grafico a barre: seleziona/deseleziona un mese toccando una barra.
+          Con filtro categoria attivo, ogni barra si colora in proporzione
+          al colore di ciascuna categoria filtrata; senza filtro resta verde. */}
       <section className="card-surface p-5">
         <h2 className="mb-4 text-sm font-semibold">Andamento nel tempo</h2>
         <TrendBars
-          data={mesiGrafico.map((m) => ({
-            key: m,
-            value: sum(
-              txInMonth(state.transazioni, m).filter(
-                (t) => catSel.size === 0 || catSel.has(t.categoria),
-              ),
-            ),
-          }))}
+          data={mesiGrafico.map((m) => {
+            const txMese = txInMonth(state.transazioni, m);
+            if (catSel.size === 0) {
+              return { key: m, value: sum(txMese) };
+            }
+            const categorieSelezionate = state.categorie.filter((c) => catSel.has(c.id));
+            const segments = categorieSelezionate
+              .map((c) => ({
+                color: c.colore,
+                value: sum(txMese.filter((t) => t.categoria === c.id)),
+              }))
+              .filter((s) => s.value > 0);
+            return {
+              key: m,
+              value: sum(txMese.filter((t) => catSel.has(t.categoria))),
+              segments,
+            };
+          })}
           selected={meseArr}
           onSelect={toggleMese}
         />
@@ -189,17 +195,17 @@ function StoricoPage() {
         </p>
       </section>
 
-      {/* Donut: seleziona/deseleziona una categoria toccando una fetta */}
-      <section className="card-surface p-5">
-        <h2 className="mb-3 text-sm font-semibold">Ripartizione per categoria</h2>
-        {slices.length > 0 ? (
-          <Donut slices={slices} total={sum(filtrate)} selected={catArr} onSelect={toggleCat} />
-        ) : (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            Nessuna spesa con questi filtri
-          </p>
-        )}
-      </section>
+      {/* Al posto del donut: una nuvola sottile per l'export, con conferma prima di esportare */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => setConfermaExport(true)}
+          disabled={filtrate.length === 0}
+          className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-muted-foreground disabled:opacity-40"
+        >
+          <FileSpreadsheet size={13} className="text-primary" />
+          Esporta in Excel
+        </button>
+      </div>
 
       <section className="space-y-2">
         {filtrate.length === 0 && (
@@ -270,15 +276,6 @@ function StoricoPage() {
         })}
       </section>
 
-      <button
-        onClick={esporta}
-        disabled={filtrate.length === 0}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-surface py-3 text-sm font-medium disabled:opacity-40"
-      >
-        <FileSpreadsheet size={16} className="text-primary" />
-        Esporta questo filtro in Excel
-      </button>
-
       <AddExpenseModal
         open={daModificare !== null}
         edit={daModificare}
@@ -289,6 +286,18 @@ function StoricoPage() {
         open={daDuplicare !== null}
         preset={daDuplicare}
         onClose={() => setDaDuplicare(null)}
+      />
+
+      <ConfirmPopup
+        open={confermaExport}
+        onClose={() => setConfermaExport(false)}
+        title="Esportare questo filtro in Excel?"
+        description="Verranno esportate solo le transazioni che rispettano i filtri attualmente selezionati."
+        confirmLabel="Esporta"
+        onConfirm={() => {
+          setConfermaExport(false);
+          esporta();
+        }}
       />
 
       <ConfirmPopup
