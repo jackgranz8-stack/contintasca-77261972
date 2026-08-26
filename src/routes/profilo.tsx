@@ -10,12 +10,16 @@ import {
   Fingerprint,
   LogIn,
   LogOut,
+  Moon,
+  Smartphone,
+  Sun,
   Upload,
   Wallet,
 } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { useScrollLock } from "@/hooks/use-scroll-lock";
 import { uid } from "@/lib/format";
+import { useThemePreference, type ThemePreference } from "@/lib/theme";
 import { HOUSING_OPTIONS, PALETTE, type Housing } from "@/lib/types";
 import { exportTemplate, exportTransactions, parseImportFile } from "@/lib/excel";
 import { suggestBudgetsWithHistory } from "@/lib/budget-suggest";
@@ -64,6 +68,7 @@ function ProfiloPage() {
   const [faceIdBusy, setFaceIdBusy] = useState(false);
   const [pushOn, setPushOn] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
+  const [tema, setTema] = useThemePreference();
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -339,6 +344,33 @@ function ProfiloPage() {
                 )}
               </div>
             )}
+
+            {/* Aspetto */}
+            <div className="py-4 first:pt-0 last:pb-0">
+              <h3 className="mb-2 text-sm font-medium">Aspetto</h3>
+              <div className="grid grid-cols-3 gap-2">
+                {(
+                  [
+                    { id: "dark", label: "Scuro", icon: Moon },
+                    { id: "light", label: "Chiaro", icon: Sun },
+                    { id: "system", label: "Automatico", icon: Smartphone },
+                  ] as { id: ThemePreference; label: string; icon: typeof Moon }[]
+                ).map(({ id, label, icon: Icon }) => (
+                  <button
+                    key={id}
+                    onClick={() => setTema(id)}
+                    className={`flex flex-col items-center gap-1.5 rounded-2xl border px-2 py-3 text-xs ${
+                      tema === id
+                        ? "border-primary bg-surface-2 text-foreground"
+                        : "border-border bg-surface text-muted-foreground"
+                    }`}
+                  >
+                    <Icon size={18} />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </section>

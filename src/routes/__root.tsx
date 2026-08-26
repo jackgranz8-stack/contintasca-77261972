@@ -114,11 +114,26 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
+// Applicato come stringa in uno script inline: deve girare prima che React
+// idrati la pagina, quindi resta una funzione a parte (non importa nulla).
+const THEME_INIT_SCRIPT = `
+(function () {
+  try {
+    var stored = localStorage.getItem("theme");
+    var isLight =
+      stored === "light" ||
+      (stored !== "dark" && window.matchMedia("(prefers-color-scheme: light)").matches);
+    if (isLight) document.documentElement.classList.add("light");
+  } catch (e) {}
+})();
+`;
+
 function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
         <HeadContent />
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body>
         {children}
