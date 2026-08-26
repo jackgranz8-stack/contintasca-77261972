@@ -3,6 +3,7 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { isFaceIdEnabled } from "@/lib/webauthn";
+import { applyTheme, getStoredTheme } from "@/lib/theme";
 import { Onboarding } from "./Onboarding";
 import { BottomNav } from "./BottomNav";
 import { AddExpenseModal } from "./AddExpenseModal";
@@ -22,6 +23,19 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (loaded && !account && !isAuthRoute) void navigate({ to: "/auth", replace: true });
   }, [loaded, account, isAuthRoute, navigate]);
+
+  // Applica subito il tema salvato (la classe è già impostata dallo script inline
+  // in __root.tsx contro il "flash"; qui sincronizziamo anche la tinta della status
+  // bar) e resta in ascolto dei cambi di tema del telefono mentre si è su "Automatico".
+  useEffect(() => {
+    applyTheme(getStoredTheme());
+    const mq = window.matchMedia("(prefers-color-scheme: light)");
+    const onChange = () => {
+      if (getStoredTheme() === "system") applyTheme("system");
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   // La pagina di accesso ha un layout autonomo (nessun onboarding, nessuna nav).
   if (isAuthRoute) return <>{children}</>;
