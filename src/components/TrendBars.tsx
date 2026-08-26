@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { eur, monthLabel } from "@/lib/format";
 
-export type BarDatum = { key: string; value: number };
+export type BarSegment = { color: string; value: number };
+export type BarDatum = { key: string; value: number; segments?: BarSegment[] };
 
 export function TrendBars({
   data,
@@ -22,6 +23,7 @@ export function TrendBars({
         const active = selectedKeys.includes(d.key);
         const shown = hover === d.key;
         const h = Math.max(6, (d.value / max) * 96);
+        const segments = d.value > 0 && d.segments && d.segments.length > 0 ? d.segments : null;
         return (
           <button
             key={d.key}
@@ -52,11 +54,25 @@ export function TrendBars({
               {d.value > 0 ? Math.round(d.value) : ""}
             </span>
             <span
-              className={`w-full rounded-t-lg transition-all duration-300 ${
-                active ? "lime-fill" : "bg-surface-2 opacity-70"
+              className={`relative flex w-full flex-col overflow-hidden rounded-t-lg transition-all duration-300 ${
+                segments
+                  ? `bg-surface-2 ${active ? "ring-2 ring-foreground/50" : ""}`
+                  : active
+                    ? "lime-fill"
+                    : "bg-surface-2 opacity-70"
               }`}
               style={{ height: h }}
-            />
+            >
+              {segments?.map((seg, i) => (
+                <span
+                  key={i}
+                  style={{
+                    height: `${(seg.value / d.value) * 100}%`,
+                    backgroundColor: seg.color,
+                  }}
+                />
+              ))}
+            </span>
             <span
               className={`text-[11px] capitalize ${
                 active ? "font-semibold text-foreground" : "text-muted-foreground"
