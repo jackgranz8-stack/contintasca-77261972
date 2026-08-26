@@ -12,6 +12,7 @@ import { ProgressBar } from "@/components/ProgressBar";
 import { EditRecurringModal } from "@/components/EditRecurringModal";
 import { EditCategoryModal } from "@/components/EditCategoryModal";
 import { SwipeToDelete } from "@/components/SwipeToDelete";
+import { ConfirmPopup } from "@/components/ConfirmPopup";
 
 export const Route = createFileRoute("/budget")({
   head: () => ({
@@ -67,7 +68,6 @@ function BudgetPage() {
   const nomeCatRef = useRef<HTMLInputElement | null>(null);
   useScrollLock(editing !== null);
   useScrollLock(editingNomeCat);
-  useScrollLock(ricDaEliminare !== null);
 
   const totale = state.categorie.reduce((a, c) => a + c.budget, 0);
   const mese = currentMonth();
@@ -250,76 +250,84 @@ function BudgetPage() {
           />
         </button>
 
-        {formCat && (
-          <div className="border-t border-border p-4 pt-3.5">
-            <input
-              ref={nomeCatRef}
-              value={nuovaCat}
-              onChange={(e) => setNuovaCat(e.target.value)}
-              onFocus={() => setEditingNomeCat(true)}
-              onBlur={() => setEditingNomeCat(false)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") e.currentTarget.blur();
-              }}
-              placeholder="Es. Abbonamenti"
-              className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
-            />
+        <div
+          className={`grid transition-[grid-template-rows] duration-300 ease-out ${
+            formCat ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+          }`}
+        >
+          <div className="overflow-hidden" aria-hidden={!formCat}>
+            <div className="border-t border-border p-4 pt-3.5">
+              <input
+                ref={nomeCatRef}
+                value={nuovaCat}
+                onChange={(e) => setNuovaCat(e.target.value)}
+                onFocus={() => setEditingNomeCat(true)}
+                onBlur={() => setEditingNomeCat(false)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                }}
+                placeholder="Es. Abbonamenti"
+                className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
+              />
 
-            <p className="mb-2 mt-3 text-xs text-muted-foreground">Icona</p>
-            <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
-              {ICON_KEYS.map((k) => {
-                const Icon = iconFor(k);
-                return (
-                  <button
-                    key={k}
-                    type="button"
-                    onClick={() => setNuovaIcona(k)}
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border ${
-                      nuovaIcona === k
-                        ? "border-primary text-primary"
-                        : "border-border text-muted-foreground"
-                    }`}
-                  >
-                    <Icon size={17} />
-                  </button>
-                );
-              })}
+              <p className="mb-2 mt-3 text-xs text-muted-foreground">Icona</p>
+              <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+                {ICON_KEYS.map((k) => {
+                  const Icon = iconFor(k);
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => setNuovaIcona(k)}
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border ${
+                        nuovaIcona === k
+                          ? "border-primary text-primary"
+                          : "border-border text-muted-foreground"
+                      }`}
+                    >
+                      <Icon size={17} />
+                    </button>
+                  );
+                })}
+              </div>
+
+              <p className="mb-2 mt-3 text-xs text-muted-foreground">Colore</p>
+              <div className="grid grid-cols-6 gap-2.5 sm:grid-cols-8">
+                {CATEGORY_COLORS.map((col) => {
+                  const attivo =
+                    nuovaColore === col ||
+                    (!nuovaColore &&
+                      col === (PALETTE[state.categorie.length % PALETTE.length] ?? "#8CE562"));
+                  return (
+                    <button
+                      key={col}
+                      type="button"
+                      onClick={() => setNuovaColore(col)}
+                      className="flex h-10 w-10 items-center justify-center rounded-full transition-transform"
+                      style={{
+                        backgroundColor: col,
+                        boxShadow: attivo
+                          ? `0 0 0 2px var(--surface), 0 0 0 4px ${col}`
+                          : undefined,
+                        transform: attivo ? "scale(1.08)" : undefined,
+                      }}
+                      aria-label={`Colore ${col}`}
+                    >
+                      {attivo && <Check size={16} color="#fff" strokeWidth={3} />}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={creaCategoria}
+                className="lime-fill mt-4 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold"
+              >
+                <Plus size={15} /> Aggiungi categoria
+              </button>
             </div>
-
-            <p className="mb-2 mt-3 text-xs text-muted-foreground">Colore</p>
-            <div className="grid grid-cols-6 gap-2.5 sm:grid-cols-8">
-              {CATEGORY_COLORS.map((col) => {
-                const attivo =
-                  nuovaColore === col ||
-                  (!nuovaColore &&
-                    col === (PALETTE[state.categorie.length % PALETTE.length] ?? "#8CE562"));
-                return (
-                  <button
-                    key={col}
-                    type="button"
-                    onClick={() => setNuovaColore(col)}
-                    className="flex h-10 w-10 items-center justify-center rounded-full transition-transform"
-                    style={{
-                      backgroundColor: col,
-                      boxShadow: attivo ? `0 0 0 2px var(--surface), 0 0 0 4px ${col}` : undefined,
-                      transform: attivo ? "scale(1.08)" : undefined,
-                    }}
-                    aria-label={`Colore ${col}`}
-                  >
-                    {attivo && <Check size={16} color="#fff" strokeWidth={3} />}
-                  </button>
-                );
-              })}
-            </div>
-
-            <button
-              onClick={creaCategoria}
-              className="lime-fill mt-4 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold"
-            >
-              <Plus size={15} /> Aggiungi categoria
-            </button>
           </div>
-        )}
+        </div>
       </section>
 
       <EditCategoryModal
@@ -339,58 +347,64 @@ function BudgetPage() {
           </button>
         </div>
 
-        {formRic && (
-          <div className="card-surface space-y-3 p-4">
-            <input
-              value={ric.nome}
-              onChange={(e) => setRic({ ...ric, nome: e.target.value })}
-              placeholder="Nome (es. Affitto)"
-              className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
-            />
-            <select
-              value={ric.categoria}
-              onChange={(e) => setRic({ ...ric, categoria: e.target.value })}
-              className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none"
-            >
-              {state.categorie.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nome}
-                </option>
-              ))}
-            </select>
-            <div className="grid grid-cols-2 gap-3">
+        <div
+          className={`grid transition-[grid-template-rows] duration-300 ease-out ${
+            formRic ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+          }`}
+        >
+          <div className="overflow-hidden" aria-hidden={!formRic}>
+            <div className="card-surface space-y-3 p-4">
               <input
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0"
-                value={ric.importo}
-                onFocus={(e) => e.target.select()}
-                onChange={(e) => setRic({ ...ric, importo: e.target.value })}
-                placeholder="Importo €"
-                className="w-full rounded-xl border border-border bg-surface px-3 py-3.5 text-lg font-semibold outline-none placeholder:text-base placeholder:font-normal placeholder:text-muted-foreground"
+                value={ric.nome}
+                onChange={(e) => setRic({ ...ric, nome: e.target.value })}
+                placeholder="Nome (es. Affitto)"
+                className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
               />
               <select
-                value={ric.giorno}
-                onChange={(e) => setRic({ ...ric, giorno: Number(e.target.value) })}
-                aria-label="Giorno del mese"
-                className="native-select w-full py-3.5"
+                value={ric.categoria}
+                onChange={(e) => setRic({ ...ric, categoria: e.target.value })}
+                className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none"
               >
-                {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
-                  <option key={d} value={d}>
-                    Giorno {d}
+                {state.categorie.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nome}
                   </option>
                 ))}
               </select>
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  value={ric.importo}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => setRic({ ...ric, importo: e.target.value })}
+                  placeholder="Importo €"
+                  className="w-full rounded-xl border border-border bg-surface px-3 py-3.5 text-lg font-semibold outline-none placeholder:text-base placeholder:font-normal placeholder:text-muted-foreground"
+                />
+                <select
+                  value={ric.giorno}
+                  onChange={(e) => setRic({ ...ric, giorno: Number(e.target.value) })}
+                  aria-label="Giorno del mese"
+                  className="native-select w-full py-3.5"
+                >
+                  {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                    <option key={d} value={d}>
+                      Giorno {d}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                onClick={creaRicorrente}
+                className="lime-fill w-full rounded-xl py-2.5 text-sm font-semibold"
+              >
+                Crea ricorrente
+              </button>
             </div>
-            <button
-              onClick={creaRicorrente}
-              className="lime-fill w-full rounded-xl py-2.5 text-sm font-semibold"
-            >
-              Crea ricorrente
-            </button>
           </div>
-        )}
+        </div>
 
         {state.ricorrenti.length === 0 && !formRic && (
           <p className="card-surface p-4 text-center text-xs text-muted-foreground">
@@ -456,40 +470,19 @@ function BudgetPage() {
         edit={state.ricorrenti.find((r) => r.id === ricEdit) ?? null}
       />
 
-      {ricDaEliminare && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overscroll-none bg-background/70 px-6 backdrop-blur-sm">
-          <button
-            className="absolute inset-0"
-            aria-label="Annulla"
-            onClick={() => setRicDaEliminare(null)}
-          />
-          <div className="relative z-10 w-full max-w-[340px] rounded-3xl border border-border bg-popover p-5">
-            <p className="text-sm font-semibold">Eliminare questa spesa ricorrente?</p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Le transazioni già generate in passato non verranno toccate: si ferma solo la
-              generazione futura.
-            </p>
-            <div className="mt-4 flex gap-2">
-              <button
-                onClick={() => setRicDaEliminare(null)}
-                className="flex-1 rounded-xl bg-surface-2 py-2.5 text-sm font-medium"
-              >
-                Annulla
-              </button>
-              <button
-                onClick={() => {
-                  deleteRecurring(ricDaEliminare);
-                  setRicDaEliminare(null);
-                  toast.success("Ricorrente eliminata");
-                }}
-                className="flex-1 rounded-xl bg-destructive py-2.5 text-sm font-semibold text-destructive-foreground"
-              >
-                Elimina
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmPopup
+        open={ricDaEliminare !== null}
+        onClose={() => setRicDaEliminare(null)}
+        title="Eliminare questa spesa ricorrente?"
+        description="Le transazioni già generate in passato non verranno toccate: si ferma solo la generazione futura."
+        confirmLabel="Elimina"
+        onConfirm={() => {
+          if (!ricDaEliminare) return;
+          deleteRecurring(ricDaEliminare);
+          setRicDaEliminare(null);
+          toast.success("Ricorrente eliminata");
+        }}
+      />
     </div>
   );
 }

@@ -17,11 +17,11 @@ import {
   Wallet,
 } from "lucide-react";
 import { useApp } from "@/lib/store";
-import { useScrollLock } from "@/hooks/use-scroll-lock";
 import { uid } from "@/lib/format";
 import { useThemePreference, type ThemePreference } from "@/lib/theme";
 import { HOUSING_OPTIONS, PALETTE, type Housing } from "@/lib/types";
 import { exportTemplate, exportTransactions, parseImportFile } from "@/lib/excel";
+import { ConfirmPopup } from "@/components/ConfirmPopup";
 import { suggestBudgetsWithHistory } from "@/lib/budget-suggest";
 import { disableFaceId, enrollFaceId, faceIdSupported, isFaceIdEnabled } from "@/lib/webauthn";
 import {
@@ -58,7 +58,6 @@ function ProfiloPage() {
   const [nome, setNome] = useState(state.profilo.nome);
   const [confermaEsci, setConfermaEsci] = useState(false);
   const [confermaReset, setConfermaReset] = useState(false);
-  useScrollLock(confermaEsci || confermaReset);
   const [ricalcoloAperto, setRicalcoloAperto] = useState(false);
   const [preferenzeAperto, setPreferenzeAperto] = useState(false);
   const [excelAperto, setExcelAperto] = useState(false);
@@ -568,74 +567,31 @@ function ProfiloPage() {
         login
       </p>
 
-      {confermaEsci && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overscroll-none bg-background/70 px-6 backdrop-blur-sm">
-          <button
-            className="absolute inset-0"
-            aria-label="Annulla"
-            onClick={() => setConfermaEsci(false)}
-          />
-          <div className="relative z-10 w-full max-w-[340px] rounded-3xl border border-border bg-popover p-5">
-            <p className="text-sm font-semibold">Sei sicuro di voler uscire?</p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Dovrai accedere di nuovo per ritrovare le tue spese sincronizzate.
-            </p>
-            <div className="mt-4 flex gap-2">
-              <button
-                onClick={() => setConfermaEsci(false)}
-                className="flex-1 rounded-xl bg-surface-2 py-2.5 text-sm font-medium"
-              >
-                Annulla
-              </button>
-              <button
-                onClick={() => {
-                  setConfermaEsci(false);
-                  void signOut();
-                  toast.success("Disconnesso");
-                }}
-                className="flex-1 rounded-xl bg-destructive py-2.5 text-sm font-semibold text-destructive-foreground"
-              >
-                Esci
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmPopup
+        open={confermaEsci}
+        onClose={() => setConfermaEsci(false)}
+        title="Sei sicuro di voler uscire?"
+        description="Dovrai accedere di nuovo per ritrovare le tue spese sincronizzate."
+        confirmLabel="Esci"
+        onConfirm={() => {
+          setConfermaEsci(false);
+          void signOut();
+          toast.success("Disconnesso");
+        }}
+      />
 
-      {confermaReset && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overscroll-none bg-background/70 px-6 backdrop-blur-sm">
-          <button
-            className="absolute inset-0"
-            aria-label="Annulla"
-            onClick={() => setConfermaReset(false)}
-          />
-          <div className="relative z-10 w-full max-w-[340px] rounded-3xl border border-border bg-popover p-5">
-            <p className="text-sm font-semibold">Sei sicuro di voler reimpostare l'app?</p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Cancella spese, categorie, ricorrenti e profilo dal tuo account. L'operazione non è
-              reversibile.
-            </p>
-            <div className="mt-4 flex gap-2">
-              <button
-                onClick={() => setConfermaReset(false)}
-                className="flex-1 rounded-xl bg-surface-2 py-2.5 text-sm font-medium"
-              >
-                Annulla
-              </button>
-              <button
-                onClick={() => {
-                  setConfermaReset(false);
-                  reset();
-                  toast.success("App reimpostata");
-                }}
-                className="flex-1 rounded-xl bg-destructive py-2.5 text-sm font-semibold text-destructive-foreground"
-              >
-                Reimposta
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmPopup
+        open={confermaReset}
+        onClose={() => setConfermaReset(false)}
+        title="Sei sicuro di voler reimpostare l'app?"
+        description="Cancella spese, categorie, ricorrenti e profilo dal tuo account. L'operazione non è reversibile."
+        confirmLabel="Reimposta"
+        onConfirm={() => {
+          setConfermaReset(false);
+          reset();
+          toast.success("App reimpostata");
+        }}
+      />
     </div>
   );
 }

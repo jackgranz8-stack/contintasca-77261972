@@ -18,6 +18,7 @@ import { iconFor } from "@/lib/icons";
 import { ProgressBar } from "@/components/ProgressBar";
 import { TrendBars } from "@/components/TrendBars";
 import { Donut } from "@/components/Donut";
+import { SwipeToDelete } from "@/components/SwipeToDelete";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -43,6 +44,7 @@ function HomePage() {
   const navigate = useNavigate();
   const [mese, setMese] = useState(currentMonth());
   const [catSel, setCatSel] = useState<string | "all">("all");
+  const [openSwipeTipId, setOpenSwipeTipId] = useState<string | null>(null);
 
   const mesi = useMemo(() => lastMonths(6), []);
   const txMese = txInMonth(state.transazioni, mese);
@@ -128,52 +130,64 @@ function HomePage() {
             <h2 className="text-sm font-semibold">Consigli intelligenti</h2>
           </div>
           {tips.map((t) => (
-            <article key={t.id} className="card-surface p-4">
-              <div className="flex items-start gap-2">
-                <span
-                  className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-                  style={{
-                    backgroundColor:
-                      t.tono === "danger"
-                        ? "var(--danger)"
-                        : t.tono === "warn"
-                          ? "var(--warn)"
-                          : t.tono === "neutral"
-                            ? "var(--muted-foreground)"
-                            : "var(--accent-lime)",
-                  }}
-                />
-                <div className="min-w-0">
-                  <h3 className="text-sm font-semibold">{t.titolo}</h3>
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{t.testo}</p>
+            <SwipeToDelete
+              key={t.id}
+              id={t.id}
+              openId={openSwipeTipId}
+              onOpenChange={setOpenSwipeTipId}
+              className="card-surface"
+              label={`Ignora consiglio: ${t.titolo}`}
+              icon={X}
+              revealClassName="bg-surface-2 text-muted-foreground"
+              onDelete={() => dismissTip(t.id)}
+            >
+              <article className="p-4">
+                <div className="flex items-start gap-2">
+                  <span
+                    className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+                    style={{
+                      backgroundColor:
+                        t.tono === "danger"
+                          ? "var(--danger)"
+                          : t.tono === "warn"
+                            ? "var(--warn)"
+                            : t.tono === "neutral"
+                              ? "var(--muted-foreground)"
+                              : "var(--accent-lime)",
+                    }}
+                  />
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-semibold">{t.titolo}</h3>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{t.testo}</p>
+                  </div>
                 </div>
-              </div>
-              <div className="mt-3 flex gap-2">
-                {t.action.kind === "ack" ? (
-                  <button
-                    onClick={() => dismissTip(t.id)}
-                    className="w-full rounded-xl bg-surface-2 py-2 text-xs font-semibold"
-                  >
-                    Ho capito
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => applica(t.action)}
-                      className="lime-fill flex-1 rounded-xl py-2 text-xs font-semibold"
-                    >
-                      {t.azione}
-                    </button>
+                <div className="mt-3 flex gap-2">
+                  {t.action.kind === "ack" ? (
                     <button
                       onClick={() => dismissTip(t.id)}
-                      className="rounded-xl bg-surface-2 px-4 py-2 text-xs text-muted-foreground"
+                      className="w-full rounded-xl bg-surface-2 py-2 text-xs font-semibold"
                     >
-                      Ignora
+                      Ho capito
                     </button>
-                  </>
-                )}
-              </div>
-            </article>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => applica(t.action)}
+                        className="lime-fill flex-1 rounded-xl py-2 text-xs font-semibold"
+                      >
+                        {t.azione}
+                      </button>
+                      <button
+                        onClick={() => dismissTip(t.id)}
+                        className="rounded-xl bg-surface-2 px-4 py-2 text-xs text-muted-foreground"
+                      >
+                        Ignora
+                      </button>
+                    </>
+                  )}
+                </div>
+              </article>
+            </SwipeToDelete>
           ))}
         </section>
       )}

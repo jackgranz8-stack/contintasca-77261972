@@ -3,7 +3,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Copy, FileSpreadsheet, Pencil, Repeat, Search } from "lucide-react";
 import { sum, totalsByCategory, txInMonth, useApp } from "@/lib/store";
-import { useScrollLock } from "@/hooks/use-scroll-lock";
 import { SwipeToDelete } from "@/components/SwipeToDelete";
 
 import { eur, formatDay, lastMonths, monthLabel, monthKey } from "@/lib/format";
@@ -12,6 +11,7 @@ import { TrendBars } from "@/components/TrendBars";
 import { Donut } from "@/components/Donut";
 import { exportTransactions } from "@/lib/excel";
 import { AddExpenseModal } from "@/components/AddExpenseModal";
+import { ConfirmPopup } from "@/components/ConfirmPopup";
 import type { Transaction } from "@/lib/types";
 
 export const Route = createFileRoute("/storico")({
@@ -45,7 +45,6 @@ function StoricoPage() {
   const [catSel, setCatSel] = useState<Set<string>>(new Set());
   const [daEliminare, setDaEliminare] = useState<string | null>(null);
   const [openSwipeId, setOpenSwipeId] = useState<string | null>(null);
-  useScrollLock(daEliminare !== null);
 
   const [daModificare, setDaModificare] = useState<Transaction | null>(null);
   const [daDuplicare, setDaDuplicare] = useState<Pick<
@@ -292,34 +291,19 @@ function StoricoPage() {
         onClose={() => setDaDuplicare(null)}
       />
 
-      {daEliminare && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-6 backdrop-blur-sm">
-          <div className="card-surface w-full max-w-[340px] p-5">
-            <h3 className="text-base font-semibold">Eliminare la transazione?</h3>
-            <p className="mt-1 text-xs text-muted-foreground">
-              L&apos;operazione non è annullabile.
-            </p>
-            <div className="mt-4 flex gap-2">
-              <button
-                onClick={() => setDaEliminare(null)}
-                className="flex-1 rounded-xl bg-surface-2 py-2.5 text-sm"
-              >
-                Annulla
-              </button>
-              <button
-                onClick={() => {
-                  deleteTransaction(daEliminare);
-                  setDaEliminare(null);
-                  toast.success("Transazione eliminata");
-                }}
-                className="flex-1 rounded-xl bg-destructive py-2.5 text-sm font-semibold text-destructive-foreground"
-              >
-                Elimina
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmPopup
+        open={daEliminare !== null}
+        onClose={() => setDaEliminare(null)}
+        title="Eliminare la transazione?"
+        description="L'operazione non è annullabile."
+        confirmLabel="Elimina"
+        onConfirm={() => {
+          if (!daEliminare) return;
+          deleteTransaction(daEliminare);
+          setDaEliminare(null);
+          toast.success("Transazione eliminata");
+        }}
+      />
     </div>
   );
 }
