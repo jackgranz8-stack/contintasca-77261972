@@ -6,8 +6,13 @@
 
 /*
  * Conti in Tasca — design system
- * Tema scuro, sfondo quasi nero (#0A0F0C), accento verde lime (#8CE562).
- * Tutti i colori in oklch. Nessun colore hardcoded nei componenti.
+ * Tema scuro (default) + tema chiaro, entrambi con accento verde lime.
+ * Il tema attivo è determinato da una classe su <html>: nessuna classe o
+ * ".dark" = scuro, ".light" = chiaro. Se l'utente non ha scelto esplicitamente
+ * (nessuna classe), segue l'impostazione di sistema del telefono via
+ * prefers-color-scheme. Tutti i colori in oklch. Nessun colore hardcoded nei
+ * componenti (eccetto BottomNav, che usa apposta le stesse variabili semantiche
+ * per restare "vetro" coerente in entrambi i temi).
  */
 
 @theme inline {
@@ -92,6 +97,93 @@
   --gradient-lime: linear-gradient(135deg, oklch(0.9 0.19 135), oklch(0.79 0.18 148));
   --shadow-card: 0 12px 32px -18px oklch(0 0 0 / 0.9);
   --shadow-float: 0 14px 34px -10px oklch(0.87 0.19 132 / 0.45);
+}
+
+/* Tema chiaro: scelta esplicita dell'utente ("Chiaro" nel profilo). */
+.light {
+  --background: oklch(0.98 0.006 150);
+  --foreground: oklch(0.19 0.02 152);
+
+  --surface: oklch(0.955 0.008 150);
+  --surface-2: oklch(0.91 0.01 150);
+
+  --card: oklch(0.955 0.008 150);
+  --card-foreground: oklch(0.19 0.02 152);
+  --popover: oklch(0.985 0.005 150);
+  --popover-foreground: oklch(0.19 0.02 152);
+
+  --accent-lime: oklch(0.62 0.19 132);
+  --primary: oklch(0.62 0.19 132);
+  --primary-foreground: oklch(0.99 0.006 150);
+
+  --secondary: oklch(0.91 0.01 150);
+  --secondary-foreground: oklch(0.19 0.02 152);
+
+  --muted: oklch(0.91 0.01 150);
+  --muted-foreground: oklch(0.48 0.015 150);
+
+  --accent: oklch(0.88 0.03 150);
+  --accent-foreground: oklch(0.19 0.02 152);
+
+  --warn: oklch(0.55 0.15 75);
+  --danger: oklch(0.58 0.2 25);
+  --destructive: oklch(0.58 0.2 25);
+  --destructive-foreground: oklch(0.98 0.005 150);
+
+  --border: oklch(0.88 0.012 150);
+  --input: oklch(0.88 0.012 150);
+  --ring: oklch(0.62 0.19 132);
+
+  --gradient-card: linear-gradient(155deg, oklch(0.99 0.006 150) 0%, oklch(0.94 0.01 150) 100%);
+  --gradient-hero: linear-gradient(150deg, oklch(0.93 0.05 140) 0%, oklch(0.97 0.02 150) 70%);
+  --gradient-lime: linear-gradient(135deg, oklch(0.68 0.19 130), oklch(0.58 0.18 140));
+  --shadow-card: 0 12px 28px -16px oklch(0.2 0.02 150 / 0.16);
+  --shadow-float: 0 14px 30px -10px oklch(0.62 0.19 132 / 0.35);
+}
+
+/* Tema chiaro "automatico": si applica solo se l'utente non ha scelto
+   esplicitamente né chiaro né scuro, e il telefono è impostato su chiaro. */
+@media (prefers-color-scheme: light) {
+  :root:not(.dark):not(.light) {
+    --background: oklch(0.98 0.006 150);
+    --foreground: oklch(0.19 0.02 152);
+
+    --surface: oklch(0.955 0.008 150);
+    --surface-2: oklch(0.91 0.01 150);
+
+    --card: oklch(0.955 0.008 150);
+    --card-foreground: oklch(0.19 0.02 152);
+    --popover: oklch(0.985 0.005 150);
+    --popover-foreground: oklch(0.19 0.02 152);
+
+    --accent-lime: oklch(0.62 0.19 132);
+    --primary: oklch(0.62 0.19 132);
+    --primary-foreground: oklch(0.99 0.006 150);
+
+    --secondary: oklch(0.91 0.01 150);
+    --secondary-foreground: oklch(0.19 0.02 152);
+
+    --muted: oklch(0.91 0.01 150);
+    --muted-foreground: oklch(0.48 0.015 150);
+
+    --accent: oklch(0.88 0.03 150);
+    --accent-foreground: oklch(0.19 0.02 152);
+
+    --warn: oklch(0.55 0.15 75);
+    --danger: oklch(0.58 0.2 25);
+    --destructive: oklch(0.58 0.2 25);
+    --destructive-foreground: oklch(0.98 0.005 150);
+
+    --border: oklch(0.88 0.012 150);
+    --input: oklch(0.88 0.012 150);
+    --ring: oklch(0.62 0.19 132);
+
+    --gradient-card: linear-gradient(155deg, oklch(0.99 0.006 150) 0%, oklch(0.94 0.01 150) 100%);
+    --gradient-hero: linear-gradient(150deg, oklch(0.93 0.05 140) 0%, oklch(0.97 0.02 150) 70%);
+    --gradient-lime: linear-gradient(135deg, oklch(0.68 0.19 130), oklch(0.58 0.18 140));
+    --shadow-card: 0 12px 28px -16px oklch(0.2 0.02 150 / 0.16);
+    --shadow-float: 0 14px 30px -10px oklch(0.62 0.19 132 / 0.35);
+  }
 }
 
 @layer base {
