@@ -57,7 +57,7 @@ export function Donut({
   return (
     <div className="flex flex-col items-center justify-center py-2">
       <div
-        className="relative h-[170px] w-[170px]"
+        className="relative h-[170px] w-[170px] touch-none"
         onPointerMove={(e) => scrubAt(e.clientX, e.clientY)}
         onPointerDown={(e) => scrubAt(e.clientX, e.clientY)}
         onPointerLeave={() => setActive(null)}
