@@ -2,11 +2,11 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Repeat, X } from "lucide-react";
 import { useApp } from "@/lib/store";
-import { useScrollLock } from "@/hooks/use-scroll-lock";
 import { iconFor } from "@/lib/icons";
 import { todayISO, uid } from "@/lib/format";
 import type { Transaction } from "@/lib/types";
-
+import { BottomSheet } from "./BottomSheet";
+import { ConfirmPopup } from "./ConfirmPopup";
 
 function shiftDay(days: number) {
   const d = new Date();
@@ -40,7 +40,6 @@ export function AddExpenseModal({
   const [giorno, setGiorno] = useState(1);
   const [confermaStop, setConfermaStop] = useState(false);
   const [campo, setCampo] = useState<"importo" | "nota" | null>(null);
-
 
   const regola = edit?.ricorrenteId
     ? state.ricorrenti.find((r) => r.id === edit.ricorrenteId)
@@ -79,10 +78,6 @@ export function AddExpenseModal({
     }
   }, [open, edit, preset, state.categorie, state.ricorrenti]);
 
-  useScrollLock(open);
-
-  if (!open) return null;
-
   const valore = Number(importo.replace(",", "."));
 
   // Categorie ordinate per uso reale: le più usate per prime, quelle mai usate in fondo.
@@ -93,7 +88,6 @@ export function AddExpenseModal({
   const categorieOrdinate = [...state.categorie].sort(
     (a, b) => (usoPerCategoria.get(b.id) ?? 0) - (usoPerCategoria.get(a.id) ?? 0),
   );
-
 
   const nomeRegola = () =>
     nota.trim() || state.categorie.find((c) => c.id === categoria)?.nome || "Spesa";
@@ -207,188 +201,167 @@ export function AddExpenseModal({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center overscroll-none bg-background/70 backdrop-blur-sm">
-      <button className="absolute inset-0" aria-label="Chiudi" onClick={onClose} />
-      <div className="relative z-10 max-h-[92dvh] w-full max-w-[430px] overflow-y-auto overscroll-contain rounded-t-[28px] border border-border bg-popover px-4 pt-3 pb-[max(env(safe-area-inset-bottom),14px)]">
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-base font-semibold">{edit ? "Modifica spesa" : "Nuova spesa"}</h2>
-          <button
-            onClick={onClose}
-            className="rounded-full bg-surface-2 p-2 text-muted-foreground"
-            aria-label="Chiudi"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Importo in evidenza — solo tastiera nativa iOS */}
-        <div
-          className={`mb-3 flex items-center justify-center gap-2 rounded-2xl bg-surface px-4 py-5 transition-opacity ${
-            campo === "importo" ? "ring-2 ring-primary" : ""
-          } ${campo === "nota" ? "pointer-events-none opacity-40" : ""}`}
+    <BottomSheet open={open} onClose={onClose}>
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="text-base font-semibold">{edit ? "Modifica spesa" : "Nuova spesa"}</h2>
+        <button
+          onClick={onClose}
+          className="rounded-full bg-surface-2 p-2 text-muted-foreground"
+          aria-label="Chiudi"
         >
-          <span className="text-2xl font-semibold text-muted-foreground">€</span>
-          <input
-            type="number"
-            inputMode="decimal"
-            step="0.01"
-            min="0"
-            value={importo.replace(",", ".")}
-            onFocus={(e) => {
-              setCampo("importo");
-              e.target.select();
-            }}
-            onBlur={() => setCampo((v) => (v === "importo" ? null : v))}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") e.currentTarget.blur();
-            }}
-            onChange={(e) => setImporto(e.target.value.replace(".", ","))}
-            placeholder="0"
-            aria-label="Importo"
-            className="w-full min-w-0 bg-transparent text-center text-[42px] font-semibold leading-tight tracking-tight outline-none placeholder:text-muted-foreground"
-          />
-        </div>
+          <X size={18} />
+        </button>
+      </div>
 
-        <div className={campo ? "pointer-events-none opacity-40" : ""}>
-          {/* Categorie: riga orizzontale di icone */}
-          <div className="no-scrollbar -mx-4 mb-3 flex gap-2 overflow-x-auto px-4">
-            {categorieOrdinate.map((c) => {
-              const Icon = iconFor(c.icona);
-              const active = c.id === categoria;
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setCategoria(c.id)}
-                  className={`flex w-[68px] shrink-0 flex-col items-center gap-1 rounded-2xl border px-1 py-2 text-[11px] transition-colors ${
-                    active
-                      ? "border-primary bg-surface-2 font-semibold text-foreground"
-                      : "border-border bg-surface text-muted-foreground"
-                  }`}
-                >
-                  <span
-                    className="flex h-9 w-9 items-center justify-center rounded-full"
-                    style={{ backgroundColor: `${c.colore}22`, color: c.colore }}
-                  >
-                    <Icon size={18} />
-                  </span>
-                  <span className="w-full truncate text-center">{c.nome}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Data */}
-          <div className="no-scrollbar -mx-4 mb-2.5 flex items-center gap-2 overflow-x-auto px-4">
-            {dateChips.map((d) => (
-              <button
-                key={d.value}
-                type="button"
-                onClick={() => setData(d.value)}
-                className={`shrink-0 rounded-full border px-3.5 py-2 text-xs ${
-                  data === d.value
-                    ? "border-primary bg-surface-2 font-semibold"
-                    : "border-border bg-surface text-muted-foreground"
-                }`}
-              >
-                {d.label}
-              </button>
-            ))}
-            <input
-              type="date"
-              value={data}
-              onChange={(e) => setData(e.target.value)}
-              className="shrink-0 rounded-full border border-border bg-surface px-3 py-2 text-xs outline-none"
-            />
-          </div>
-        </div>
-
+      {/* Importo in evidenza — solo tastiera nativa iOS */}
+      <div
+        className={`mb-3 flex items-center justify-center gap-2 rounded-2xl bg-surface px-4 py-5 transition-opacity ${
+          campo === "importo" ? "ring-2 ring-primary" : ""
+        } ${campo === "nota" ? "pointer-events-none opacity-40" : ""}`}
+      >
+        <span className="text-2xl font-semibold text-muted-foreground">€</span>
         <input
-          value={nota}
-          onFocus={() => setCampo("nota")}
-          onBlur={() => setCampo((v) => (v === "nota" ? null : v))}
+          type="number"
+          inputMode="decimal"
+          step="0.01"
+          min="0"
+          value={importo.replace(",", ".")}
+          onFocus={(e) => {
+            setCampo("importo");
+            e.target.select();
+          }}
+          onBlur={() => setCampo((v) => (v === "importo" ? null : v))}
           onKeyDown={(e) => {
             if (e.key === "Enter") e.currentTarget.blur();
           }}
-          onChange={(e) => setNota(e.target.value)}
-          placeholder="Descrizione (opzionale)"
-          className={`mb-2.5 w-full rounded-2xl border bg-surface px-4 py-3 text-base outline-none placeholder:text-muted-foreground ${
-            campo === "nota" ? "border-primary ring-2 ring-primary" : "border-border"
-          } ${campo === "importo" ? "pointer-events-none opacity-40" : ""}`}
+          onChange={(e) => setImporto(e.target.value.replace(".", ","))}
+          placeholder="0"
+          aria-label="Importo"
+          className="w-full min-w-0 bg-transparent text-center text-[42px] font-semibold leading-tight tracking-tight outline-none placeholder:text-muted-foreground"
         />
+      </div>
 
-        {/* Toggle ricorrenza compatto */}
-        <div
-          className={`mb-3 flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-2.5 ${
-            campo ? "pointer-events-none opacity-40" : ""
-          }`}
-        >
-
-          <Repeat size={15} className="shrink-0 text-primary" />
-          <span className="flex-1 truncate text-sm">Ripeti ogni mese</span>
-          {ripeti && (
-            <select
-              value={giorno}
-              onChange={(e) => setGiorno(Number(e.target.value))}
-              aria-label="Giorno del mese"
-              className="native-select w-20 shrink-0"
-            >
-              {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          )}
-          <button
-            type="button"
-            onClick={() => setRipeti((v) => !v)}
-            aria-pressed={ripeti}
-            aria-label="Ripeti ogni mese"
-            className={`h-7 w-12 shrink-0 rounded-full p-1 transition-colors ${ripeti ? "lime-fill" : "bg-surface-2"}`}
-          >
-            <span
-              className={`block h-5 w-5 rounded-full bg-background transition-transform ${ripeti ? "translate-x-5" : ""}`}
-            />
-          </button>
+      <div className={campo ? "pointer-events-none opacity-40" : ""}>
+        {/* Categorie: riga orizzontale di icone */}
+        <div className="no-scrollbar -mx-4 mb-3 flex gap-2 overflow-x-auto px-4">
+          {categorieOrdinate.map((c) => {
+            const Icon = iconFor(c.icona);
+            const active = c.id === categoria;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setCategoria(c.id)}
+                className={`flex w-[68px] shrink-0 flex-col items-center gap-1 rounded-2xl border px-1 py-2 text-[11px] transition-colors ${
+                  active
+                    ? "border-primary bg-surface-2 font-semibold text-foreground"
+                    : "border-border bg-surface text-muted-foreground"
+                }`}
+              >
+                <span
+                  className="flex h-9 w-9 items-center justify-center rounded-full"
+                  style={{ backgroundColor: `${c.colore}22`, color: c.colore }}
+                >
+                  <Icon size={18} />
+                </span>
+                <span className="w-full truncate text-center">{c.nome}</span>
+              </button>
+            );
+          })}
         </div>
 
-        <button
-          onClick={salva}
-          className="lime-fill w-full rounded-2xl py-3.5 text-base font-semibold active:scale-[0.99]"
-        >
-          {edit ? "Salva modifiche" : "Salva spesa"}
-        </button>
-
-        {confermaStop && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/80 px-6 backdrop-blur-sm">
-            <div className="card-surface w-full max-w-[340px] p-5">
-              <h3 className="text-base font-semibold">Fermare la ricorrenza?</h3>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Le spese già registrate in passato non vengono toccate: si ferma solo la
-                generazione automatica dei prossimi mesi.
-              </p>
-              <div className="mt-4 flex gap-2">
-                <button
-                  onClick={() => setConfermaStop(false)}
-                  className="flex-1 rounded-xl bg-surface-2 py-2.5 text-sm"
-                >
-                  Annulla
-                </button>
-                <button
-                  onClick={() => {
-                    setConfermaStop(false);
-                    salvaEdit(true);
-                  }}
-                  className="flex-1 rounded-xl bg-destructive py-2.5 text-sm font-semibold text-destructive-foreground"
-                >
-                  Ferma
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Data */}
+        <div className="no-scrollbar -mx-4 mb-2.5 flex items-center gap-2 overflow-x-auto px-4">
+          {dateChips.map((d) => (
+            <button
+              key={d.value}
+              type="button"
+              onClick={() => setData(d.value)}
+              className={`shrink-0 rounded-full border px-3.5 py-2 text-xs ${
+                data === d.value
+                  ? "border-primary bg-surface-2 font-semibold"
+                  : "border-border bg-surface text-muted-foreground"
+              }`}
+            >
+              {d.label}
+            </button>
+          ))}
+          <input
+            type="date"
+            value={data}
+            onChange={(e) => setData(e.target.value)}
+            className="shrink-0 rounded-full border border-border bg-surface px-3 py-2 text-xs outline-none"
+          />
+        </div>
       </div>
-    </div>
+
+      <input
+        value={nota}
+        onFocus={() => setCampo("nota")}
+        onBlur={() => setCampo((v) => (v === "nota" ? null : v))}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
+        onChange={(e) => setNota(e.target.value)}
+        placeholder="Descrizione (opzionale)"
+        className={`mb-2.5 w-full rounded-2xl border bg-surface px-4 py-3 text-base outline-none placeholder:text-muted-foreground ${
+          campo === "nota" ? "border-primary ring-2 ring-primary" : "border-border"
+        } ${campo === "importo" ? "pointer-events-none opacity-40" : ""}`}
+      />
+
+      {/* Toggle ricorrenza compatto */}
+      <div
+        className={`mb-3 flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-2.5 ${
+          campo ? "pointer-events-none opacity-40" : ""
+        }`}
+      >
+        <Repeat size={15} className="shrink-0 text-primary" />
+        <span className="flex-1 truncate text-sm">Ripeti ogni mese</span>
+        {ripeti && (
+          <select
+            value={giorno}
+            onChange={(e) => setGiorno(Number(e.target.value))}
+            aria-label="Giorno del mese"
+            className="native-select w-20 shrink-0"
+          >
+            {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+        )}
+        <button
+          type="button"
+          onClick={() => setRipeti((v) => !v)}
+          aria-pressed={ripeti}
+          aria-label="Ripeti ogni mese"
+          className={`h-7 w-12 shrink-0 rounded-full p-1 transition-colors ${ripeti ? "lime-fill" : "bg-surface-2"}`}
+        >
+          <span
+            className={`block h-5 w-5 rounded-full bg-background transition-transform ${ripeti ? "translate-x-5" : ""}`}
+          />
+        </button>
+      </div>
+
+      <button
+        onClick={salva}
+        className="lime-fill w-full rounded-2xl py-3.5 text-base font-semibold active:scale-[0.99]"
+      >
+        {edit ? "Salva modifiche" : "Salva spesa"}
+      </button>
+
+      <ConfirmPopup
+        open={confermaStop}
+        onClose={() => setConfermaStop(false)}
+        title="Fermare la ricorrenza?"
+        description="Le spese già registrate in passato non vengono toccate: si ferma solo la generazione automatica dei prossimi mesi."
+        confirmLabel="Ferma"
+        onConfirm={() => {
+          setConfermaStop(false);
+          salvaEdit(true);
+        }}
+      />
+    </BottomSheet>
   );
 }

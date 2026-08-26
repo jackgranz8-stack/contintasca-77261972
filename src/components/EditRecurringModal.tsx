@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { X } from "lucide-react";
 import { useApp } from "@/lib/store";
-import { useScrollLock } from "@/hooks/use-scroll-lock";
 import { iconFor } from "@/lib/icons";
 import type { Recurring } from "@/lib/types";
+import { BottomSheet } from "./BottomSheet";
 
 export function EditRecurringModal({
   open,
@@ -21,6 +21,13 @@ export function EditRecurringModal({
   const [importo, setImporto] = useState("");
   const [giorno, setGiorno] = useState(1);
   const [campo, setCampo] = useState<"importo" | "nome" | null>(null);
+  // Resta con l'ultima ricorrente valida durante l'animazione di chiusura,
+  // così il contenuto non sparisce di scatto mentre il foglio scorre giù.
+  const [lastEdit, setLastEdit] = useState<Recurring | null>(edit);
+
+  useEffect(() => {
+    if (edit) setLastEdit(edit);
+  }, [edit]);
 
   useEffect(() => {
     if (!open || !edit) return;
@@ -31,9 +38,8 @@ export function EditRecurringModal({
     setCampo(null);
   }, [open, edit]);
 
-  useScrollLock(open);
-
-  if (!open || !edit) return null;
+  const shown = edit ?? lastEdit;
+  if (!shown) return null;
 
   const salva = () => {
     const valore = Number(importo.replace(",", "."));
@@ -41,7 +47,7 @@ export function EditRecurringModal({
       toast.error("Compila nome, importo e categoria");
       return;
     }
-    updateRecurring(edit.id, {
+    updateRecurring(shown.id, {
       nome: nome.trim(),
       categoria,
       importo: valore,
@@ -52,118 +58,115 @@ export function EditRecurringModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center overscroll-none bg-background/70 backdrop-blur-sm">
-      <button className="absolute inset-0" aria-label="Chiudi" onClick={onClose} />
-      <div className="relative z-10 max-h-[92dvh] w-full max-w-[430px] overflow-y-auto overscroll-contain rounded-t-[28px] border border-border bg-popover px-4 pt-3 pb-[max(env(safe-area-inset-bottom),14px)]">
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-base font-semibold">Modifica ricorrente</h2>
-          <button
-            onClick={onClose}
-            className="rounded-full bg-surface-2 p-2 text-muted-foreground"
-            aria-label="Chiudi"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <div
-          className={`mb-3 flex items-center justify-center gap-2 rounded-2xl bg-surface px-4 py-5 transition-opacity ${
-            campo === "importo" ? "ring-2 ring-primary" : ""
-          } ${campo === "nome" ? "pointer-events-none opacity-40" : ""}`}
+    <BottomSheet open={open} onClose={onClose}>
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="text-base font-semibold">Modifica ricorrente</h2>
+        <button
+          onClick={onClose}
+          className="rounded-full bg-surface-2 p-2 text-muted-foreground"
+          aria-label="Chiudi"
         >
-          <span className="text-2xl font-semibold text-muted-foreground">€</span>
-          <input
-            type="number"
-            inputMode="decimal"
-            step="0.01"
-            min="0"
-            value={importo}
-            onFocus={(e) => {
-              setCampo("importo");
-              e.target.select();
-            }}
-            onBlur={() => setCampo((v) => (v === "importo" ? null : v))}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") e.currentTarget.blur();
-            }}
-            onChange={(e) => setImporto(e.target.value)}
-            placeholder="0"
-            aria-label="Importo"
-            className="w-full min-w-0 bg-transparent text-center text-[42px] font-semibold leading-tight tracking-tight outline-none placeholder:text-muted-foreground"
-          />
-        </div>
+          <X size={18} />
+        </button>
+      </div>
 
+      <div
+        className={`mb-3 flex items-center justify-center gap-2 rounded-2xl bg-surface px-4 py-5 transition-opacity ${
+          campo === "importo" ? "ring-2 ring-primary" : ""
+        } ${campo === "nome" ? "pointer-events-none opacity-40" : ""}`}
+      >
+        <span className="text-2xl font-semibold text-muted-foreground">€</span>
         <input
-          value={nome}
+          type="number"
+          inputMode="decimal"
+          step="0.01"
+          min="0"
+          value={importo}
           onFocus={(e) => {
-            setCampo("nome");
+            setCampo("importo");
             e.target.select();
           }}
-          onBlur={() => setCampo((v) => (v === "nome" ? null : v))}
+          onBlur={() => setCampo((v) => (v === "importo" ? null : v))}
           onKeyDown={(e) => {
             if (e.key === "Enter") e.currentTarget.blur();
           }}
-          onChange={(e) => setNome(e.target.value)}
-          placeholder="Nome (es. Affitto)"
-          className={`mb-3 w-full rounded-2xl border bg-surface px-4 py-3 text-base outline-none placeholder:text-muted-foreground ${
-            campo === "nome" ? "border-primary ring-2 ring-primary" : "border-border"
-          } ${campo === "importo" ? "pointer-events-none opacity-40" : ""}`}
+          onChange={(e) => setImporto(e.target.value)}
+          placeholder="0"
+          aria-label="Importo"
+          className="w-full min-w-0 bg-transparent text-center text-[42px] font-semibold leading-tight tracking-tight outline-none placeholder:text-muted-foreground"
         />
+      </div>
 
-        <div className={campo ? "pointer-events-none opacity-40" : ""}>
-          <div className="no-scrollbar -mx-4 mb-3 flex gap-2 overflow-x-auto px-4">
-            {state.categorie.map((c) => {
-              const Icon = iconFor(c.icona);
-              const active = c.id === categoria;
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setCategoria(c.id)}
-                  className={`flex w-[68px] shrink-0 flex-col items-center gap-1 rounded-2xl border px-1 py-2 text-[11px] transition-colors ${
-                    active
-                      ? "border-primary bg-surface-2 font-semibold text-foreground"
-                      : "border-border bg-surface text-muted-foreground"
-                  }`}
+      <input
+        value={nome}
+        onFocus={(e) => {
+          setCampo("nome");
+          e.target.select();
+        }}
+        onBlur={() => setCampo((v) => (v === "nome" ? null : v))}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
+        onChange={(e) => setNome(e.target.value)}
+        placeholder="Nome (es. Affitto)"
+        className={`mb-3 w-full rounded-2xl border bg-surface px-4 py-3 text-base outline-none placeholder:text-muted-foreground ${
+          campo === "nome" ? "border-primary ring-2 ring-primary" : "border-border"
+        } ${campo === "importo" ? "pointer-events-none opacity-40" : ""}`}
+      />
+
+      <div className={campo ? "pointer-events-none opacity-40" : ""}>
+        <div className="no-scrollbar -mx-4 mb-3 flex gap-2 overflow-x-auto px-4">
+          {state.categorie.map((c) => {
+            const Icon = iconFor(c.icona);
+            const active = c.id === categoria;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setCategoria(c.id)}
+                className={`flex w-[68px] shrink-0 flex-col items-center gap-1 rounded-2xl border px-1 py-2 text-[11px] transition-colors ${
+                  active
+                    ? "border-primary bg-surface-2 font-semibold text-foreground"
+                    : "border-border bg-surface text-muted-foreground"
+                }`}
+              >
+                <span
+                  className="flex h-9 w-9 items-center justify-center rounded-full"
+                  style={{ backgroundColor: `${c.colore}22`, color: c.colore }}
                 >
-                  <span
-                    className="flex h-9 w-9 items-center justify-center rounded-full"
-                    style={{ backgroundColor: `${c.colore}22`, color: c.colore }}
-                  >
-                    <Icon size={18} />
-                  </span>
-                  <span className="w-full truncate text-center">{c.nome}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="mb-3 flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-2.5">
-            <span className="flex-1 truncate text-sm">Giorno del mese</span>
-            <select
-              value={giorno}
-              onChange={(e) => setGiorno(Number(e.target.value))}
-              aria-label="Giorno del mese"
-              className="native-select w-20 shrink-0"
-            >
-              {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          </div>
+                  <Icon size={18} />
+                </span>
+                <span className="w-full truncate text-center">{c.nome}</span>
+              </button>
+            );
+          })}
         </div>
 
-        <button
-          onClick={salva}
-          className={`lime-fill w-full rounded-2xl py-3.5 text-base font-semibold ${
-            campo ? "pointer-events-none opacity-40" : ""
-          }`}
-        >
-          Salva modifiche
-        </button>
+        <div className="mb-3 flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-2.5">
+          <span className="flex-1 truncate text-sm">Giorno del mese</span>
+          <select
+            value={giorno}
+            onChange={(e) => setGiorno(Number(e.target.value))}
+            aria-label="Giorno del mese"
+            className="native-select w-20 shrink-0"
+          >
+            {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
-    </div>
+
+      <button
+        onClick={salva}
+        className={`lime-fill w-full rounded-2xl py-3.5 text-base font-semibold ${
+          campo ? "pointer-events-none opacity-40" : ""
+        }`}
+      >
+        Salva modifiche
+      </button>
+    </BottomSheet>
   );
 }

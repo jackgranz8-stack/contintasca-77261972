@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, ChevronDown, Plus } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { ICON_KEYS, iconFor } from "@/lib/icons";
@@ -34,6 +34,13 @@ export function Onboarding() {
   const totaleNum = Math.max(0, Number(totale.replace(",", ".")) || 0);
   const attive = cats.filter((c) => c.attiva);
   const sommaBudget = useMemo(() => attive.reduce((a, c) => a + c.budget, 0), [attive]);
+  const canGoNext = !((step === 1 && totaleNum <= 0) || (step === 3 && attive.length === 0));
+
+  const [direction, setDirection] = useState<"forward" | "back">("forward");
+  const [dragX, setDragX] = useState(0);
+  const draggingRef = useRef(false);
+  const startRef = useRef({ x: 0, y: 0 });
+  const axisRef = useRef<"none" | "x" | "y">("none");
 
   const next = () => {
     if (step === 1 && totaleNum <= 0) return;
@@ -41,7 +48,54 @@ export function Onboarding() {
       if (attive.length === 0) return;
       setCats((cs) => suggestBudgets(cs, totaleNum, abitazione, auto, persone));
     }
+    setDirection("forward");
     setStep((s) => s + 1);
+  };
+
+  const back = () => {
+    setDirection("back");
+    setStep((s) => Math.max(0, s - 1));
+  };
+
+  // Swipe orizzontale tra gli step, alternativo ai pulsanti Continua/Indietro
+  // (che restano invariati). Ignora i gesti che partono da zone con il loro
+  // proprio scroll orizzontale (es. la striscia di icone), per non entrare
+  // in conflitto con quello scroll nativo.
+  const onStepPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    if ((e.target as HTMLElement).closest("[data-no-swipe]")) return;
+    draggingRef.current = true;
+    axisRef.current = "none";
+    startRef.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const onStepPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) return;
+    const dx = e.clientX - startRef.current.x;
+    const dy = e.clientY - startRef.current.y;
+    if (axisRef.current === "none") {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      axisRef.current = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+      if (axisRef.current === "x") e.currentTarget.setPointerCapture(e.pointerId);
+    }
+    if (axisRef.current !== "x") return;
+    e.preventDefault();
+    // Ai bordi (primo/ultimo step, o step senza via libera) il trascinamento
+    // è smorzato invece che bloccato di scatto.
+    const atEdge = (dx > 0 && step === 0) || (dx < 0 && (step === 4 || (dx < 0 && !canGoNext)));
+    setDragX(atEdge ? dx / 3 : dx);
+  };
+
+  const onStepPointerUp = () => {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
+    if (axisRef.current === "x") {
+      const THRESHOLD = 70;
+      if (dragX < -THRESHOLD && step < 4 && canGoNext) next();
+      else if (dragX > THRESHOLD && step > 0) back();
+    }
+    axisRef.current = "none";
+    setDragX(0);
   };
 
   const aggiungiCategoria = () => {
@@ -92,290 +146,308 @@ export function Onboarding() {
         ))}
       </div>
 
-      <div className="flex-1">
-        {step === 0 && (
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight">Conti in Tasca</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Tieni le spese sotto controllo in pochi tap. I tuoi dati sono salvati nel tuo account
-              e disponibili su ogni dispositivo.
-            </p>
-            <label className="mt-8 mb-1 block text-xs text-muted-foreground">
-              Come ti chiami? (opzionale)
-            </label>
-            <input
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              placeholder="Il tuo nome"
-              className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-base outline-none placeholder:text-muted-foreground"
-            />
-          </div>
-        )}
-
-        {step === 1 && (
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Budget mensile</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Quanto puoi spendere ogni mese in totale?
-            </p>
-            <div className="mt-6 flex items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-4">
-              <span className="text-3xl font-semibold text-muted-foreground">€</span>
+      <div
+        className="flex-1 touch-pan-y"
+        onPointerDown={onStepPointerDown}
+        onPointerMove={onStepPointerMove}
+        onPointerUp={onStepPointerUp}
+        onPointerCancel={onStepPointerUp}
+      >
+        <div
+          key={step}
+          className={`animate-in fade-in duration-300 ${
+            direction === "forward" ? "slide-in-from-right-8" : "slide-in-from-left-8"
+          }`}
+          style={
+            draggingRef.current
+              ? { transform: `translateX(${dragX}px)`, transition: "none" }
+              : undefined
+          }
+        >
+          {step === 0 && (
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight">Conti in Tasca</h1>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Tieni le spese sotto controllo in pochi tap. I tuoi dati sono salvati nel tuo
+                account e disponibili su ogni dispositivo.
+              </p>
+              <label className="mt-8 mb-1 block text-xs text-muted-foreground">
+                Come ti chiami? (opzionale)
+              </label>
               <input
-                autoFocus
-                inputMode="decimal"
-                value={totale}
-                onChange={(e) => setTotale(e.target.value)}
-                placeholder="1500"
-                className="w-full bg-transparent text-4xl font-semibold tracking-tight outline-none placeholder:text-muted-foreground"
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                placeholder="Il tuo nome"
+                className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-base outline-none placeholder:text-muted-foreground"
               />
             </div>
-          </div>
-        )}
+          )}
 
-        {step === 2 && (
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Profilo rapido</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Serve a proporti dei budget realistici.
-            </p>
-            <p className="mt-6 mb-2 text-xs text-muted-foreground">Situazione abitativa</p>
-            <div className="grid grid-cols-2 gap-2">
-              {HOUSING_OPTIONS.map((h) => (
-                <button
-                  key={h.id}
-                  onClick={() => setAbitazione(h.id)}
-                  className={`rounded-2xl border px-3 py-3 text-sm ${
-                    abitazione === h.id
-                      ? "border-primary bg-surface-2"
-                      : "border-border bg-surface text-muted-foreground"
-                  }`}
-                >
-                  {h.label}
-                </button>
-              ))}
+          {step === 1 && (
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">Budget mensile</h1>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Quanto puoi spendere ogni mese in totale?
+              </p>
+              <div className="mt-6 flex items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-4">
+                <span className="text-3xl font-semibold text-muted-foreground">€</span>
+                <input
+                  autoFocus
+                  inputMode="decimal"
+                  value={totale}
+                  onChange={(e) => setTotale(e.target.value)}
+                  placeholder="1500"
+                  className="w-full bg-transparent text-4xl font-semibold tracking-tight outline-none placeholder:text-muted-foreground"
+                />
+              </div>
             </div>
+          )}
 
-            <p className="mt-6 mb-2 text-xs text-muted-foreground">Hai un&apos;auto?</p>
-            <div className="grid grid-cols-2 gap-2">
-              {[true, false].map((v) => (
-                <button
-                  key={String(v)}
-                  onClick={() => setAuto(v)}
-                  className={`rounded-2xl border px-3 py-3 text-sm ${
-                    auto === v
-                      ? "border-primary bg-surface-2"
-                      : "border-border bg-surface text-muted-foreground"
-                  }`}
-                >
-                  {v ? "Sì" : "No"}
-                </button>
-              ))}
-            </div>
-
-            <p className="mt-6 mb-2 text-xs text-muted-foreground">Persone in famiglia</p>
-            <div className="flex items-center gap-4 rounded-2xl border border-border bg-surface px-4 py-3">
-              <button
-                onClick={() => setPersone((p) => Math.max(1, p - 1))}
-                className="h-9 w-9 rounded-full bg-surface-2 text-lg"
-              >
-                −
-              </button>
-              <span className="flex-1 text-center text-lg font-semibold">{persone}</span>
-              <button
-                onClick={() => setPersone((p) => Math.min(12, p + 1))}
-                className="h-9 w-9 rounded-full bg-surface-2 text-lg"
-              >
-                +
-              </button>
-            </div>
-          </div>
-        )}
-
-        {step === 3 && (
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Le tue categorie</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Tocca per attivare o disattivare. Puoi aggiungerne altre.
-            </p>
-            <div className="mt-5 grid grid-cols-3 gap-2">
-              {cats.map((c) => {
-                const Icon = iconFor(c.icona);
-                return (
+          {step === 2 && (
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">Profilo rapido</h1>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Serve a proporti dei budget realistici.
+              </p>
+              <p className="mt-6 mb-2 text-xs text-muted-foreground">Situazione abitativa</p>
+              <div className="grid grid-cols-2 gap-2">
+                {HOUSING_OPTIONS.map((h) => (
                   <button
-                    key={c.id}
-                    onClick={() =>
-                      setCats((cs) =>
-                        cs.map((x) => (x.id === c.id ? { ...x, attiva: !x.attiva } : x)),
-                      )
-                    }
-                    className={`flex flex-col items-center gap-2 rounded-2xl border px-2 py-3 text-[11px] ${
-                      c.attiva
+                    key={h.id}
+                    onClick={() => setAbitazione(h.id)}
+                    className={`rounded-2xl border px-3 py-3 text-sm ${
+                      abitazione === h.id
                         ? "border-primary bg-surface-2"
                         : "border-border bg-surface text-muted-foreground"
                     }`}
                   >
-                    <span
-                      className="flex h-10 w-10 items-center justify-center rounded-full"
-                      style={{ backgroundColor: `${c.colore}22`, color: c.colore }}
-                    >
-                      <Icon size={19} />
-                    </span>
-                    <span className="text-center leading-tight">{c.nome}</span>
+                    {h.label}
                   </button>
-                );
-              })}
-            </div>
+                ))}
+              </div>
 
-            <div className="card-surface mt-5 overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setFormCat((v) => !v)}
-                className="flex w-full items-center justify-between px-4 py-3.5 text-sm font-medium"
-                aria-expanded={formCat}
-              >
-                <span className="flex items-center gap-2">
-                  <Plus size={15} /> Aggiungi categoria
-                </span>
-                <ChevronDown
-                  size={16}
-                  className={`text-muted-foreground transition-transform ${formCat ? "rotate-180" : ""}`}
-                />
-              </button>
-
-              {formCat && (
-                <div className="border-t border-border p-4 pt-3.5">
-                  <input
-                    value={nuovoNome}
-                    onChange={(e) => setNuovoNome(e.target.value)}
-                    placeholder="Es. Abbonamenti"
-                    className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
-                  />
-
-                  <p className="mb-2 mt-3 text-xs text-muted-foreground">Icona</p>
-                  <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
-                    {ICON_KEYS.map((k) => {
-                      const Icon = iconFor(k);
-                      return (
-                        <button
-                          key={k}
-                          type="button"
-                          onClick={() => setNuovaIcona(k)}
-                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border ${
-                            nuovaIcona === k
-                              ? "border-primary text-primary"
-                              : "border-border text-muted-foreground"
-                          }`}
-                        >
-                          <Icon size={17} />
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <p className="mb-2 mt-3 text-xs text-muted-foreground">Colore</p>
-                  <div className="grid grid-cols-6 gap-2.5">
-                    {CATEGORY_COLORS.map((col) => {
-                      const attivo =
-                        nuovaColore === col ||
-                        (!nuovaColore &&
-                          col === (PALETTE[cats.length % PALETTE.length] ?? "#8CE562"));
-                      return (
-                        <button
-                          key={col}
-                          type="button"
-                          onClick={() => setNuovaColore(col)}
-                          className="flex h-10 w-10 items-center justify-center rounded-full transition-transform"
-                          style={{
-                            backgroundColor: col,
-                            boxShadow: attivo
-                              ? `0 0 0 2px var(--surface), 0 0 0 4px ${col}`
-                              : undefined,
-                            transform: attivo ? "scale(1.08)" : undefined,
-                          }}
-                          aria-label={`Colore ${col}`}
-                        >
-                          {attivo && <Check size={16} color="#fff" strokeWidth={3} />}
-                        </button>
-                      );
-                    })}
-                  </div>
-
+              <p className="mt-6 mb-2 text-xs text-muted-foreground">Hai un&apos;auto?</p>
+              <div className="grid grid-cols-2 gap-2">
+                {[true, false].map((v) => (
                   <button
-                    onClick={aggiungiCategoria}
-                    className="lime-fill mt-4 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold"
+                    key={String(v)}
+                    onClick={() => setAuto(v)}
+                    className={`rounded-2xl border px-3 py-3 text-sm ${
+                      auto === v
+                        ? "border-primary bg-surface-2"
+                        : "border-border bg-surface text-muted-foreground"
+                    }`}
                   >
-                    <Plus size={15} /> Aggiungi
+                    {v ? "Sì" : "No"}
                   </button>
-                </div>
-              )}
+                ))}
+              </div>
+
+              <p className="mt-6 mb-2 text-xs text-muted-foreground">Persone in famiglia</p>
+              <div className="flex items-center gap-4 rounded-2xl border border-border bg-surface px-4 py-3">
+                <button
+                  onClick={() => setPersone((p) => Math.max(1, p - 1))}
+                  className="h-9 w-9 rounded-full bg-surface-2 text-lg"
+                >
+                  −
+                </button>
+                <span className="flex-1 text-center text-lg font-semibold">{persone}</span>
+                <button
+                  onClick={() => setPersone((p) => Math.min(12, p + 1))}
+                  className="h-9 w-9 rounded-full bg-surface-2 text-lg"
+                >
+                  +
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {step === 4 && (
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {nome.trim() ? `Ciao ${nome.trim()}, quasi fatto` : "Quasi fatto"}
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Budget proposto in base alle tue risposte. Modifica gli importi come preferisci, poi
-              conferma.
-            </p>
+          {step === 3 && (
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">Le tue categorie</h1>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Tocca per attivare o disattivare. Puoi aggiungerne altre.
+              </p>
+              <div className="mt-5 grid grid-cols-3 gap-2">
+                {cats.map((c) => {
+                  const Icon = iconFor(c.icona);
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() =>
+                        setCats((cs) =>
+                          cs.map((x) => (x.id === c.id ? { ...x, attiva: !x.attiva } : x)),
+                        )
+                      }
+                      className={`flex flex-col items-center gap-2 rounded-2xl border px-2 py-3 text-[11px] ${
+                        c.attiva
+                          ? "border-primary bg-surface-2"
+                          : "border-border bg-surface text-muted-foreground"
+                      }`}
+                    >
+                      <span
+                        className="flex h-10 w-10 items-center justify-center rounded-full"
+                        style={{ backgroundColor: `${c.colore}22`, color: c.colore }}
+                      >
+                        <Icon size={19} />
+                      </span>
+                      <span className="text-center leading-tight">{c.nome}</span>
+                    </button>
+                  );
+                })}
+              </div>
 
-            <div className="card-hero mt-5 p-5">
-              <p className="text-xs text-muted-foreground">Budget mensile</p>
-              <p className="text-3xl font-semibold tracking-tight">{eur(sommaBudget)}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {attive.length} categorie · {persone} {persone === 1 ? "persona" : "persone"} ·{" "}
-                {HOUSING_OPTIONS.find((h) => h.id === abitazione)?.label.toLowerCase()}
-                {auto ? " · con auto" : ""}
+              <div className="card-surface mt-5 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setFormCat((v) => !v)}
+                  className="flex w-full items-center justify-between px-4 py-3.5 text-sm font-medium"
+                  aria-expanded={formCat}
+                >
+                  <span className="flex items-center gap-2">
+                    <Plus size={15} /> Aggiungi categoria
+                  </span>
+                  <ChevronDown
+                    size={16}
+                    className={`text-muted-foreground transition-transform ${formCat ? "rotate-180" : ""}`}
+                  />
+                </button>
+
+                {formCat && (
+                  <div className="border-t border-border p-4 pt-3.5">
+                    <input
+                      value={nuovoNome}
+                      onChange={(e) => setNuovoNome(e.target.value)}
+                      placeholder="Es. Abbonamenti"
+                      className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
+                    />
+
+                    <p className="mb-2 mt-3 text-xs text-muted-foreground">Icona</p>
+                    <div data-no-swipe className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+                      {ICON_KEYS.map((k) => {
+                        const Icon = iconFor(k);
+                        return (
+                          <button
+                            key={k}
+                            type="button"
+                            onClick={() => setNuovaIcona(k)}
+                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border ${
+                              nuovaIcona === k
+                                ? "border-primary text-primary"
+                                : "border-border text-muted-foreground"
+                            }`}
+                          >
+                            <Icon size={17} />
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <p className="mb-2 mt-3 text-xs text-muted-foreground">Colore</p>
+                    <div className="grid grid-cols-6 gap-2.5">
+                      {CATEGORY_COLORS.map((col) => {
+                        const attivo =
+                          nuovaColore === col ||
+                          (!nuovaColore &&
+                            col === (PALETTE[cats.length % PALETTE.length] ?? "#8CE562"));
+                        return (
+                          <button
+                            key={col}
+                            type="button"
+                            onClick={() => setNuovaColore(col)}
+                            className="flex h-10 w-10 items-center justify-center rounded-full transition-transform"
+                            style={{
+                              backgroundColor: col,
+                              boxShadow: attivo
+                                ? `0 0 0 2px var(--surface), 0 0 0 4px ${col}`
+                                : undefined,
+                              transform: attivo ? "scale(1.08)" : undefined,
+                            }}
+                            aria-label={`Colore ${col}`}
+                          >
+                            {attivo && <Check size={16} color="#fff" strokeWidth={3} />}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <button
+                      onClick={aggiungiCategoria}
+                      className="lime-fill mt-4 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold"
+                    >
+                      <Plus size={15} /> Aggiungi
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {step === 4 && (
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">
+                {nome.trim() ? `Ciao ${nome.trim()}, quasi fatto` : "Quasi fatto"}
+              </h1>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Budget proposto in base alle tue risposte. Modifica gli importi come preferisci, poi
+                conferma.
+              </p>
+
+              <div className="card-hero mt-5 p-5">
+                <p className="text-xs text-muted-foreground">Budget mensile</p>
+                <p className="text-3xl font-semibold tracking-tight">{eur(sommaBudget)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {attive.length} categorie · {persone} {persone === 1 ? "persona" : "persone"} ·{" "}
+                  {HOUSING_OPTIONS.find((h) => h.id === abitazione)?.label.toLowerCase()}
+                  {auto ? " · con auto" : ""}
+                </p>
+              </div>
+
+              <div className="mt-5 space-y-2">
+                {attive.map((c) => {
+                  const Icon = iconFor(c.icona);
+                  return (
+                    <div key={c.id} className="card-surface flex items-center gap-3 px-4 py-3">
+                      <span
+                        className="flex h-9 w-9 items-center justify-center rounded-full"
+                        style={{ backgroundColor: `${c.colore}22`, color: c.colore }}
+                      >
+                        <Icon size={17} />
+                      </span>
+                      <span className="flex-1 text-sm">{c.nome}</span>
+                      <div className="flex items-center gap-1 rounded-xl bg-surface px-3 py-1.5">
+                        <input
+                          inputMode="decimal"
+                          value={c.budget}
+                          onChange={(e) =>
+                            setCats((cs) =>
+                              cs.map((x) =>
+                                x.id === c.id
+                                  ? { ...x, budget: Math.max(0, Number(e.target.value) || 0) }
+                                  : x,
+                              ),
+                            )
+                          }
+                          className="w-16 bg-transparent text-right text-sm font-semibold outline-none"
+                        />
+                        <span className="text-xs text-muted-foreground">€</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="mt-4 text-center text-xs text-muted-foreground">
+                Totale assegnato {eur(sommaBudget)} su {eur(totaleNum)}
               </p>
             </div>
-
-            <div className="mt-5 space-y-2">
-              {attive.map((c) => {
-                const Icon = iconFor(c.icona);
-                return (
-                  <div key={c.id} className="card-surface flex items-center gap-3 px-4 py-3">
-                    <span
-                      className="flex h-9 w-9 items-center justify-center rounded-full"
-                      style={{ backgroundColor: `${c.colore}22`, color: c.colore }}
-                    >
-                      <Icon size={17} />
-                    </span>
-                    <span className="flex-1 text-sm">{c.nome}</span>
-                    <div className="flex items-center gap-1 rounded-xl bg-surface px-3 py-1.5">
-                      <input
-                        inputMode="decimal"
-                        value={c.budget}
-                        onChange={(e) =>
-                          setCats((cs) =>
-                            cs.map((x) =>
-                              x.id === c.id
-                                ? { ...x, budget: Math.max(0, Number(e.target.value) || 0) }
-                                : x,
-                            ),
-                          )
-                        }
-                        className="w-16 bg-transparent text-right text-sm font-semibold outline-none"
-                      />
-                      <span className="text-xs text-muted-foreground">€</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <p className="mt-4 text-center text-xs text-muted-foreground">
-              Totale assegnato {eur(sommaBudget)} su {eur(totaleNum)}
-            </p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <div className="mt-8 flex items-center gap-3">
         {step > 0 && (
           <button
-            onClick={() => setStep((s) => s - 1)}
+            onClick={back}
             className="flex h-12 w-12 items-center justify-center rounded-2xl bg-surface-2"
             aria-label="Indietro"
           >
@@ -385,7 +457,7 @@ export function Onboarding() {
         {step < 4 ? (
           <button
             onClick={next}
-            disabled={(step === 1 && totaleNum <= 0) || (step === 3 && attive.length === 0)}
+            disabled={!canGoNext}
             className="lime-fill flex flex-1 items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-semibold disabled:opacity-40"
           >
             Continua <ArrowRight size={17} />

@@ -1,12 +1,14 @@
 import { useRef, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Trash2, type LucideIcon } from "lucide-react";
 
 const REVEAL = 76;
 
 /**
  * Wrapper che aggiunge lo swipe-to-delete in stile iOS a una singola riga/card.
- * Lo scorrimento verso sinistra rivela un pannello rosso con l'icona del cestino,
+ * Lo scorrimento verso sinistra rivela un pannello colorato con un'icona,
  * confinato esclusivamente al riquadro di questa riga (non influenza le altre).
+ * Di default è il cestino rosso ("elimina"), ma icona/colori sono configurabili
+ * per azioni non distruttive (es. "ignora", grigio neutro).
  *
  * È un componente controllato: `openId`/`onOpenChange` sono condivisi tra tutte le
  * righe di una stessa lista, così aprendone una tutte le altre si richiudono da sole.
@@ -17,6 +19,8 @@ export function SwipeToDelete({
   onOpenChange,
   onDelete,
   label = "Elimina",
+  icon: Icon = Trash2,
+  revealClassName = "bg-destructive text-destructive-foreground",
   className = "",
   children,
 }: {
@@ -25,6 +29,9 @@ export function SwipeToDelete({
   onOpenChange: (id: string | null) => void;
   onDelete: () => void;
   label?: string;
+  icon?: LucideIcon;
+  /** Colore di sfondo/testo del pannello rivelato dallo swipe. */
+  revealClassName?: string;
   className?: string;
   children: React.ReactNode;
 }) {
@@ -81,9 +88,9 @@ export function SwipeToDelete({
             setOffset(0);
             onDelete();
           }}
-          className="flex h-full w-full items-center justify-center bg-destructive text-destructive-foreground"
+          className={`flex h-full w-full items-center justify-center ${revealClassName}`}
         >
-          <Trash2 size={18} />
+          <Icon size={18} />
         </button>
       </div>
       <div
