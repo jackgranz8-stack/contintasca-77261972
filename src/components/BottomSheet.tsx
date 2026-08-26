@@ -86,7 +86,7 @@ export function BottomSheet({
         }`}
       />
       <div
-        className="relative z-10 max-h-[92dvh] w-full max-w-[430px] overflow-y-auto overscroll-contain rounded-t-[28px] border border-border bg-popover pb-[max(env(safe-area-inset-bottom),14px)]"
+        className="no-scrollbar relative z-10 max-h-[92dvh] w-full max-w-[430px] overflow-y-auto overscroll-contain rounded-t-[28px] border border-border bg-popover pb-[max(env(safe-area-inset-bottom),14px)]"
         style={{ transform, transition }}
       >
         <div
