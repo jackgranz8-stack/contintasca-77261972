@@ -143,15 +143,25 @@ function StoricoPage() {
           <button onClick={() => setCatSel(new Set())} className={chipClass(catSel.size === 0)}>
             Tutte le categorie
           </button>
-          {state.categorie.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => toggleCat(c.id)}
-              className={chipClass(catSel.has(c.id))}
-            >
-              {c.nome}
-            </button>
-          ))}
+          {state.categorie.map((c) => {
+            const attiva = catSel.has(c.id);
+            return (
+              <button
+                key={c.id}
+                onClick={() => toggleCat(c.id)}
+                className={`shrink-0 rounded-full border px-3.5 py-2 text-xs ${
+                  attiva ? "font-medium" : "border-border text-muted-foreground"
+                }`}
+                style={
+                  attiva
+                    ? { borderColor: c.colore, color: c.colore, backgroundColor: `${c.colore}15` }
+                    : undefined
+                }
+              >
+                {c.nome}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -196,7 +206,7 @@ function StoricoPage() {
       </section>
 
       {/* Al posto del donut: una nuvola sottile per l'export, con conferma prima di esportare */}
-      <div className="flex justify-end">
+      <div className="flex justify-start">
         <button
           onClick={() => setConfermaExport(true)}
           disabled={filtrate.length === 0}
