@@ -86,15 +86,16 @@ export function pct(part: number, total: number) {
   return Math.min(999, (part / total) * 100);
 }
 
-// Gradiente colore delle barre spesa/budget: verde (poco speso) → giallo ocra
-// (a metà) → rosso (budget raggiunto/superato). Colori OKLCH fissi, apposta
-// SLEGATI dalle variabili del tema (--accent-lime/--warn/--danger sono usate
-// anche altrove nell'interfaccia per scopi diversi, e in tema chiaro alcune
-// erano state scurite per motivi di contrasto testo — riusarle qui produceva
-// un giallo che virava al marrone in tema chiaro). Così restano identiche in
-// tema scuro e chiaro, e l'interpolazione continua fa sì che anche una
-// differenza piccola di percentuale (es. 5%) dia una tonalità leggermente
-// diversa, invece dei tre "scalini" di prima.
+// Colore delle barre spesa/budget: verde fisso fino al 50% del budget, poi
+// gradiente continuo verde → giallo ocra (75%) → rosso (100%) nella metà
+// restante. Colori OKLCH fissi, apposta SLEGATI dalle variabili del tema
+// (--accent-lime/--warn/--danger sono usate anche altrove nell'interfaccia
+// per scopi diversi, e in tema chiaro alcune erano state scurite per motivi
+// di contrasto testo — riusarle qui produceva un giallo che virava al
+// marrone in tema chiaro). Così restano identiche in tema scuro e chiaro, e
+// l'interpolazione continua fa sì che anche una differenza piccola di
+// percentuale (es. 5%) dia una tonalità leggermente diversa, invece dei tre
+// "scalini" della versione precedente.
 type OklchStop = { l: number; c: number; h: number };
 const BUDGET_GREEN: OklchStop = { l: 0.74, c: 0.17, h: 148 };
 const BUDGET_OCHER: OklchStop = { l: 0.79, c: 0.16, h: 85 };
@@ -111,11 +112,12 @@ function lerpStop(a: OklchStop, b: OklchStop, t: number): OklchStop {
 const toOklch = (s: OklchStop) => `oklch(${s.l.toFixed(3)} ${s.c.toFixed(3)} ${s.h.toFixed(1)})`;
 
 export function barTone(percent: number) {
+  if (percent <= 50) return toOklch(BUDGET_GREEN);
   if (percent > 100) return toOklch(BUDGET_RED);
-  const p = Math.max(0, Math.min(100, percent));
+  const p = Math.min(100, percent);
   const stop =
-    p <= 50
-      ? lerpStop(BUDGET_GREEN, BUDGET_OCHER, p / 50)
-      : lerpStop(BUDGET_OCHER, BUDGET_RED, (p - 50) / 50);
+    p <= 75
+      ? lerpStop(BUDGET_GREEN, BUDGET_OCHER, (p - 50) / 25)
+      : lerpStop(BUDGET_OCHER, BUDGET_RED, (p - 75) / 25);
   return toOklch(stop);
 }
