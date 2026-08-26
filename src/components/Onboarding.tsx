@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ChevronDown, Plus } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { ICON_KEYS, iconFor } from "@/lib/icons";
 import {
+  CATEGORY_COLORS,
   DEFAULT_CATEGORIES,
   HOUSING_OPTIONS,
   PALETTE,
@@ -27,6 +28,8 @@ export function Onboarding() {
   );
   const [nuovoNome, setNuovoNome] = useState("");
   const [nuovaIcona, setNuovaIcona] = useState("cart");
+  const [nuovaColore, setNuovaColore] = useState<string | null>(null);
+  const [formCat, setFormCat] = useState(false);
 
   const totaleNum = Math.max(0, Number(totale.replace(",", ".")) || 0);
   const attive = cats.filter((c) => c.attiva);
@@ -50,12 +53,15 @@ export function Onboarding() {
         id: uid(),
         nome: n,
         icona: nuovaIcona,
-        colore: PALETTE[cs.length % PALETTE.length] ?? "#8CE562",
+        colore: nuovaColore ?? PALETTE[cs.length % PALETTE.length] ?? "#8CE562",
         budget: 0,
         attiva: true,
       },
     ]);
     setNuovoNome("");
+    setNuovaIcona("cart");
+    setNuovaColore(null);
+    setFormCat(false);
   };
 
   const conferma = () => {
@@ -78,7 +84,7 @@ export function Onboarding() {
   return (
     <div className="app-frame mx-auto flex min-h-screen w-full max-w-[430px] flex-col px-5 pt-[calc(env(safe-area-inset-top,0px)+40px)] pb-8">
       <div className="mb-6 flex gap-1.5">
-        {[0, 1, 2, 3, 4, 5].map((i) => (
+        {[0, 1, 2, 3, 4].map((i) => (
           <span
             key={i}
             className={`h-1 flex-1 rounded-full ${i <= step ? "lime-fill" : "bg-surface-2"}`}
@@ -220,48 +226,112 @@ export function Onboarding() {
               })}
             </div>
 
-            <div className="card-surface mt-5 p-4">
-              <p className="mb-2 text-xs text-muted-foreground">Nuova categoria</p>
-              <input
-                value={nuovoNome}
-                onChange={(e) => setNuovoNome(e.target.value)}
-                placeholder="Es. Abbonamenti"
-                className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
-              />
-              <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto pb-1">
-                {ICON_KEYS.map((k) => {
-                  const Icon = iconFor(k);
-                  return (
-                    <button
-                      key={k}
-                      onClick={() => setNuovaIcona(k)}
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border ${
-                        nuovaIcona === k
-                          ? "border-primary text-primary"
-                          : "border-border text-muted-foreground"
-                      }`}
-                    >
-                      <Icon size={17} />
-                    </button>
-                  );
-                })}
-              </div>
+            <div className="card-surface mt-5 overflow-hidden">
               <button
-                onClick={aggiungiCategoria}
-                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-surface-2 py-2.5 text-sm font-medium"
+                type="button"
+                onClick={() => setFormCat((v) => !v)}
+                className="flex w-full items-center justify-between px-4 py-3.5 text-sm font-medium"
+                aria-expanded={formCat}
               >
-                <Plus size={15} /> Aggiungi
+                <span className="flex items-center gap-2">
+                  <Plus size={15} /> Aggiungi categoria
+                </span>
+                <ChevronDown
+                  size={16}
+                  className={`text-muted-foreground transition-transform ${formCat ? "rotate-180" : ""}`}
+                />
               </button>
+
+              {formCat && (
+                <div className="border-t border-border p-4 pt-3.5">
+                  <input
+                    value={nuovoNome}
+                    onChange={(e) => setNuovoNome(e.target.value)}
+                    placeholder="Es. Abbonamenti"
+                    className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
+                  />
+
+                  <p className="mb-2 mt-3 text-xs text-muted-foreground">Icona</p>
+                  <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+                    {ICON_KEYS.map((k) => {
+                      const Icon = iconFor(k);
+                      return (
+                        <button
+                          key={k}
+                          type="button"
+                          onClick={() => setNuovaIcona(k)}
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border ${
+                            nuovaIcona === k
+                              ? "border-primary text-primary"
+                              : "border-border text-muted-foreground"
+                          }`}
+                        >
+                          <Icon size={17} />
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <p className="mb-2 mt-3 text-xs text-muted-foreground">Colore</p>
+                  <div className="grid grid-cols-6 gap-2.5">
+                    {CATEGORY_COLORS.map((col) => {
+                      const attivo =
+                        nuovaColore === col ||
+                        (!nuovaColore &&
+                          col === (PALETTE[cats.length % PALETTE.length] ?? "#8CE562"));
+                      return (
+                        <button
+                          key={col}
+                          type="button"
+                          onClick={() => setNuovaColore(col)}
+                          className="flex h-10 w-10 items-center justify-center rounded-full transition-transform"
+                          style={{
+                            backgroundColor: col,
+                            boxShadow: attivo
+                              ? `0 0 0 2px var(--surface), 0 0 0 4px ${col}`
+                              : undefined,
+                            transform: attivo ? "scale(1.08)" : undefined,
+                          }}
+                          aria-label={`Colore ${col}`}
+                        >
+                          {attivo && <Check size={16} color="#fff" strokeWidth={3} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    onClick={aggiungiCategoria}
+                    className="lime-fill mt-4 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold"
+                  >
+                    <Plus size={15} /> Aggiungi
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
 
         {step === 4 && (
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Budget proposti</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {nome.trim() ? `Ciao ${nome.trim()}, quasi fatto` : "Quasi fatto"}
+            </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Divisi in base alle tue risposte. Modificali come vuoi.
+              Budget proposto in base alle tue risposte. Modifica gli importi come preferisci, poi
+              conferma.
             </p>
+
+            <div className="card-hero mt-5 p-5">
+              <p className="text-xs text-muted-foreground">Budget mensile</p>
+              <p className="text-3xl font-semibold tracking-tight">{eur(sommaBudget)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {attive.length} categorie · {persone} {persone === 1 ? "persona" : "persone"} ·{" "}
+                {HOUSING_OPTIONS.find((h) => h.id === abitazione)?.label.toLowerCase()}
+                {auto ? " · con auto" : ""}
+              </p>
+            </div>
+
             <div className="mt-5 space-y-2">
               {attive.map((c) => {
                 const Icon = iconFor(c.icona);
@@ -300,34 +370,6 @@ export function Onboarding() {
             </p>
           </div>
         )}
-
-        {step === 5 && (
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Tutto pronto</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {nome.trim() ? `Ciao ${nome.trim()}, ` : ""}ecco il tuo riepilogo.
-            </p>
-            <div className="card-hero mt-5 p-5">
-              <p className="text-xs text-muted-foreground">Budget mensile</p>
-              <p className="text-3xl font-semibold tracking-tight">{eur(sommaBudget)}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {attive.length} categorie · {persone} {persone === 1 ? "persona" : "persone"} ·{" "}
-                {HOUSING_OPTIONS.find((h) => h.id === abitazione)?.label.toLowerCase()}
-                {auto ? " · con auto" : ""}
-              </p>
-            </div>
-            <div className="card-surface mt-3 divide-y divide-border">
-              {attive.map((c) => (
-                <div key={c.id} className="flex justify-between px-4 py-2.5 text-sm">
-                  <span>{c.nome}</span>
-                  <span className="font-semibold" style={{ color: c.colore }}>
-                    {eur(c.budget)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="mt-8 flex items-center gap-3">
@@ -340,7 +382,7 @@ export function Onboarding() {
             <ArrowLeft size={18} />
           </button>
         )}
-        {step < 5 ? (
+        {step < 4 ? (
           <button
             onClick={next}
             disabled={(step === 1 && totaleNum <= 0) || (step === 3 && attive.length === 0)}

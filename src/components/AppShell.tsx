@@ -29,7 +29,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (!loaded || !account) {
     return (
       <div className="app-frame flex min-h-screen items-center justify-center">
-        <span className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-primary" />
+        <span
+          aria-hidden
+          className="inline-block animate-spin text-4xl leading-none font-bold text-primary"
+        >
+          €
+        </span>
       </div>
     );
   }
