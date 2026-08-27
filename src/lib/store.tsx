@@ -18,7 +18,7 @@ import {
   type Recurring,
   type Transaction,
 } from "./types";
-import { currentMonth, monthKey, uid } from "./format";
+import { currentMonth, monthKey, shiftMonth, uid } from "./format";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -57,18 +57,36 @@ function runRecurring(s: AppState): { next: AppState; created: number } {
   let created = 0;
   const transazioni = [...s.transazioni];
   const ricorrenti = s.ricorrenti.map((r) => {
-    if (!r.attiva || r.giorno > day || r.ultimaGenerazione === mk) return r;
+    if (!r.attiva || r.ultimaGenerazione === mk) return r;
     if (!s.categorie.some((c) => c.id === r.categoria)) return r;
-    transazioni.push({
-      id: uid(),
-      importo: r.importo,
-      categoria: r.categoria,
-      data: `${mk}-${String(r.giorno).padStart(2, "0")}`,
-      nota: r.nome,
-      ricorrenteId: r.id,
-    });
-    created++;
-    return { ...r, ultimaGenerazione: mk };
+
+    // Se l'app non viene aperta per un po', al riapertura recuperiamo anche i
+    // mesi pienamente trascorsi da ultimaGenerazione (non solo quello attuale,
+    // come prima), per non perdere silenziosamente le ricorrenti saltate. Un
+    // tetto di 12 mesi evita un recupero assurdo in casi limite.
+    const mesi: string[] = [];
+    let cursore = r.ultimaGenerazione ? shiftMonth(r.ultimaGenerazione, 1) : mk;
+    let guardia = 0;
+    while (cursore < mk && guardia < 12) {
+      mesi.push(cursore);
+      cursore = shiftMonth(cursore, 1);
+      guardia++;
+    }
+    if (r.giorno <= day) mesi.push(mk);
+    if (mesi.length === 0) return r;
+
+    for (const m of mesi) {
+      transazioni.push({
+        id: uid(),
+        importo: r.importo,
+        categoria: r.categoria,
+        data: `${m}-${String(r.giorno).padStart(2, "0")}`,
+        nota: r.nome,
+        ricorrenteId: r.id,
+      });
+      created++;
+    }
+    return { ...r, ultimaGenerazione: mesi[mesi.length - 1] ?? mk };
   });
   return { next: { ...s, transazioni, ricorrenti }, created };
 }
