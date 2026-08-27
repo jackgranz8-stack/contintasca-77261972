@@ -61,6 +61,7 @@ function StoricoPage() {
     return d.toISOString().slice(0, 10);
   });
   const [periodoA, setPeriodoA] = useState(() => todayISO());
+  const [periodoPop, setPeriodoPop] = useState(false);
 
   const [daModificare, setDaModificare] = useState<Transaction | null>(null);
   const [daDuplicare, setDaDuplicare] = useState<Pick<
@@ -78,7 +79,8 @@ function StoricoPage() {
     const [da, a] = periodoDa <= periodoA ? [periodoDa, periodoA] : [periodoA, periodoDa];
     setPeriodoRange({ da, a });
     setMeseSel(new Set());
-    setPeriodoAperto(false);
+    setPeriodoPop(true);
+    window.setTimeout(() => setPeriodoPop(false), 160);
   };
 
   const mesiGrafico = useMemo(() => lastMonths(6), []);
@@ -184,7 +186,11 @@ function StoricoPage() {
           }`}
         >
           <div className="overflow-hidden">
-            <div className="card-surface mt-1 flex flex-wrap items-center gap-2 p-3">
+            <div
+              className={`card-surface mt-1 flex flex-wrap items-center gap-2 p-3 transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+                periodoPop ? "scale-x-[1.035] scale-y-[0.88]" : "scale-100"
+              }`}
+            >
               <div className="flex min-w-0 flex-1 items-center gap-2">
                 <input
                   type="date"
