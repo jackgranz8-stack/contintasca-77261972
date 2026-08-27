@@ -1,7 +1,7 @@
 {
   "name": "Conti in Tasca",
   "short_name": "Conti in Tasca",
-  "description": "Gestisci spese personali e budget mensile, offline sul tuo iPhone.",
+  "description": "Gestisci spese personali e budget mensile, offline sul tuo telefono.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
