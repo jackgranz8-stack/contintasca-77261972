@@ -41,6 +41,13 @@ export function monthLabel(key: string, short = false) {
   return short ? name.slice(0, 3) : `${name} ${y}`;
 }
 
+/** Etichetta sintetica per i chip: "ago 26" invece di "Agosto 2026". */
+export function monthChipLabel(key: string) {
+  const [y, m] = key.split("-").map(Number) as [number, number];
+  const name = MONTHS[(m ?? 1) - 1] ?? "";
+  return `${name.slice(0, 3).toLowerCase()} ${String(y).slice(-2)}`;
+}
+
 export function shiftMonth(key: string, delta: number) {
   const [y, m] = key.split("-").map(Number) as [number, number];
   const d = new Date(y, m - 1 + delta, 1);
