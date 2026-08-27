@@ -32,7 +32,7 @@ export const Route = createFileRoute("/")({
       { property: "og:title", content: "Conti in Tasca — Spese e budget mensile" },
       {
         property: "og:description",
-        content: "Spese personali e budget mensile in un'app installabile su iPhone.",
+        content: "Spese personali e budget mensile in un'app installabile sul tuo telefono.",
       },
     ],
   }),

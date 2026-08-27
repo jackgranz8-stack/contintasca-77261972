@@ -24,6 +24,7 @@ import { exportTemplate, exportTransactions, parseImportFile } from "@/lib/excel
 import { ConfirmPopup } from "@/components/ConfirmPopup";
 import { suggestBudgetsWithHistory } from "@/lib/budget-suggest";
 import { disableFaceId, enrollFaceId, faceIdSupported, isFaceIdEnabled } from "@/lib/webauthn";
+import { isApplePlatform } from "@/lib/platform";
 import {
   disablePush,
   enablePush,
@@ -97,17 +98,22 @@ function ProfiloPage() {
   const toggleFaceId = async () => {
     if (!account) return;
     setFaceIdBusy(true);
+    const apple = isApplePlatform();
+    const soggetto = apple ? "Face ID" : "L'autenticazione biometrica";
+    const desinenza = apple ? "o" : "a";
     if (faceIdOn) {
       disableFaceId(account.id);
       setFaceIdOn(false);
-      toast.success("Face ID disattivato");
+      toast.success(`${soggetto} disattivat${desinenza}`);
     } else {
       const ok = await enrollFaceId(account.id, account.email ?? "");
       if (ok) {
         setFaceIdOn(true);
-        toast.success("Face ID attivato: da ora ti servirà per aprire l'app");
+        toast.success(`${soggetto} attivat${desinenza}: da ora ti servirà per aprire l'app`);
       } else {
-        toast.error("Non riesco ad attivare Face ID su questo dispositivo");
+        toast.error(
+          `Non riesco ad attivare ${apple ? "Face ID" : "l'autenticazione biometrica"} su questo dispositivo`,
+        );
       }
     }
     setFaceIdBusy(false);
@@ -272,7 +278,9 @@ function ProfiloPage() {
                     <Fingerprint size={17} />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-sm font-medium">Sblocco con Face ID</h3>
+                    <h3 className="text-sm font-medium">
+                      Sblocco con {isApplePlatform() ? "Face ID" : "autenticazione biometrica"}
+                    </h3>
                     <p className="text-xs text-muted-foreground">
                       {faceIdOn
                         ? "Attivo su questo dispositivo"

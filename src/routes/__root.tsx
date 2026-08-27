@@ -79,7 +79,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "description",
         content:
-          "App per gestire spese personali e budget mensile, installabile su iPhone. Dati sincronizzati in modo sicuro sul tuo account.",
+          "App per gestire spese personali e budget mensile, installabile sul tuo telefono. Dati sincronizzati in modo sicuro sul tuo account.",
       },
       { name: "theme-color", content: "#0A0F0C" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
