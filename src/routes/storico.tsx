@@ -1,11 +1,19 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Copy, FileSpreadsheet, Pencil, Repeat, Search } from "lucide-react";
+import { Calendar, ChevronDown, Copy, FileSpreadsheet, Pencil, Repeat, Search } from "lucide-react";
 import { sum, txInMonth, useApp } from "@/lib/store";
 import { SwipeToDelete } from "@/components/SwipeToDelete";
 
-import { eur, formatDay, lastMonths, monthLabel, monthKey } from "@/lib/format";
+import {
+  eur,
+  formatDay,
+  lastMonths,
+  monthLabel,
+  monthChipLabel,
+  monthKey,
+  shiftMonth,
+} from "@/lib/format";
 import { iconFor } from "@/lib/icons";
 import { TrendBars } from "@/components/TrendBars";
 import { exportTransactions } from "@/lib/excel";
@@ -45,6 +53,9 @@ function StoricoPage() {
   const [daEliminare, setDaEliminare] = useState<string | null>(null);
   const [openSwipeId, setOpenSwipeId] = useState<string | null>(null);
   const [confermaExport, setConfermaExport] = useState(false);
+  const [periodoAperto, setPeriodoAperto] = useState(false);
+  const [periodoDa, setPeriodoDa] = useState(() => shiftMonth(monthKey(new Date()), -12));
+  const [periodoA, setPeriodoA] = useState(() => monthKey(new Date()));
 
   const [daModificare, setDaModificare] = useState<Transaction | null>(null);
   const [daDuplicare, setDaDuplicare] = useState<Pick<
@@ -53,11 +64,24 @@ function StoricoPage() {
   > | null>(null);
   const [ricerca, setRicerca] = useState("");
 
-  const mesiDisponibili = useMemo(() => {
-    const set = new Set(state.transazioni.map((t) => monthKey(t.data)));
-    lastMonths(6).forEach((m) => set.add(m));
-    return [...set].sort().reverse();
-  }, [state.transazioni]);
+  // Chip sempre visibili: solo gli ultimi 12 mesi, per non allungarsi
+  // all'infinito con l'uso nel tempo. Per periodi più lontani c'è il
+  // selettore "Periodo" sotto, che raggiunge qualsiasi mese/anno.
+  const mesiDisponibili = useMemo(() => lastMonths(12), []);
+
+  const applicaPeriodo = () => {
+    const [da, a] = periodoDa <= periodoA ? [periodoDa, periodoA] : [periodoA, periodoDa];
+    const mesi: string[] = [];
+    let cursore = da;
+    let guardia = 0;
+    while (cursore <= a && guardia < 600) {
+      mesi.push(cursore);
+      cursore = shiftMonth(cursore, 1);
+      guardia++;
+    }
+    setMeseSel(new Set(mesi));
+    setPeriodoAperto(false);
+  };
 
   const mesiGrafico = useMemo(() => lastMonths(6), []);
 
@@ -129,16 +153,58 @@ function StoricoPage() {
           <button onClick={() => setMeseSel(new Set())} className={chipClass(meseSel.size === 0)}>
             Tutti i mesi
           </button>
+          <button
+            onClick={() => setPeriodoAperto((v) => !v)}
+            className={`flex shrink-0 items-center gap-1 rounded-full border px-3.5 py-2 text-xs ${
+              periodoAperto ? "border-primary text-primary" : "border-border text-muted-foreground"
+            }`}
+          >
+            <Calendar size={13} /> Periodo
+          </button>
           {mesiDisponibili.map((m) => (
-            <button
-              key={m}
-              onClick={() => toggleMese(m)}
-              className={`${chipClass(meseSel.has(m))} capitalize`}
-            >
-              {monthLabel(m)}
+            <button key={m} onClick={() => toggleMese(m)} className={chipClass(meseSel.has(m))}>
+              {monthChipLabel(m)}
             </button>
           ))}
         </div>
+
+        {/* Periodo personalizzato: raggiunge qualsiasi mese/anno, anche lontano nel
+            tempo, con i selettori nativi mese/anno (rendono bene sia su iPhone che
+            su Android, ognuno con la propria interfaccia di sistema). */}
+        <div
+          className={`grid transition-[grid-template-rows] duration-300 ease-out ${
+            periodoAperto ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+          }`}
+        >
+          <div className="overflow-hidden">
+            <div className="card-surface mt-1 flex flex-wrap items-center gap-2 p-3">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <input
+                  type="month"
+                  value={periodoDa}
+                  onChange={(e) => setPeriodoDa(e.target.value)}
+                  aria-label="Da"
+                  className="native-select min-w-0 flex-1 text-xs"
+                />
+                <span className="shrink-0 text-xs text-muted-foreground">–</span>
+                <input
+                  type="month"
+                  value={periodoA}
+                  onChange={(e) => setPeriodoA(e.target.value)}
+                  aria-label="A"
+                  className="native-select min-w-0 flex-1 text-xs"
+                />
+              </div>
+              <button
+                onClick={applicaPeriodo}
+                className="lime-fill shrink-0 rounded-xl px-4 py-2 text-xs font-semibold"
+              >
+                Applica
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1">
           <button onClick={() => setCatSel(new Set())} className={chipClass(catSel.size === 0)}>
             Tutte le categorie
