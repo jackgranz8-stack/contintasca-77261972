@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Fingerprint, Loader2 } from "lucide-react";
 import { verifyFaceId } from "@/lib/webauthn";
+import { biometricLabel, isApplePlatform } from "@/lib/platform";
 
 const SESSION_KEY = "faceid-unlocked";
 
@@ -34,7 +35,11 @@ export function FaceIdGate({ userId, children }: { userId: string; children: Rea
         <Fingerprint size={28} />
       </span>
       <h1 className="mt-5 text-xl font-semibold tracking-tight">Sblocca Conti in Tasca</h1>
-      <p className="mt-2 text-sm text-muted-foreground">Usa Face ID o Touch ID per continuare.</p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        {isApplePlatform()
+          ? "Usa Face ID o Touch ID per continuare."
+          : `Usa ${biometricLabel()} per continuare.`}
+      </p>
       {failed && <p className="mt-3 text-xs text-destructive">Verifica non riuscita. Riprova.</p>}
       <button
         onClick={() => void tryUnlock()}
