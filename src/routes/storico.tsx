@@ -12,7 +12,7 @@ import {
   monthLabel,
   monthChipLabel,
   monthKey,
-  shiftMonth,
+  todayISO,
 } from "@/lib/format";
 import { iconFor } from "@/lib/icons";
 import { TrendBars } from "@/components/TrendBars";
@@ -54,8 +54,13 @@ function StoricoPage() {
   const [openSwipeId, setOpenSwipeId] = useState<string | null>(null);
   const [confermaExport, setConfermaExport] = useState(false);
   const [periodoAperto, setPeriodoAperto] = useState(false);
-  const [periodoDa, setPeriodoDa] = useState(() => shiftMonth(monthKey(new Date()), -12));
-  const [periodoA, setPeriodoA] = useState(() => monthKey(new Date()));
+  const [periodoRange, setPeriodoRange] = useState<{ da: string; a: string } | null>(null);
+  const [periodoDa, setPeriodoDa] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1);
+    return d.toISOString().slice(0, 10);
+  });
+  const [periodoA, setPeriodoA] = useState(() => todayISO());
 
   const [daModificare, setDaModificare] = useState<Transaction | null>(null);
   const [daDuplicare, setDaDuplicare] = useState<Pick<
@@ -64,34 +69,29 @@ function StoricoPage() {
   > | null>(null);
   const [ricerca, setRicerca] = useState("");
 
-  // Chip sempre visibili: solo gli ultimi 12 mesi, per non allungarsi
-  // all'infinito con l'uso nel tempo. Per periodi più lontani c'è il
-  // selettore "Periodo" sotto, che raggiunge qualsiasi mese/anno.
-  const mesiDisponibili = useMemo(() => lastMonths(12), []);
+  // Chip sempre visibili: solo gli ultimi 12 mesi, dal più recente al meno
+  // recente, per non allungarsi all'infinito con l'uso nel tempo. Per periodi
+  // più lontani o precisi al giorno c'è il selettore "Periodo" sotto.
+  const mesiDisponibili = useMemo(() => [...lastMonths(12)].reverse(), []);
 
   const applicaPeriodo = () => {
     const [da, a] = periodoDa <= periodoA ? [periodoDa, periodoA] : [periodoA, periodoDa];
-    const mesi: string[] = [];
-    let cursore = da;
-    let guardia = 0;
-    while (cursore <= a && guardia < 600) {
-      mesi.push(cursore);
-      cursore = shiftMonth(cursore, 1);
-      guardia++;
-    }
-    setMeseSel(new Set(mesi));
+    setPeriodoRange({ da, a });
+    setMeseSel(new Set());
     setPeriodoAperto(false);
   };
 
   const mesiGrafico = useMemo(() => lastMonths(6), []);
 
-  const toggleMese = (m: string) =>
+  const toggleMese = (m: string) => {
+    setPeriodoRange(null);
     setMeseSel((prev) => {
       const next = new Set(prev);
       if (next.has(m)) next.delete(m);
       else next.add(m);
       return next;
     });
+  };
 
   const toggleCat = (id: string) =>
     setCatSel((prev) => {
@@ -101,8 +101,9 @@ function StoricoPage() {
       return next;
     });
 
-  const base =
-    meseSel.size === 0
+  const base = periodoRange
+    ? state.transazioni.filter((t) => t.data >= periodoRange.da && t.data <= periodoRange.a)
+    : meseSel.size === 0
       ? state.transazioni
       : state.transazioni.filter((t) => meseSel.has(monthKey(t.data)));
   const q = ricerca.trim().toLowerCase();
@@ -112,8 +113,9 @@ function StoricoPage() {
     .sort((a, b) => (a.data < b.data ? 1 : -1));
   const meseArr = [...meseSel].sort();
   const catArr = [...catSel];
-  const meseLabel =
-    meseSel.size === 0
+  const meseLabel = periodoRange
+    ? `dal ${formatDay(periodoRange.da)} al ${formatDay(periodoRange.a)}`
+    : meseSel.size === 0
       ? "di tutti i mesi"
       : meseSel.size === 1
         ? monthLabel(meseArr[0] ?? "")
@@ -126,7 +128,13 @@ function StoricoPage() {
         : ` · ${catSel.size} categorie selezionate`;
 
   const esporta = () => {
-    const nomeMese = meseSel.size === 0 ? "tutto" : meseSel.size === 1 ? meseArr[0] : "multi-mese";
+    const nomeMese = periodoRange
+      ? `${periodoRange.da}_${periodoRange.a}`
+      : meseSel.size === 0
+        ? "tutto"
+        : meseSel.size === 1
+          ? meseArr[0]
+          : "multi-mese";
     const nomeCat = catSel.size === 1 ? "-" + catArr[0] : catSel.size > 1 ? "-multi-categoria" : "";
     const n = exportTransactions(filtrate, state.categorie, `spese-${nomeMese}${nomeCat}.xlsx`);
     toast.success(`${n} transazioni esportate`);
@@ -150,13 +158,12 @@ function StoricoPage() {
       {/* Filtri rapidi: mese e categoria, selezionabili insieme per filtri personalizzati */}
       <div className="space-y-2">
         <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1">
-          <button onClick={() => setMeseSel(new Set())} className={chipClass(meseSel.size === 0)}>
-            Tutti i mesi
-          </button>
           <button
             onClick={() => setPeriodoAperto((v) => !v)}
             className={`flex shrink-0 items-center gap-1 rounded-full border px-3.5 py-2 text-xs ${
-              periodoAperto ? "border-primary text-primary" : "border-border text-muted-foreground"
+              periodoAperto || periodoRange
+                ? "border-primary text-primary"
+                : "border-border text-muted-foreground"
             }`}
           >
             <Calendar size={13} /> Periodo
@@ -168,9 +175,9 @@ function StoricoPage() {
           ))}
         </div>
 
-        {/* Periodo personalizzato: raggiunge qualsiasi mese/anno, anche lontano nel
-            tempo, con i selettori nativi mese/anno (rendono bene sia su iPhone che
-            su Android, ognuno con la propria interfaccia di sistema). */}
+        {/* Periodo personalizzato: raggiunge qualsiasi giorno, anche lontano nel
+            tempo, con i selettori nativi giorno/mese/anno (rendono bene sia su
+            iPhone che su Android, ognuno con la propria interfaccia di sistema). */}
         <div
           className={`grid transition-[grid-template-rows] duration-300 ease-out ${
             periodoAperto ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
@@ -180,7 +187,7 @@ function StoricoPage() {
             <div className="card-surface mt-1 flex flex-wrap items-center gap-2 p-3">
               <div className="flex min-w-0 flex-1 items-center gap-2">
                 <input
-                  type="month"
+                  type="date"
                   value={periodoDa}
                   onChange={(e) => setPeriodoDa(e.target.value)}
                   aria-label="Da"
@@ -188,7 +195,7 @@ function StoricoPage() {
                 />
                 <span className="shrink-0 text-xs text-muted-foreground">–</span>
                 <input
-                  type="month"
+                  type="date"
                   value={periodoA}
                   onChange={(e) => setPeriodoA(e.target.value)}
                   aria-label="A"
