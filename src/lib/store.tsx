@@ -155,7 +155,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
-    void db.auth.getSession().then(({ data }) => {
+    const init = async () => {
+      // I link nelle email (conferma iscrizione, reset password) possono arrivare
+      // con "?code=..." nell'URL (flusso PKCE di Supabase): va scambiato
+      // esplicitamente con una sessione vera prima di controllare chi è
+      // collegato, altrimenti il link non autentica mai l'utente. Il flusso
+      // "implicito" più vecchio (token nell'hash dell'URL) resta gestito da
+      // solo dal client Supabase, qui serve occuparsi solo del caso "code".
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get("code");
+      if (code) {
+        await db.auth.exchangeCodeForSession(code);
+        url.searchParams.delete("code");
+        window.history.replaceState({}, "", url.pathname + url.search);
+      }
+
+      const { data } = await db.auth.getSession();
       if (cancelled) return;
       const user = data.session?.user;
       if (user) {
@@ -169,7 +184,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setLoaded(true);
         setLoadError(false);
       }
-    });
+    };
+
+    void init();
 
     const { data: sub } = db.auth.onAuthStateChange((event, session) => {
       if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
