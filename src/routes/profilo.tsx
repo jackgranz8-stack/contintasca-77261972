@@ -460,7 +460,10 @@ function ProfiloPage() {
               ))}
             </div>
 
-            <p className="mt-5 mb-2 text-xs text-muted-foreground">Persone in famiglia</p>
+            <p className="mt-5 mb-1 text-xs text-muted-foreground">Per quante persone spendi?</p>
+            <p className="mb-2 text-[11px] text-muted-foreground/70">
+              Serve solo a tarare meglio spese come cibo e bollette.
+            </p>
             <div className="flex items-center gap-4 rounded-2xl border border-border bg-surface px-4 py-3">
               <button
                 onClick={() => setPersone(Math.max(1, state.profilo.persone - 1))}
