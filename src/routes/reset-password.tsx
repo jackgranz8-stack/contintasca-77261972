@@ -32,7 +32,22 @@ function ResetPasswordPage() {
   const [pronto, setPronto] = useState(false);
 
   useEffect(() => {
-    // Il link dell'email crea una sessione temporanea di recupero.
+    // Se il link è scaduto o già usato, Supabase reindirizza qui con un
+    // errore nell'URL (nella query o nell'hash, a seconda del flusso) invece
+    // che con una sessione valida: lo intercettiamo per dare un messaggio
+    // chiaro invece di lasciare la pagina bloccata senza spiegazioni.
+    const url = new URL(window.location.href);
+    const hashParams = new URLSearchParams(url.hash.replace(/^#/, ""));
+    const errorDescription =
+      url.searchParams.get("error_description") ?? hashParams.get("error_description");
+    if (errorDescription) {
+      toast.error(decodeURIComponent(errorDescription.replace(/\+/g, " ")));
+      window.history.replaceState({}, "", url.pathname);
+    }
+
+    // Il link dell'email crea una sessione temporanea di recupero (lo scambio
+    // del "code", se presente, viene già gestito a livello globale appena
+    // l'app si avvia).
     void db.auth.getSession().then(({ data }) => setPronto(Boolean(data.session)));
     const { data } = db.auth.onAuthStateChange((_e, session) => {
       if (session) setPronto(true);
