@@ -120,10 +120,11 @@ const THEME_INIT_SCRIPT = `
 (function () {
   try {
     var stored = localStorage.getItem("theme");
-    var isLight =
-      stored === "light" ||
-      (stored !== "dark" && window.matchMedia("(prefers-color-scheme: light)").matches);
+    var systemLight = window.matchMedia("(prefers-color-scheme: light)").matches;
+    var isLight = stored === "light" || (stored !== "dark" && systemLight);
+    var isDark = stored === "dark";
     if (isLight) document.documentElement.classList.add("light");
+    if (isDark) document.documentElement.classList.add("dark");
   } catch (e) {}
 })();
 `;
