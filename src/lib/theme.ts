@@ -14,12 +14,15 @@ export function getStoredTheme(): ThemePreference {
 /** Applica la preferenza alla pagina corrente (classe su <html> + tinta della status bar). */
 export function applyTheme(pref: ThemePreference) {
   if (typeof document === "undefined") return;
-  const isLight =
-    pref === "light" ||
-    (pref === "system" &&
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-color-scheme: light)").matches);
+  const systemLight =
+    typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: light)").matches;
+  const isLight = pref === "light" || (pref === "system" && systemLight);
+  // Scelta esplicita di "Scuro": va marcata anche quando il sistema è chiaro,
+  // altrimenti la regola CSS automatica (che si attiva quando non c'è né
+  // .dark né .light) prende il sopravvento e mostra comunque il tema chiaro.
+  const isDark = pref === "dark";
   document.documentElement.classList.toggle("light", isLight);
+  document.documentElement.classList.toggle("dark", isDark);
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute("content", isLight ? "#F6FAF6" : "#0A0F0C");
 }
