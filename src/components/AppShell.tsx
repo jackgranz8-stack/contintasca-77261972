@@ -183,23 +183,32 @@ export function AppShell({ children }: { children: ReactNode }) {
         {(() => {
           const pos = dragPos ?? fabRestPosition(fabCorner, safeArea);
           return (
-            <button
-              onPointerDown={onFabPointerDown}
-              onPointerMove={onFabPointerMove}
-              onPointerUp={onFabPointerEnd}
-              onPointerCancel={onFabPointerEnd}
-              onClick={() => {
-                if (!movedRef.current) setAddOpen(true);
-              }}
-              aria-label="Aggiungi spesa"
-              className="lime-fill float-shadow fixed top-0 left-0 z-40 flex h-14 w-14 touch-none items-center justify-center rounded-full"
-              style={{
-                transform: `translate(${pos.x}px, ${pos.y}px) scale(${fabPressed ? 0.95 : 1})`,
-                transition: dragPos ? "none" : "transform 420ms cubic-bezier(0.34,1.56,0.64,1)",
-              }}
-            >
-              <Plus size={26} strokeWidth={2.6} />
-            </button>
+            <>
+              {dragPos && (
+                <div
+                  aria-hidden
+                  className="fixed inset-0 z-30 touch-none"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              )}
+              <button
+                onPointerDown={onFabPointerDown}
+                onPointerMove={onFabPointerMove}
+                onPointerUp={onFabPointerEnd}
+                onPointerCancel={onFabPointerEnd}
+                onClick={() => {
+                  if (!movedRef.current) setAddOpen(true);
+                }}
+                aria-label="Aggiungi spesa"
+                className="lime-fill float-shadow fixed top-0 left-0 z-40 flex h-14 w-14 touch-none items-center justify-center rounded-full"
+                style={{
+                  transform: `translate(${pos.x}px, ${pos.y}px) scale(${fabPressed ? 0.95 : 1})`,
+                  transition: dragPos ? "none" : "transform 420ms cubic-bezier(0.34,1.56,0.64,1)",
+                }}
+              >
+                <Plus size={26} strokeWidth={2.6} />
+              </button>
+            </>
           );
         })()}
 
