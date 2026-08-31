@@ -30,6 +30,7 @@ export function useScrollLock(active: boolean) {
       body.style.top = `-${savedScrollY}px`;
       body.style.left = "0";
       body.style.right = "0";
+      body.style.bottom = "0";
       body.style.width = "100%";
       body.style.overflow = "hidden";
       body.style.touchAction = "none";
@@ -53,6 +54,7 @@ export function useScrollLock(active: boolean) {
         body.style.top = "";
         body.style.left = "";
         body.style.right = "";
+        body.style.bottom = "";
         body.style.width = "";
         body.style.overflow = "";
         body.style.touchAction = "";
