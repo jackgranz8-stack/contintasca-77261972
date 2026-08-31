@@ -299,32 +299,48 @@
 }
 
 /*
- * .app-frame è l'UNICO elemento che scorre in tutta l'app: html e body sono
- * bloccati (vedi sopra, overflow: hidden) e non si muovono mai. Prima invece
- * era il body a scorrere, e per bloccarlo mentre un foglio (BottomSheet) era
- * aperto si doveva alternare "position: fixed" sul body — proprio quel
- * cambio di layout, unito al riposizionamento della barra degli indirizzi di
- * Safari, causava lo scatto visibile alla chiusura. Con lo scroll confinato
- * qui dentro, Safari non ha più motivo di muovere la sua barra durante l'uso
- * dell'app, e i fogli non devono più toccare né body né html per bloccare lo
- * sfondo: basta impedire il touch (vedi use-scroll-lock.ts).
+ * .app-frame è il guscio esterno dell'app: fissa l'altezza a tutto lo
+ * schermo (100dvh) ma NON scorre lui stesso e non contiene direttamente lo
+ * scroll — serve solo da riferimento per gli elementi "fixed" (barra di
+ * navigazione, FAB, banner) che restano suoi figli diretti, MAI dentro un
+ * contenitore che scorre. È una precauzione nota su iOS/WebKit: un elemento
+ * "position: fixed" annidato dentro un div con overflow-y: auto può, in
+ * alcune situazioni, restare "agganciato" ai bordi di quel div invece che ai
+ * bordi reali dello schermo, lasciando uno spazio vuoto se il div è più
+ * corto dello schermo. Tenendo barra/FAB/banner FUORI dal div che scorre
+ * (vedi .app-scroll) restano sempre ancorati allo schermo vero, per intero,
+ * su qualunque iPhone.
+ *
+ * html e body restano bloccati (overflow: hidden, vedi sopra) e non si
+ * muovono mai: l'unico elemento che scorre in tutta l'app è .app-scroll,
+ * qui dentro.
  */
 .app-frame {
   height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.app-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior-y: contain;
-  -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
 
-.app-frame::-webkit-scrollbar {
+.app-scroll::-webkit-scrollbar {
   display: none;
 }
 
 /*
  * Su schermi da tablet/computer in su, l'app non resta una colonna stretta
  * persa nel resto della pagina: prende l'aspetto di un pannello a sé stante,
- * centrato, con la stessa larghezza pensata per iPhone.
+ * centrato, con la stessa larghezza pensata per iPhone. Qui .app-frame
+ * diventa anche il "contenitore" per gli elementi fixed (tramite transform),
+ * così barra/FAB restano visivamente dentro la cornice del telefono invece
+ * di agganciarsi ai bordi dell'intera finestra del browser.
  */
 @media (min-width: 640px) {
   body {
@@ -338,10 +354,10 @@
     max-width: 430px;
     height: auto;
     max-height: calc(100dvh - 5rem);
-    overflow-y: auto;
     border-radius: 32px;
     border: 1px solid var(--color-border);
     box-shadow: 0 40px 90px -20px oklch(0 0 0 / 0.6);
     background-color: var(--color-background);
+    overflow: hidden;
   }
 }
