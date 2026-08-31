@@ -16,21 +16,23 @@ let removeTouchBlock: (() => void) | null = null;
  *
  * Ora html e body sono bloccati in modo permanente (vedi styles.css:
  * overflow: hidden su entrambi) e l'unico elemento che scorre in tutta
- * l'app è .app-frame. Per bloccare lo sfondo basta quindi congelare
- * .app-frame stesso con "overflow: hidden", senza alcun riposizionamento:
- * nessuno scatto, perché nulla si sposta quando il blocco si toglie. Il
- * blocco diretto su "touchmove" a livello di documento resta come rete di
- * sicurezza aggiuntiva (utile anche per non far scorrere lo sfondo se il
- * tocco parte su un elemento con un proprio comportamento di trascinamento).
+ * l'app è .app-scroll (dentro .app-frame, ma separato dagli elementi
+ * "fixed" come barra di navigazione e FAB). Per bloccare lo sfondo basta
+ * quindi congelare .app-scroll con "overflow: hidden", senza alcun
+ * riposizionamento: nessuno scatto, perché nulla si sposta quando il
+ * blocco si toglie. Il blocco diretto su "touchmove" a livello di
+ * documento resta come rete di sicurezza aggiuntiva (utile anche per non
+ * far scorrere lo sfondo se il tocco parte su un elemento con un proprio
+ * comportamento di trascinamento).
  */
 export function useScrollLock(active: boolean) {
   useEffect(() => {
     if (!active || typeof document === "undefined") return;
-    const frame = document.querySelector<HTMLElement>(".app-frame");
+    const scroller = document.querySelector<HTMLElement>(".app-scroll");
 
-    if (locks === 0 && frame) {
-      frame.style.overflow = "hidden";
-      frame.style.touchAction = "none";
+    if (locks === 0 && scroller) {
+      scroller.style.overflow = "hidden";
+      scroller.style.touchAction = "none";
     }
     locks += 1;
 
@@ -47,9 +49,9 @@ export function useScrollLock(active: boolean) {
     return () => {
       locks = Math.max(0, locks - 1);
       if (locks === 0) {
-        if (frame) {
-          frame.style.overflow = "";
-          frame.style.touchAction = "";
+        if (scroller) {
+          scroller.style.overflow = "";
+          scroller.style.touchAction = "";
         }
         removeTouchBlock?.();
         removeTouchBlock = null;
