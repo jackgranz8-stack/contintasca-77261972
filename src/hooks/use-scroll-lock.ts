@@ -1,39 +1,36 @@
 import { useEffect } from "react";
 
 let locks = 0;
-let savedScrollY = 0;
 let removeTouchBlock: (() => void) | null = null;
 
 /**
- * Blocca lo scroll/interazione dello sfondo mentre un popup è aperto.
- * "position: fixed sul body" è l'unica tecnica che blocca lo scroll in modo
- * davvero affidabile su iOS Safari (overflow/touch-action da soli lasciano
- * ancora passare lo scroll in certi casi, specie se il tocco parte su un
- * elemento con un proprio comportamento di trascinamento). In più, un
- * blocco diretto su "touchmove" a livello di documento fa da rete di
- * sicurezza aggiuntiva.
+ * Blocca l'interazione con lo sfondo mentre un foglio (BottomSheet) è
+ * aperto.
  *
- * Il piccolo scatto visivo che questa tecnica può causare sugli elementi
- * fissi (es. la barra di navigazione) durante il grande cambio di layout
- * del body non si risolve evitando la tecnica, ma isolando quegli elementi
- * su un proprio livello grafico indipendente (vedi "will-change: transform"
- * su BottomNav, FAB e banner), così il browser non li ridisegna insieme al
- * resto della pagina.
+ * Prima questa funzione doveva alternare "position: fixed" sul body per
+ * bloccarne lo scroll in modo affidabile su iOS Safari. Era proprio quel
+ * cambio di layout — unito al ricalcolo della barra degli indirizzi di
+ * Safari quando il body tornava "normale" alla chiusura del foglio — a
+ * causare lo scatto visibile sugli elementi fissi (barra di navigazione,
+ * FAB).
+ *
+ * Ora html e body sono bloccati in modo permanente (vedi styles.css:
+ * overflow: hidden su entrambi) e l'unico elemento che scorre in tutta
+ * l'app è .app-frame. Per bloccare lo sfondo basta quindi congelare
+ * .app-frame stesso con "overflow: hidden", senza alcun riposizionamento:
+ * nessuno scatto, perché nulla si sposta quando il blocco si toglie. Il
+ * blocco diretto su "touchmove" a livello di documento resta come rete di
+ * sicurezza aggiuntiva (utile anche per non far scorrere lo sfondo se il
+ * tocco parte su un elemento con un proprio comportamento di trascinamento).
  */
 export function useScrollLock(active: boolean) {
   useEffect(() => {
     if (!active || typeof document === "undefined") return;
-    const body = document.body;
-    if (locks === 0) {
-      savedScrollY = window.scrollY;
-      body.style.position = "fixed";
-      body.style.top = `-${savedScrollY}px`;
-      body.style.left = "0";
-      body.style.right = "0";
-      body.style.bottom = "0";
-      body.style.width = "100%";
-      body.style.overflow = "hidden";
-      body.style.touchAction = "none";
+    const frame = document.querySelector<HTMLElement>(".app-frame");
+
+    if (locks === 0 && frame) {
+      frame.style.overflow = "hidden";
+      frame.style.touchAction = "none";
     }
     locks += 1;
 
@@ -50,15 +47,10 @@ export function useScrollLock(active: boolean) {
     return () => {
       locks = Math.max(0, locks - 1);
       if (locks === 0) {
-        body.style.position = "";
-        body.style.top = "";
-        body.style.left = "";
-        body.style.right = "";
-        body.style.bottom = "";
-        body.style.width = "";
-        body.style.overflow = "";
-        body.style.touchAction = "";
-        window.scrollTo(0, savedScrollY);
+        if (frame) {
+          frame.style.overflow = "";
+          frame.style.touchAction = "";
+        }
         removeTouchBlock?.();
         removeTouchBlock = null;
       }
