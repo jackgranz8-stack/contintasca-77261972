@@ -34,15 +34,8 @@ export const Route = createFileRoute("/budget")({
 });
 
 function BudgetPage() {
-  const {
-    state,
-    updateCategory,
-    addCategory,
-    deleteCategory,
-    addRecurring,
-    updateRecurring,
-    deleteRecurring,
-  } = useApp();
+  const { state, addCategory, deleteCategory, addRecurring, updateRecurring, deleteRecurring } =
+    useApp();
 
   const [formCat, setFormCat] = useState(false);
   const [nuovaCat, setNuovaCat] = useState("");
@@ -57,16 +50,12 @@ function BudgetPage() {
     giorno: 1,
   });
 
-  const [focusCat, setFocusCat] = useState<string | null>(null);
-  const [editing, setEditing] = useState<string | null>(null);
   const [editingNomeCat, setEditingNomeCat] = useState(false);
   const [ricEdit, setRicEdit] = useState<string | null>(null);
   const [ricDaEliminare, setRicDaEliminare] = useState<string | null>(null);
   const [openSwipeCatId, setOpenSwipeCatId] = useState<string | null>(null);
   const [openSwipeRicId, setOpenSwipeRicId] = useState<string | null>(null);
-  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const nomeCatRef = useRef<HTMLInputElement | null>(null);
-  useScrollLock(editing !== null);
   useScrollLock(editingNomeCat);
 
   const totale = state.categorie.reduce((a, c) => a + c.budget, 0);
@@ -137,15 +126,6 @@ function BudgetPage() {
         </section>
       )}
 
-      {editing && (
-        <button
-          type="button"
-          aria-label="Conferma importo"
-          onClick={() => inputRefs.current[editing]?.blur()}
-          className="fixed inset-0 z-30 bg-background/70 backdrop-blur-sm"
-        />
-      )}
-
       {editingNomeCat && (
         <button
           type="button"
@@ -159,8 +139,6 @@ function BudgetPage() {
         {state.categorie.map((c) => {
           const Icon = iconFor(c.icona);
           const speso = spesiMese.get(c.id) ?? 0;
-          const evidenzia = focusCat === c.id;
-          const inModifica = editing === c.id;
           return (
             <SwipeToDelete
               key={c.id}
@@ -173,9 +151,7 @@ function BudgetPage() {
                   toast.error("Categoria in uso: non può essere eliminata");
                 else toast.success("Categoria eliminata");
               }}
-              className={`card-surface transition-colors ${evidenzia ? "ring-1 ring-primary/40" : ""} ${
-                inModifica ? "relative z-40 ring-2 ring-primary" : ""
-              }`}
+              className="card-surface transition-colors"
             >
               <div id={`cat-row-${c.id}`} className="px-4 py-3">
                 <div className="flex items-center gap-3">
@@ -189,34 +165,9 @@ function BudgetPage() {
                     <p className="truncate text-sm">{c.nome}</p>
                     <p className="text-[11px] text-muted-foreground">speso {eur(speso)}</p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-1 rounded-xl bg-surface px-2.5 py-1.5">
-                    <input
-                      ref={(el) => {
-                        inputRefs.current[c.id] = el;
-                      }}
-                      type="number"
-                      inputMode="decimal"
-                      min={0}
-                      value={c.budget}
-                      onFocus={(e) => {
-                        setFocusCat(c.id);
-                        setEditing(c.id);
-                        e.target.select();
-                      }}
-                      onBlur={() => {
-                        setEditing((v) => (v === c.id ? null : v));
-                        setFocusCat((v) => (v === c.id ? null : v));
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") e.currentTarget.blur();
-                      }}
-                      onChange={(e) =>
-                        updateCategory(c.id, { budget: Math.max(0, Number(e.target.value) || 0) })
-                      }
-                      className="w-[72px] bg-transparent py-1 text-right text-base font-semibold outline-none"
-                    />
-                    <span className="text-xs text-muted-foreground">€</span>
-                  </div>
+                  <span className="shrink-0 rounded-xl bg-surface px-2.5 py-1.5 text-base font-semibold">
+                    {eur(c.budget)}
+                  </span>
                   <button
                     onClick={() => setCatEdit(c.id)}
                     className="shrink-0 text-muted-foreground"
