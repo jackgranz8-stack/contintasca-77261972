@@ -183,6 +183,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   const app = (
     <UiContext.Provider value={{ openAdd: () => setAddOpen(true) }}>
       <div className="app-frame">
+        <div className="app-scroll">
+          <div className="mx-auto w-full max-w-[430px] px-4 pt-[calc(env(safe-area-inset-top,0px)+28px)] pb-32">
+            {children}
+          </div>
+        </div>
+
         {bannerVisible && (
           <div
             className={`fixed inset-x-0 top-0 z-50 bg-warn px-4 py-2 text-center text-xs font-medium text-background transition-transform duration-300 ease-out ${
@@ -194,9 +200,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             ritorno della connessione
           </div>
         )}
-        <div className="mx-auto w-full max-w-[430px] px-4 pt-[calc(env(safe-area-inset-top,0px)+28px)] pb-32">
-          {children}
-        </div>
 
         {(() => {
           const pos = dragPos ?? fabRestPosition(fabCorner, safeArea);
