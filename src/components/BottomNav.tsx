@@ -82,7 +82,10 @@ export function BottomNav() {
   }, [shownIndex]);
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),16px)]">
+    <nav
+      className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),16px)]"
+      style={{ willChange: "transform" }}
+    >
       <div className="relative w-full max-w-[320px]">
         {/* Solo questo sfondo si schiaccia leggermente al tocco: icone e indicatore restano fissi */}
         <div

@@ -188,6 +188,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             className={`fixed inset-x-0 top-0 z-50 bg-warn px-4 py-2 text-center text-xs font-medium text-background transition-transform duration-300 ease-out ${
               bannerIn ? "translate-y-0" : "-translate-y-full"
             }`}
+            style={{ willChange: "transform" }}
           >
             Sei offline: le modifiche sono salvate sul telefono e si sincronizzano da sole al
             ritorno della connessione
@@ -221,6 +222,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 style={{
                   transform: `translate(${pos.x}px, ${pos.y}px) scale(${fabPressed ? 0.95 : 1})`,
                   transition: dragPos ? "none" : "transform 420ms cubic-bezier(0.34,1.56,0.64,1)",
+                  willChange: "transform",
                 }}
               >
                 <Plus size={26} strokeWidth={2.6} />
