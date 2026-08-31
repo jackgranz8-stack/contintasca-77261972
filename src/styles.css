@@ -194,7 +194,8 @@
   html {
     -webkit-text-size-adjust: 100%;
     background-color: var(--color-background);
-    overflow-x: hidden;
+    height: 100%;
+    overflow: hidden;
     scrollbar-width: none;
   }
 
@@ -212,7 +213,8 @@
     -webkit-user-select: none;
     user-select: none;
     overscroll-behavior-y: none;
-    overflow-x: hidden;
+    height: 100%;
+    overflow: hidden;
     scrollbar-width: none;
   }
 
@@ -297,6 +299,29 @@
 }
 
 /*
+ * .app-frame è l'UNICO elemento che scorre in tutta l'app: html e body sono
+ * bloccati (vedi sopra, overflow: hidden) e non si muovono mai. Prima invece
+ * era il body a scorrere, e per bloccarlo mentre un foglio (BottomSheet) era
+ * aperto si doveva alternare "position: fixed" sul body — proprio quel
+ * cambio di layout, unito al riposizionamento della barra degli indirizzi di
+ * Safari, causava lo scatto visibile alla chiusura. Con lo scroll confinato
+ * qui dentro, Safari non ha più motivo di muovere la sua barra durante l'uso
+ * dell'app, e i fogli non devono più toccare né body né html per bloccare lo
+ * sfondo: basta impedire il touch (vedi use-scroll-lock.ts).
+ */
+.app-frame {
+  height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.app-frame::-webkit-scrollbar {
+  display: none;
+}
+
+/*
  * Su schermi da tablet/computer in su, l'app non resta una colonna stretta
  * persa nel resto della pagina: prende l'aspetto di un pannello a sé stante,
  * centrato, con la stessa larghezza pensata per iPhone.
@@ -311,7 +336,7 @@
     margin-inline: auto;
     margin-block: 2.5rem;
     max-width: 430px;
-    min-height: 0 !important;
+    height: auto;
     max-height: calc(100dvh - 5rem);
     overflow-y: auto;
     border-radius: 32px;
