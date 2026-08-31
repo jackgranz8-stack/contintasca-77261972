@@ -19,6 +19,7 @@ export function EditCategoryModal({
   const [nome, setNome] = useState("");
   const [icona, setIcona] = useState("wallet");
   const [colore, setColore] = useState("#8CE562");
+  const [budget, setBudget] = useState("0");
   // Resta con l'ultima categoria valida durante l'animazione di chiusura,
   // così il contenuto non sparisce di scatto mentre il foglio scorre giù.
   const [lastEdit, setLastEdit] = useState<Category | null>(edit);
@@ -32,6 +33,7 @@ export function EditCategoryModal({
     setNome(edit.nome);
     setIcona(edit.icona);
     setColore(edit.colore);
+    setBudget(String(edit.budget));
   }, [open, edit]);
 
   const shown = edit ?? lastEdit;
@@ -45,7 +47,8 @@ export function EditCategoryModal({
       toast.error("Il nome non può essere vuoto");
       return;
     }
-    updateCategory(shown.id, { nome: n, icona, colore });
+    const budgetValue = Math.max(0, Number(budget.replace(",", ".")) || 0);
+    updateCategory(shown.id, { nome: n, icona, colore, budget: budgetValue });
     toast.success("Categoria aggiornata");
     onClose();
   };
@@ -78,6 +81,26 @@ export function EditCategoryModal({
           }}
           placeholder="Nome categoria"
           className="min-w-0 flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-muted-foreground"
+        />
+      </div>
+
+      <p className="mb-2 text-xs text-muted-foreground">Budget mensile</p>
+      <div className="mb-4 flex items-center gap-2 rounded-2xl bg-surface px-4 py-3.5">
+        <span className="text-lg font-semibold text-muted-foreground">€</span>
+        <input
+          type="number"
+          inputMode="decimal"
+          step="0.01"
+          min="0"
+          value={budget}
+          onFocus={(e) => e.target.select()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
+          onChange={(e) => setBudget(e.target.value)}
+          placeholder="0"
+          aria-label="Budget mensile"
+          className="w-full min-w-0 bg-transparent text-lg font-semibold outline-none placeholder:text-muted-foreground"
         />
       </div>
 

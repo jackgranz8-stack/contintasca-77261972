@@ -138,7 +138,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   if (!loaded || !account) {
     return (
-      <div className="app-frame flex min-h-dvh items-center justify-center">
+      <div className="app-frame flex items-center justify-center">
         <span
           aria-hidden
           className="inline-block animate-spin text-4xl leading-none font-bold text-primary"
@@ -151,7 +151,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   if (loadError) {
     return (
-      <div className="app-frame flex min-h-dvh flex-col items-center justify-center px-6 text-center">
+      <div className="app-frame flex flex-col items-center justify-center px-6 text-center">
         <p className="text-sm font-semibold">Non riesco a leggere i tuoi dati</p>
         <p className="mt-2 text-xs text-muted-foreground">
           Sembra un problema di connessione momentaneo. I tuoi dati sono al sicuro, non è stato
@@ -182,7 +182,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const app = (
     <UiContext.Provider value={{ openAdd: () => setAddOpen(true) }}>
-      <div className="app-frame min-h-dvh">
+      <div className="app-frame">
         {bannerVisible && (
           <div
             className={`fixed inset-x-0 top-0 z-50 bg-warn px-4 py-2 text-center text-xs font-medium text-background transition-transform duration-300 ease-out ${
