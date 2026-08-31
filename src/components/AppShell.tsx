@@ -43,6 +43,19 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [fabPressed, setFabPressed] = useState(false);
   const draggingRef = useRef(false);
   const movedRef = useRef(false);
+  const [bannerVisible, setBannerVisible] = useState(offlinePending);
+  const [bannerIn, setBannerIn] = useState(false);
+
+  useEffect(() => {
+    if (offlinePending) {
+      setBannerVisible(true);
+      const raf = requestAnimationFrame(() => setBannerIn(true));
+      return () => cancelAnimationFrame(raf);
+    }
+    setBannerIn(false);
+    const t = window.setTimeout(() => setBannerVisible(false), 300);
+    return () => window.clearTimeout(t);
+  }, [offlinePending]);
   const startRef = useRef({ x: 0, y: 0, offsetX: 0, offsetY: 0 });
 
   useEffect(() => {
@@ -170,8 +183,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   const app = (
     <UiContext.Provider value={{ openAdd: () => setAddOpen(true) }}>
       <div className="app-frame min-h-screen">
-        {offlinePending && (
-          <div className="fixed inset-x-0 top-0 z-50 bg-warn px-4 py-2 text-center text-xs font-medium text-background">
+        {bannerVisible && (
+          <div
+            className={`fixed inset-x-0 top-0 z-50 bg-warn px-4 py-2 text-center text-xs font-medium text-background transition-transform duration-300 ease-out ${
+              bannerIn ? "translate-y-0" : "-translate-y-full"
+            }`}
+          >
             Sei offline: le modifiche sono salvate sul telefono e si sincronizzano da sole al
             ritorno della connessione
           </div>
