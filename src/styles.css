@@ -312,7 +312,7 @@
     margin-block: 2.5rem;
     max-width: 430px;
     min-height: 0 !important;
-    max-height: calc(100vh - 5rem);
+    max-height: calc(100dvh - 5rem);
     overflow-y: auto;
     border-radius: 32px;
     border: 1px solid var(--color-border);
