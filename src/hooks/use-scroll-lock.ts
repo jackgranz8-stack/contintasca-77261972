@@ -1,32 +1,40 @@
 import { useEffect } from "react";
 
 let locks = 0;
+let savedScrollY = 0;
 let removeTouchBlock: (() => void) | null = null;
 
 /**
  * Blocca lo scroll/interazione dello sfondo mentre un popup è aperto.
- * Deliberatamente NON usa "position: fixed sul body": su iOS, cambiare
- * dinamicamente la position del body provoca un piccolo scatto visivo su
- * tutti gli elementi con position:fixed (es. la barra di navigazione in
- * basso) nel momento in cui il blocco si toglie.
+ * "position: fixed sul body" è l'unica tecnica che blocca lo scroll in modo
+ * davvero affidabile su iOS Safari (overflow/touch-action da soli lasciano
+ * ancora passare lo scroll in certi casi, specie se il tocco parte su un
+ * elemento con un proprio comportamento di trascinamento). In più, un
+ * blocco diretto su "touchmove" a livello di documento fa da rete di
+ * sicurezza aggiuntiva.
  *
- * overflow/touch-action da soli, però, non bastano sempre su iOS: se il
- * tocco parte su un elemento annidato con un proprio touch-action (es. una
- * riga con swipe), quello può prevalere e lasciar scorrere comunque lo
- * sfondo. Per questo il blocco vero avviene intercettando "touchmove" a
- * livello di documento: viene lasciato passare solo se il tocco è iniziato
- * dentro un elemento marcato esplicitamente con data-scroll-lock-allow
- * (il contenuto interno dei fogli, che deve poter scorrere per conto suo).
+ * Il piccolo scatto visivo che questa tecnica può causare sugli elementi
+ * fissi (es. la barra di navigazione) durante il grande cambio di layout
+ * del body non si risolve evitando la tecnica, ma isolando quegli elementi
+ * su un proprio livello grafico indipendente (vedi "will-change: transform"
+ * su BottomNav, FAB e banner), così il browser non li ridisegna insieme al
+ * resto della pagina.
  */
 export function useScrollLock(active: boolean) {
   useEffect(() => {
     if (!active || typeof document === "undefined") return;
     const body = document.body;
-    const prevOverflow = body.style.overflow;
-    const prevTouch = body.style.touchAction;
+    if (locks === 0) {
+      savedScrollY = window.scrollY;
+      body.style.position = "fixed";
+      body.style.top = `-${savedScrollY}px`;
+      body.style.left = "0";
+      body.style.right = "0";
+      body.style.width = "100%";
+      body.style.overflow = "hidden";
+      body.style.touchAction = "none";
+    }
     locks += 1;
-    body.style.overflow = "hidden";
-    body.style.touchAction = "none";
 
     if (!removeTouchBlock) {
       const blockTouch = (e: TouchEvent) => {
@@ -41,8 +49,14 @@ export function useScrollLock(active: boolean) {
     return () => {
       locks = Math.max(0, locks - 1);
       if (locks === 0) {
-        body.style.overflow = prevOverflow;
-        body.style.touchAction = prevTouch;
+        body.style.position = "";
+        body.style.top = "";
+        body.style.left = "";
+        body.style.right = "";
+        body.style.width = "";
+        body.style.overflow = "";
+        body.style.touchAction = "";
+        window.scrollTo(0, savedScrollY);
         removeTouchBlock?.();
         removeTouchBlock = null;
       }
