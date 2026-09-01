@@ -32,7 +32,7 @@ const sameState = (a: AppState, b: AppState) => JSON.stringify(a) === JSON.strin
  * tenendo l'app ferma sulla schermata di caricamento anche quando sul
  * telefono c'era già una copia dei dati pronta da usare.
  */
-const NETWORK_TIMEOUT_MS = 5000;
+const NETWORK_TIMEOUT_MS = 3000;
 function withTimeout<T>(promise: Promise<T>, ms = NETWORK_TIMEOUT_MS): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("Tempo scaduto: nessuna rete")), ms);
