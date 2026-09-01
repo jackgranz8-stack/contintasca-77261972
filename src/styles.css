@@ -604,7 +604,13 @@
  * qui sopra riguarda solo Safari su iPhone, quindi su desktop si può usare
  * flexbox senza problemi.
  */
-@media (min-width: 640px) {
+/*
+ * La cornice "telefono" vale SOLO dove c'è davvero un mouse (computer).
+ * Alcuni telefoni/webview riportano una larghezza pagina superiore a 640px:
+ * senza il controllo sul puntatore finivano nella modalità cornice, con la
+ * fascia grigia sopra e sotto invece dell'app a tutto schermo.
+ */
+@media (min-width: 640px) and (pointer: fine) and (hover: hover) {
   body {
     background-color: var(--backdrop);
   }
