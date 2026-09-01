@@ -50,6 +50,61 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+
+  /*
+   * SCALA TIPOGRAFICA
+   *
+   * Ridefinisce le misure di testo di Tailwind (text-xs, text-sm, ...) come
+   * una scala unica e coerente, invece di valori scelti caso per caso. Le
+   * dimensioni restano quelle a cui l'app è già abituata — così nessuna
+   * schermata si scompone — mentre a cambiare sono i due valori che fanno
+   * davvero la differenza sulla resa:
+   *
+   * - INTERLINEA: larga sui testi piccoli (si leggono meglio), stretta sui
+   *   titoli grandi (altrimenti le righe "galleggiano" lontane);
+   * - CRENATURA (spazio fra le lettere): a zero sui testi piccoli, sempre
+   *   più negativa man mano che il testo cresce.
+   *
+   * È la stessa regola che segue Apple nei suoi caratteri di sistema: più
+   * il testo è grande, più le lettere vanno avvicinate, altrimenti i titoli
+   * sembrano "sparpagliati". Applicandola qui, in un punto solo, si allinea
+   * automaticamente tutta l'app senza toccare le singole schermate.
+   */
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.4;
+  --text-xs--letter-spacing: 0em;
+
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.45;
+  --text-sm--letter-spacing: -0.003em;
+
+  --text-base: 1rem;
+  --text-base--line-height: 1.5;
+  --text-base--letter-spacing: -0.006em;
+
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.45;
+  --text-lg--letter-spacing: -0.01em;
+
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.35;
+  --text-xl--letter-spacing: -0.014em;
+
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 1.25;
+  --text-2xl--letter-spacing: -0.018em;
+
+  --text-3xl: 1.875rem;
+  --text-3xl--line-height: 1.15;
+  --text-3xl--letter-spacing: -0.022em;
+
+  --text-4xl: 2.25rem;
+  --text-4xl--line-height: 1.08;
+  --text-4xl--letter-spacing: -0.026em;
+
+  --text-5xl: 3rem;
+  --text-5xl--line-height: 1.04;
+  --text-5xl--letter-spacing: -0.03em;
 }
 
 :root {
@@ -66,7 +121,27 @@
    * sopra. Cambiando questo numero si sposta tutto insieme, senza toccare
    * nient'altro.
    */
-  --nav-height: 58px;
+  --nav-height: 56px;
+
+  /* Margini laterali della "nuvola" rispetto ai bordi dello schermo. */
+  --nav-inset: 10px;
+
+  /*
+   * Quanto la nuvola sta sollevata dal bordo inferiore VERO dello schermo.
+   *
+   * Qui stava il difetto della "striscia vuota" in fondo: prima la barra era
+   * incollata al bordo e si aggiungeva dentro di sé tutto il margine di
+   * sicurezza del telefono (env(safe-area-inset-bottom), ~34px su iPhone).
+   * Il risultato era una fascia di vetro alta 34px sotto le icone, con
+   * dentro nulla — proprio la "barra senza niente" che si vedeva.
+   *
+   * Ora la nuvola è staccata e si solleva molto meno del margine di
+   * sicurezza pieno: la barra gesti del telefono passa NELLO spazio sotto la
+   * nuvola, dove si vede il contenuto che scorre, esattamente come su
+   * Instagram. Su iPhone (34px di margine) la nuvola resta sollevata 18px;
+   * su telefoni senza margine di sicurezza il minimo garantito è 10px.
+   */
+  --nav-lift: max(10px, calc(env(safe-area-inset-bottom, 0px) - 16px));
 
   color-scheme: dark;
 
@@ -113,6 +188,9 @@
   --nav-bg-solid: oklch(0.175 0.014 152);
   --nav-border: oklch(0.97 0.008 150 / 0.1);
   --nav-pill: oklch(0.97 0.008 150 / 0.11);
+  /* Filo di luce sul bordo alto del vetro: è il dettaglio che fa sembrare la
+     nuvola uno strato spesso invece di una semplice trasparenza. */
+  --nav-sheen: oklch(1 0 0 / 0.09);
 
   --gradient-card: linear-gradient(155deg, oklch(0.24 0.02 152) 0%, oklch(0.185 0.014 152) 100%);
   --gradient-hero: linear-gradient(150deg, oklch(0.31 0.06 145) 0%, oklch(0.2 0.02 152) 70%);
@@ -164,6 +242,7 @@
   --nav-bg-solid: oklch(0.995 0.003 150);
   --nav-border: oklch(0.22 0.016 152 / 0.1);
   --nav-pill: oklch(0.22 0.016 152 / 0.07);
+  --nav-sheen: oklch(1 0 0 / 0.7);
 
   --gradient-card: linear-gradient(160deg, oklch(1 0 0) 0%, oklch(0.988 0.004 150) 100%);
   --gradient-hero: linear-gradient(150deg, oklch(0.945 0.06 146) 0%, oklch(0.99 0.012 150) 72%);
@@ -219,6 +298,7 @@
     --nav-bg-solid: oklch(0.995 0.003 150);
     --nav-border: oklch(0.22 0.016 152 / 0.1);
     --nav-pill: oklch(0.22 0.016 152 / 0.07);
+    --nav-sheen: oklch(1 0 0 / 0.7);
 
     --gradient-card: linear-gradient(160deg, oklch(1 0 0) 0%, oklch(0.988 0.004 150) 100%);
     --gradient-hero: linear-gradient(150deg, oklch(0.945 0.06 146) 0%, oklch(0.99 0.012 150) 72%);
@@ -431,37 +511,66 @@
 /* Spazio in fondo alle pagine: barra di navigazione + margine di sicurezza
    del telefono + aria. Ricavato dalla stessa --nav-height della barra. */
 @utility pb-nav {
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 28px);
+  padding-bottom: calc(var(--nav-height) + var(--nav-lift) + 28px);
 }
 
 /*
- * BARRA DI NAVIGAZIONE — stile Instagram / Apple
+ * BARRA DI NAVIGAZIONE — "nuvola" flottante stile Instagram / Apple
  *
- * A tutta larghezza e appoggiata al bordo inferiore vero dello schermo (non
- * più una "pillola" flottante staccata), con:
- * - vetro smerigliato: sfondo semi-trasparente + sfocatura di ciò che scorre
- *   sotto, come la tab bar di iOS e di Instagram;
- * - una riga di separazione sottilissima in alto (mezzo pixel su schermi
- *   retina), invece di un bordo pieno;
- * - il margine di sicurezza in basso incluso nella barra stessa, così il
- *   vetro arriva fino al bordo dello schermo e passa SOTTO la barra gesti di
- *   iPhone/Android invece di lasciare una striscia di sfondo.
+ * Non è più incollata al bordo inferiore: è una pillola staccata, con aria
+ * attorno su tutti e quattro i lati, sotto la quale si intravede il
+ * contenuto che scorre. Questo elimina anche la "striscia vuota" in fondo
+ * (vedi --nav-lift), perché non c'è più un'area di vetro che deve
+ * inglobare il margine di sicurezza del telefono.
+ *
+ * Vetro in stile Apple: sfocatura forte di ciò che passa sotto, più una
+ * leggera saturazione (i colori dietro restano vivi invece di ingrigirsi) e
+ * un filo di luce interno sul bordo, che è ciò che dà l'impressione del
+ * vetro spesso invece di una semplice trasparenza.
+ *
+ * Movimento: la nuvola si rimpicciolisce quando si scorre verso il basso
+ * (per lasciare spazio alla lettura) e torna piena scorrendo verso l'alto o
+ * al primo tocco. La curva di transizione supera leggermente il valore
+ * finale prima di assestarsi: è il "rimbalzo" morbido delle animazioni iOS.
  */
 .app-nav {
   position: fixed;
-  right: 0;
-  bottom: 0;
-  left: 0;
+  left: max(var(--nav-inset), env(safe-area-inset-left, 0px));
+  right: max(var(--nav-inset), env(safe-area-inset-right, 0px));
+  bottom: var(--nav-lift);
   z-index: 40;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  padding-left: env(safe-area-inset-left, 0px);
-  padding-right: env(safe-area-inset-right, 0px);
+  border-radius: 30px;
   background-color: var(--nav-bg);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  backdrop-filter: blur(30px) saturate(180%);
   box-shadow:
-    inset 0 0.5px 0 var(--nav-border),
-    0 -14px 34px -26px oklch(0 0 0 / 0.6);
+    inset 0 0 0 0.5px var(--nav-border),
+    inset 0 1px 0 var(--nav-sheen),
+    0 20px 44px -22px oklch(0 0 0 / 0.6);
+  transform-origin: bottom center;
+  transition:
+    transform 560ms cubic-bezier(0.34, 1.32, 0.64, 1),
+    opacity 320ms ease-out;
+  will-change: transform;
+}
+
+/* Stato "ridotto": si rimpicciolisce e si abbassa appena, restando
+   comunque toccabile. */
+.app-nav[data-compact="true"] {
+  transform: scale(0.84) translateY(8px);
+  opacity: 0.9;
+}
+
+/* Chi ha attivato la riduzione dei movimenti sul telefono non vede
+   rimpicciolimenti né rimbalzi: la barra resta ferma e piena. */
+@media (prefers-reduced-motion: reduce) {
+  .app-nav {
+    transition: none;
+  }
+  .app-nav[data-compact="true"] {
+    transform: none;
+    opacity: 1;
+  }
 }
 
 /* Se il browser non sa sfocare (Android datati, Firefox con l'opzione
@@ -532,10 +641,5 @@
     inset: auto;
     flex: 1 1 auto;
     min-height: 0;
-  }
-
-  .app-nav {
-    border-bottom-left-radius: 39px;
-    border-bottom-right-radius: 39px;
   }
 }
