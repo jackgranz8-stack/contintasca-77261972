@@ -439,10 +439,34 @@
 /* Su mobile è la pagina a seguire il viewport di Safari. Non blocchiamo
    permanentemente html/body: su iOS la loro altezza al 100% può riferirsi al
    layout viewport più corto e lasciare una fascia scoperta sotto l'app. */
+/*
+ * ALTEZZA DELLA PAGINA — perché lvh e non dvh
+ *
+ * "dvh" (dynamic viewport height) vale l'altezza visibile ISTANTE PER
+ * ISTANTE. Su iPhone, mentre si scorre, la barra degli indirizzi di Safari
+ * si ritrae con un'animazione: durante quell'animazione dvh cambia a ogni
+ * fotogramma, e ogni cambio costringe il browser a rifare i conti su tutta
+ * la pagina. È esattamente questo che faceva scorrere l'app "a scatti", ed
+ * è il motivo per cui all'apertura la home appariva storta e si sistemava
+ * solo dopo aver scorso: il primo calcolo veniva fatto con la barra aperta
+ * e poi rifatto con la barra chiusa.
+ *
+ * "lvh" (large viewport height) vale invece l'altezza a barra RITRATTA, ed
+ * è un numero FISSO che non cambia mai durante lo scorrimento: niente
+ * ricalcoli, niente scatti, nessun assestamento all'apertura.
+ *
+ * In più risolve da sé il "va a schermo intero solo dopo aver scorso": la
+ * pagina è sempre alta almeno quanto lo schermo pieno, quindi c'è sempre il
+ * minimo margine di scorrimento che serve a Safari per ritrarre la barra.
+ * Da lì in poi contenuto e schermo coincidono esattamente.
+ *
+ * "100vh" resta come riserva per i browser che non conoscono lvh; su iOS
+ * vale già quanto lvh, quindi il risultato è lo stesso.
+ */
 .app-frame {
   position: relative;
   min-height: 100vh;
-  min-height: 100dvh;
+  min-height: 100lvh;
   background-color: var(--color-background);
 }
 
