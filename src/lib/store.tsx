@@ -24,6 +24,31 @@ import { currentMonth, monthKey, shiftMonth, uid } from "./format";
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const sameState = (a: AppState, b: AppState) => JSON.stringify(a) === JSON.stringify(b);
 
+/**
+ * In modalità aereo (o senza rete in generale) "fetch" può restare in
+ * attesa a lungo invece di fallire subito: il browser non gli mette da
+ * solo un limite di tempo. Senza questo avvolgimento, un caricamento o un
+ * salvataggio verso Supabase poteva restare bloccato indefinitamente,
+ * tenendo l'app ferma sulla schermata di caricamento anche quando sul
+ * telefono c'era già una copia dei dati pronta da usare.
+ */
+const NETWORK_TIMEOUT_MS = 5000;
+function withTimeout<T>(promise: Promise<T>, ms = NETWORK_TIMEOUT_MS): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("Tempo scaduto: nessuna rete")), ms);
+    promise.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
+}
+
 type Account = { id: string; email: string | null } | null;
 
 type Ctx = {
@@ -112,7 +137,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const maxAttempts = 3;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        const remote = await loadRemoteState(userId);
+        const remote = await withTimeout(loadRemoteState(userId));
 
         // C'era una modifica fatta offline mai arrivata al server (l'app è
         // stata chiusa del tutto prima che la rete tornasse, e ora si riapre
@@ -130,7 +155,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             // Rete appena verificata funzionante: si prova a sincronizzare
             // subito, invece di aspettare un evento "online" che non
             // arriverà più (la connessione non sta "tornando", c'è già).
-            await persistDiff(remote, cached.state, userId);
+            await withTimeout(persistDiff(remote, cached.state, userId));
             baseline.current = cached.state;
             saveOfflineCache(userId, cached.state, cached.state);
             toast.success("Modifiche fatte offline sincronizzate");
@@ -286,7 +311,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const maxAttempts = 3;
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           try {
-            await persistDiff(prev, attempted, acc.id);
+            await withTimeout(persistDiff(prev, attempted, acc.id));
             return;
           } catch (err) {
             const stillOnline = typeof navigator === "undefined" || navigator.onLine;
@@ -328,7 +353,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!acc || !prev || !attempted) return;
       setSyncing(true);
       queue.current = queue.current
-        .then(() => persistDiff(prev, attempted, acc.id))
+        .then(() => withTimeout(persistDiff(prev, attempted, acc.id)))
         .then(() => {
           baseline.current = attempted;
           pending.current = null;
