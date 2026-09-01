@@ -1,13 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Home, List, PieChart, User } from "lucide-react";
+import { Home, List, PieChart, Plus, User } from "lucide-react";
 
-const items = [
-  { to: "/", label: "Home", icon: Home },
-  { to: "/storico", label: "Storico", icon: List },
-  { to: "/budget", label: "Budget", icon: PieChart },
-  { to: "/profilo", label: "Profilo", icon: User },
-] as const;
+type Slot =
+  { kind: "link"; to: string; label: string; icon: typeof Home } | { kind: "add"; label: string };
+
+/**
+ * Le cinque posizioni della barra. Il "+" sta in mezzo, come su Instagram:
+ * è il gesto più frequente dell'app, quindi finisce nel punto più comodo da
+ * raggiungere con il pollice.
+ */
+const slots: Slot[] = [
+  { kind: "link", to: "/", label: "Home", icon: Home },
+  { kind: "link", to: "/storico", label: "Storico", icon: List },
+  { kind: "add", label: "Aggiungi spesa" },
+  { kind: "link", to: "/budget", label: "Budget", icon: PieChart },
+  { kind: "link", to: "/profilo", label: "Profilo", icon: User },
+];
+
+const ADD_INDEX = slots.findIndex((s) => s.kind === "add");
 
 /** Vibrazione brevissima, solo dove il telefono la supporta (Android). */
 function tap(ms: number) {
@@ -16,32 +27,66 @@ function tap(ms: number) {
 }
 
 /**
- * Barra di navigazione in stile Instagram / tab bar iOS.
+ * Barra di navigazione "a nuvola", stile Instagram / libreria Apple.
  *
- * Rispetto alla versione precedente (pillola flottante staccata dal bordo):
- * - occupa tutta la larghezza e si appoggia al bordo inferiore vero dello
- *   schermo, con il vetro che prosegue sotto la barra gesti del telefono;
- * - è più alta e ha le etichette sotto le icone, come su iPhone: si capisce
- *   dove si sta andando senza dover interpretare l'icona;
- * - resta identica nel comportamento "fluido": si può scorrere il dito sulla
- *   barra per passare da una sezione all'altra, l'indicatore insegue il dito
- *   con il rimbalzo elastico e si allunga mentre si muove.
- *
- * Tutto il "vetro" (sfondo, sfocatura, riga di separazione, colore
- * dell'indicatore) vive in styles.css nelle classi .app-nav / .app-nav-track,
- * così cambia da solo tra tema chiaro e scuro.
+ * - Pillola flottante staccata dai bordi, in vetro smerigliato: sotto di lei
+ *   si intravede il contenuto che scorre (tutto l'aspetto vive in
+ *   styles.css, classe .app-nav, così segue da solo tema chiaro e scuro).
+ * - Si RIMPICCIOLISCE scorrendo verso il basso e torna piena scorrendo verso
+ *   l'alto, al tocco, o quando si è in cima alla pagina: è la regola delle
+ *   interfacce Apple — i comandi si fanno da parte mentre leggi e tornano
+ *   appena li cerchi.
+ * - Il "+" per aggiungere una spesa è dentro la barra, al centro.
+ * - Resta lo scorrimento del dito sulla barra per passare da una sezione
+ *   all'altra, con l'indicatore che insegue il dito.
  */
-export function BottomNav() {
+export function BottomNav({ onAdd }: { onAdd: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const trackRef = useRef<HTMLUListElement | null>(null);
   const draggingRef = useRef(false);
   const dragIndexRef = useRef<number | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [compact, setCompact] = useState(false);
 
-  const activeIndex = items.findIndex(({ to }) =>
-    to === "/" ? pathname === "/" : pathname.startsWith(to),
+  const activeIndex = slots.findIndex((s) =>
+    s.kind === "link" ? (s.to === "/" ? pathname === "/" : pathname.startsWith(s.to)) : false,
   );
+
+  /*
+   * Rimpicciolimento allo scorrimento.
+   *
+   * L'elemento che scorre non è la pagina ma .app-scroll (vedi styles.css),
+   * quindi è a lui che ci si aggancia. Le letture sono raggruppate dentro un
+   * requestAnimationFrame: si aggiorna al massimo una volta per fotogramma,
+   * senza appesantire lo scorrimento. La soglia di 6px evita che la barra
+   * "sfarfalli" ai micro-movimenti del dito.
+   */
+  useEffect(() => {
+    const scroller = document.querySelector<HTMLElement>(".app-scroll");
+    if (!scroller) return;
+    let last = scroller.scrollTop;
+    let frame = 0;
+
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        const y = scroller.scrollTop;
+        const delta = y - last;
+        if (y < 24) setCompact(false);
+        else if (delta > 6) setCompact(true);
+        else if (delta < -6) setCompact(false);
+        last = y;
+      });
+    };
+
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      scroller.removeEventListener("scroll", onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
 
   const indexFromX = useCallback((clientX: number) => {
     const el = trackRef.current;
@@ -49,21 +94,26 @@ export function BottomNav() {
     const rect = el.getBoundingClientRect();
     const clamped = Math.min(rect.right - 1, Math.max(rect.left, clientX));
     const ratio = (clamped - rect.left) / rect.width;
-    return Math.min(items.length - 1, Math.max(0, Math.floor(ratio * items.length)));
+    return Math.min(slots.length - 1, Math.max(0, Math.floor(ratio * slots.length)));
   }, []);
 
   const goTo = (index: number) => {
-    const target = items[index];
-    if (!target) return;
+    const target = slots[index];
+    if (!target || target.kind !== "link") return;
     const already = target.to === "/" ? pathname === "/" : pathname.startsWith(target.to);
     if (!already) void navigate({ to: target.to });
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLUListElement>) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    // Primo tocco: la barra torna sempre a grandezza piena.
+    setCompact(false);
     draggingRef.current = true;
     trackRef.current?.setPointerCapture(e.pointerId);
     const idx = indexFromX(e.clientX);
+    // Il "+" non fa parte dello scorrimento fra sezioni: è un'azione, non
+    // una destinazione, quindi passandoci sopra col dito non lo si "seleziona".
+    if (idx === ADD_INDEX) return;
     dragIndexRef.current = idx;
     setDragIndex(idx);
   };
@@ -71,7 +121,8 @@ export function BottomNav() {
   const handlePointerMove = (e: React.PointerEvent<HTMLUListElement>) => {
     if (!draggingRef.current) return;
     const idx = indexFromX(e.clientX);
-    if (idx !== null && idx !== dragIndexRef.current) {
+    if (idx === null || idx === ADD_INDEX) return;
+    if (idx !== dragIndexRef.current) {
       dragIndexRef.current = idx;
       setDragIndex(idx);
       tap(3);
@@ -101,10 +152,10 @@ export function BottomNav() {
     return () => window.clearTimeout(timer);
   }, [shownIndex]);
 
-  const slot = 100 / items.length;
+  const slotWidth = 100 / slots.length;
 
   return (
-    <nav className="app-nav" aria-label="Navigazione principale">
+    <nav className="app-nav" data-compact={compact} aria-label="Navigazione principale">
       <ul
         ref={trackRef}
         onPointerDown={handlePointerDown}
@@ -113,51 +164,67 @@ export function BottomNav() {
         onPointerCancel={endDrag}
         className="app-nav-track"
       >
-        {/* Indicatore che scorre sotto l'icona attiva. Mentre si muove si
-            allunga leggermente in verticale (effetto elastico), poi si
-            riassesta: è lo stesso comportamento di prima. */}
+        {/* Indicatore che scorre sotto l'icona attiva: mentre si muove si
+            allunga leggermente, poi si riassesta. */}
         <span
           aria-hidden
           className={`pointer-events-none absolute transition-[left,top,bottom] duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
-            moving ? "top-1 bottom-1" : "top-[7px] bottom-[7px]"
+            moving ? "top-1.5 bottom-1.5" : "top-2.5 bottom-2.5"
           }`}
-          style={{ width: `${slot}%`, left: `${slot * shownIndex}%` }}
+          style={{ width: `${slotWidth}%`, left: `${slotWidth * shownIndex}%` }}
         >
           <span
-            className="mx-2.5 block h-full rounded-[18px]"
+            className="mx-2 block h-full rounded-[20px]"
             style={{ backgroundColor: "var(--nav-pill)" }}
           />
         </span>
 
-        {items.map(({ to, label, icon: Icon }, i) => {
+        {slots.map((slot, i) => {
+          if (slot.kind === "add") {
+            return (
+              <li key="add" className="relative z-10 flex-1">
+                <button
+                  type="button"
+                  aria-label={slot.label}
+                  onClick={onAdd}
+                  onPointerDown={(e) => {
+                    // Il "+" gestisce il proprio tocco: non deve far partire
+                    // lo scorrimento fra sezioni.
+                    e.stopPropagation();
+                    setCompact(false);
+                  }}
+                  className="flex h-full w-full touch-none items-center justify-center [-webkit-touch-callout:none]"
+                >
+                  <span className="lime-fill flex h-9 w-9 items-center justify-center rounded-full transition-transform duration-300 ease-out active:scale-90">
+                    <Plus size={20} strokeWidth={2.8} />
+                  </span>
+                </button>
+              </li>
+            );
+          }
+
           const active = i === shownIndex;
+          const Icon = slot.icon;
           return (
-            <li key={to} className="relative z-10 flex-1">
+            <li key={slot.to} className="relative z-10 flex-1">
               <Link
-                to={to}
-                aria-label={label}
+                to={slot.to}
+                aria-label={slot.label}
                 aria-current={active ? "page" : undefined}
                 onClick={(e) => {
                   if (draggingRef.current) e.preventDefault();
                 }}
-                className={`flex h-full touch-none flex-col items-center justify-center gap-[3px] transition-transform duration-300 ease-out [-webkit-touch-callout:none] ${
-                  active && dragIndex !== null ? "scale-[1.06]" : "scale-100"
+                className={`flex h-full touch-none items-center justify-center transition-transform duration-300 ease-out [-webkit-touch-callout:none] ${
+                  active && dragIndex !== null ? "scale-110" : "scale-100"
                 }`}
                 draggable={false}
               >
                 <Icon
-                  size={23}
+                  size={24}
                   fill={active ? "currentColor" : "none"}
                   strokeWidth={active ? 1.6 : 1.8}
                   className={active ? "text-foreground" : "text-muted-foreground"}
                 />
-                <span
-                  className={`text-[10px] leading-none tracking-tight ${
-                    active ? "font-semibold text-foreground" : "font-medium text-muted-foreground"
-                  }`}
-                >
-                  {label}
-                </span>
               </Link>
             </li>
           );
