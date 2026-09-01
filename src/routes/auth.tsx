@@ -118,15 +118,37 @@ function AuthPage() {
           className="w-full rounded-2xl border border-border bg-surface px-4 py-4 text-base outline-none placeholder:text-muted-foreground"
         />
         {mode !== "reset" && (
-          <input
-            type="password"
-            autoComplete={mode === "login" ? "current-password" : "new-password"}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password"
-            className="w-full rounded-2xl border border-border bg-surface px-4 py-4 text-base outline-none placeholder:text-muted-foreground"
-          />
+          <div className="space-y-2">
+            <div className="relative">
+              <input
+                type={mostraPassword ? "text" : "password"}
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyUp={rilevaMaiusc}
+                onKeyDown={rilevaMaiusc}
+                onBlur={() => setMaiusc(false)}
+                placeholder="Password"
+                className="w-full rounded-2xl border border-border bg-surface py-4 pr-14 pl-4 text-base outline-none placeholder:text-muted-foreground"
+              />
+              <button
+                type="button"
+                aria-label={mostraPassword ? "Nascondi password" : "Mostra password"}
+                aria-pressed={mostraPassword}
+                onClick={() => setMostraPassword((v) => !v)}
+                className="absolute top-1/2 right-2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl text-muted-foreground"
+              >
+                {mostraPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
+            {maiusc && (
+              <p className="flex items-center gap-2 px-1 text-xs text-warn">
+                <ArrowBigUp size={16} /> Blocco maiuscole attivo
+              </p>
+            )}
+          </div>
         )}
+
         <button
           type="submit"
           disabled={busy}
