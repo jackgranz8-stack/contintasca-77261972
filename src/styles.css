@@ -299,32 +299,34 @@
 }
 
 /*
- * .app-frame è il guscio esterno dell'app: fissa l'altezza a tutto lo
- * schermo (100dvh) ma NON scorre lui stesso e non contiene direttamente lo
- * scroll — serve solo da riferimento per gli elementi "fixed" (barra di
- * navigazione, FAB, banner) che restano suoi figli diretti, MAI dentro un
- * contenitore che scorre. È una precauzione nota su iOS/WebKit: un elemento
- * "position: fixed" annidato dentro un div con overflow-y: auto può, in
- * alcune situazioni, restare "agganciato" ai bordi di quel div invece che ai
- * bordi reali dello schermo, lasciando uno spazio vuoto se il div è più
- * corto dello schermo. Tenendo barra/FAB/banner FUORI dal div che scorre
- * (vedi .app-scroll) restano sempre ancorati allo schermo vero, per intero,
- * su qualunque iPhone.
+ * .app-frame è il guscio esterno dell'app, alto quanto lo schermo vero
+ * (vedi --app-vh, impostata via JS in __root.tsx: più affidabile di 100dvh
+ * da solo, che in alcune versioni di iOS in modalità "aggiunta alla
+ * schermata Home" risulta più corto dello schermo reale, lasciando una
+ * striscia nera in fondo).
+ *
+ * Di proposito NON ha "display: flex" né "overflow: hidden" su mobile: è
+ * un'altra precauzione nota su iOS/WebKit — un elemento "position: fixed"
+ * (qui: barra di navigazione, FAB, banner) annidato dentro un contenitore
+ * flex con overflow:hidden può, in alcune situazioni, restare "agganciato"
+ * ai bordi di QUEL contenitore invece che ai bordi reali dello schermo.
+ * .app-frame resta quindi un semplice "position: relative" (che non crea
+ * un nuovo riferimento per gli elementi fixed, solo per quelli assoluti),
+ * e .app-scroll — l'UNICO elemento che scorre in tutta l'app — lo riempie
+ * con "position: absolute; inset: 0" invece che con flexbox.
  *
  * html e body restano bloccati (overflow: hidden, vedi sopra) e non si
- * muovono mai: l'unico elemento che scorre in tutta l'app è .app-scroll,
- * qui dentro.
+ * muovono mai.
  */
 .app-frame {
+  position: relative;
   height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  height: var(--app-vh, 100dvh);
 }
 
 .app-scroll {
-  flex: 1 1 auto;
-  min-height: 0;
+  position: absolute;
+  inset: 0;
   overflow-y: auto;
   overscroll-behavior-y: contain;
   scrollbar-width: none;
@@ -340,7 +342,9 @@
  * centrato, con la stessa larghezza pensata per iPhone. Qui .app-frame
  * diventa anche il "contenitore" per gli elementi fixed (tramite transform),
  * così barra/FAB restano visivamente dentro la cornice del telefono invece
- * di agganciarsi ai bordi dell'intera finestra del browser.
+ * di agganciarsi ai bordi dell'intera finestra del browser: il dubbio
+ * WebKit qui sopra riguarda solo Safari su iPhone, quindi su desktop si può
+ * usare flexbox senza problemi.
  */
 @media (min-width: 640px) {
   body {
@@ -354,10 +358,19 @@
     max-width: 430px;
     height: auto;
     max-height: calc(100dvh - 5rem);
+    display: flex;
+    flex-direction: column;
     border-radius: 32px;
     border: 1px solid var(--color-border);
     box-shadow: 0 40px 90px -20px oklch(0 0 0 / 0.6);
     background-color: var(--color-background);
     overflow: hidden;
+  }
+
+  .app-scroll {
+    position: static;
+    inset: auto;
+    flex: 1 1 auto;
+    min-height: 0;
   }
 }
