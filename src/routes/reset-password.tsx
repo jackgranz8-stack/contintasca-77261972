@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { KeyRound, Loader2 } from "lucide-react";
+import { ArrowBigUp, Eye, EyeOff, KeyRound, Loader2 } from "lucide-react";
 import { db } from "@/integrations/external/client";
 
 export const Route = createFileRoute("/reset-password")({
