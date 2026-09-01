@@ -195,8 +195,8 @@ export function BottomNav({ onAdd }: { onAdd: () => void }) {
                   }}
                   className="flex h-full w-full touch-none items-center justify-center [-webkit-touch-callout:none]"
                 >
-                  <span className="lime-fill flex h-9 w-9 items-center justify-center rounded-full transition-transform duration-300 ease-out active:scale-90">
-                    <Plus size={20} strokeWidth={2.8} />
+                  <span className="lime-fill flex h-10 w-10 items-center justify-center rounded-full transition-transform duration-300 ease-out active:scale-90">
+                    <Plus size={22} strokeWidth={2.8} />
                   </span>
                 </button>
               </li>
@@ -220,7 +220,7 @@ export function BottomNav({ onAdd }: { onAdd: () => void }) {
                 draggable={false}
               >
                 <Icon
-                  size={24}
+                  size={26}
                   fill={active ? "currentColor" : "none"}
                   strokeWidth={active ? 1.6 : 1.8}
                   className={active ? "text-foreground" : "text-muted-foreground"}
