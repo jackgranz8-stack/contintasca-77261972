@@ -11,6 +11,7 @@ import type { ReactNode } from "react";
 import { toast } from "sonner";
 import { db } from "@/integrations/external/client";
 import { loadRemoteState, persistDiff, wipeRemote } from "./remote";
+import { saveOfflineCache, loadOfflineCache, clearOfflineCache } from "./offlineCache";
 import {
   initialState,
   type AppState,
@@ -21,6 +22,7 @@ import {
 import { currentMonth, monthKey, shiftMonth, uid } from "./format";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const sameState = (a: AppState, b: AppState) => JSON.stringify(a) === JSON.stringify(b);
 
 type Account = { id: string; email: string | null } | null;
 
@@ -111,21 +113,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         const remote = await loadRemoteState(userId);
-        const { next, created } = runRecurring(remote);
-        baseline.current = remote;
-        setState(next);
-        setLoaded(true);
-        setLoadError(false);
-        if (created > 0) {
-          setTimeout(
-            () =>
-              toast.success(
-                created === 1
-                  ? "1 spesa ricorrente registrata"
-                  : `${created} spese ricorrenti registrate`,
-              ),
-            400,
-          );
+
+        // C'era una modifica fatta offline mai arrivata al server (l'app è
+        // stata chiusa del tutto prima che la rete tornasse, e ora si riapre
+        // già connessa)? Senza questo controllo verrebbe sovrascritta in
+        // silenzio dal solo stato del server, perdendola per sempre.
+        const cached = loadOfflineCache(userId);
+        const pendingEdits = cached && !sameState(cached.baseline, cached.state);
+
+        if (pendingEdits) {
+          baseline.current = remote;
+          setState(cached.state);
+          setLoaded(true);
+          setLoadError(false);
+          try {
+            // Rete appena verificata funzionante: si prova a sincronizzare
+            // subito, invece di aspettare un evento "online" che non
+            // arriverà più (la connessione non sta "tornando", c'è già).
+            await persistDiff(remote, cached.state, userId);
+            baseline.current = cached.state;
+            saveOfflineCache(userId, cached.state, cached.state);
+            toast.success("Modifiche fatte offline sincronizzate");
+          } catch {
+            pending.current = cached.state;
+            setOfflinePending(true);
+            saveOfflineCache(userId, remote, cached.state);
+          }
+        } else {
+          const { next, created } = runRecurring(remote);
+          baseline.current = remote;
+          setState(next);
+          setLoaded(true);
+          setLoadError(false);
+          // Copia locale aggiornata: è quella che permetterà di aprire
+          // l'app anche senza rete la prossima volta.
+          saveOfflineCache(userId, remote, next);
+          if (created > 0) {
+            setTimeout(
+              () =>
+                toast.success(
+                  created === 1
+                    ? "1 spesa ricorrente registrata"
+                    : `${created} spese ricorrenti registrate`,
+                ),
+              400,
+            );
+          }
         }
         break;
       } catch {
@@ -136,12 +169,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
           await sleep(600 * attempt);
           continue;
         }
-        // Non tocchiamo lo stato locale né lo confermiamo come "vuoto": potrebbe
-        // essere solo un problema di rete temporaneo, non un account senza dati.
-        // baseline resta null, quindi nessuna sincronizzazione può scattare finché
-        // non riusciamo a leggere davvero cosa c'è sul database.
-        setLoaded(true);
-        setLoadError(true);
+        // Nessuna rete raggiungibile dopo tre tentativi: invece di bloccarsi
+        // sulla schermata di errore, si prova a ripartire dall'ultima copia
+        // salvata sul telefono. Se conteneva modifiche non ancora
+        // sincronizzate (l'app era stata chiusa offline con qualcosa in
+        // sospeso), quelle restano in coda e ripartono da sole non appena
+        // torna la rete (vedi l'effetto "online" più sotto).
+        const cached = loadOfflineCache(userId);
+        if (cached) {
+          baseline.current = cached.baseline;
+          setState(cached.state);
+          setLoaded(true);
+          setLoadError(false);
+          if (!sameState(cached.baseline, cached.state)) {
+            pending.current = cached.state;
+            setOfflinePending(true);
+          }
+        } else {
+          // Primo utilizzo mai riuscito su questo telefono: senza una copia
+          // precedente non c'è nulla da mostrare, serve davvero la rete.
+          setLoaded(true);
+          setLoadError(true);
+        }
       }
     }
     setSyncing(false);
@@ -199,6 +248,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setLoaded(false);
         void loadFor(user.id);
       } else {
+        if (accountRef.current) clearOfflineCache(accountRef.current.id);
         accountRef.current = null;
         baseline.current = null;
         pending.current = null;
@@ -226,6 +276,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const prev = baseline.current;
     if (!loaded || !acc || !prev || prev === state) return;
     const attempted = state;
+    // Salvata subito, prima ancora di sapere se il salvataggio su Supabase
+    // andrà a buon fine: se l'app viene chiusa (o il telefono va offline)
+    // proprio in questo istante, la modifica non si perde comunque.
+    saveOfflineCache(acc.id, prev, attempted);
     setSyncing(true);
     queue.current = queue.current
       .then(async () => {
@@ -251,6 +305,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         baseline.current = attempted;
         pending.current = null;
         setOfflinePending(false);
+        saveOfflineCache(acc.id, attempted, attempted);
       })
       .catch(() => {
         if (typeof navigator !== "undefined" && !navigator.onLine) {
@@ -278,6 +333,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           baseline.current = attempted;
           pending.current = null;
           setOfflinePending(false);
+          saveOfflineCache(acc.id, attempted, attempted);
           toast.success("Connessione tornata: modifiche sincronizzate");
         })
         .catch(() => {
@@ -293,6 +349,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     await db.auth.signOut();
+    if (accountRef.current) clearOfflineCache(accountRef.current.id);
     accountRef.current = null;
     baseline.current = null;
     pending.current = null;
@@ -353,6 +410,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const acc = accountRef.current;
         if (acc) {
           setSyncing(true);
+          clearOfflineCache(acc.id);
           queue.current = queue.current
             .then(() => wipeRemote(acc.id))
             .catch(() => {
