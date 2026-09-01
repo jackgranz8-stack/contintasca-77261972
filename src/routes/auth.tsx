@@ -31,6 +31,16 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [mostraPassword, setMostraPassword] = useState(false);
+  const [maiusc, setMaiusc] = useState(false);
+
+  // Il tasto MAIUSC bloccato è la causa più comune di "password errata":
+  // lo rileviamo dall'evento della tastiera (funziona su computer; sui
+  // telefoni non esiste e semplicemente non compare nulla).
+  const rilevaMaiusc = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (typeof e.getModifierState !== "function") return;
+    setMaiusc(e.getModifierState("CapsLock"));
+  };
 
   useEffect(() => {
     void db.auth.getSession().then(({ data }) => {
