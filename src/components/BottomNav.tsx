@@ -16,7 +16,6 @@ export function BottomNav() {
   const draggingRef = useRef(false);
   const dragIndexRef = useRef<number | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [pressed, setPressed] = useState(false);
 
   const activeIndex = items.findIndex(({ to }) =>
     to === "/" ? pathname === "/" : pathname.startsWith(to),
@@ -41,7 +40,6 @@ export function BottomNav() {
   const handlePointerDown = (e: React.PointerEvent<HTMLUListElement>) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     draggingRef.current = true;
-    setPressed(true);
     trackRef.current?.setPointerCapture(e.pointerId);
     const idx = indexFromX(e.clientX);
     dragIndexRef.current = idx;
@@ -63,7 +61,6 @@ export function BottomNav() {
   const endDrag = () => {
     if (!draggingRef.current) return;
     draggingRef.current = false;
-    setPressed(false);
     if (dragIndexRef.current !== null) goTo(dragIndexRef.current);
     dragIndexRef.current = null;
     setDragIndex(null);
@@ -81,30 +78,31 @@ export function BottomNav() {
     return () => window.clearTimeout(timer);
   }, [shownIndex]);
 
+  // Barra flottante arrotondata in stile Instagram (quella sopra i Reel):
+  // quasi tutta larghezza (piccoli margini a sinistra/destra, non centrata
+  // stretta), angoli molto arrotondati, vetro smerigliato semi-trasparente,
+  // una piccola distanza dal bordo vero dello schermo invece di stare a
+  // filo, e un'ombra morbida al posto di un bordo visibile.
   return (
-    <nav
-      className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-5 pb-[max(env(safe-area-inset-bottom),16px)]"
-      style={{ willChange: "transform" }}
+    <div
+      className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-2.5"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 10px)" }}
     >
-      <div className="relative w-full max-w-[320px]">
-        {/* Solo questo sfondo si schiaccia leggermente al tocco: icone e indicatore restano fissi */}
-        <div
-          aria-hidden
-          className={`float-shadow pointer-events-none absolute -inset-1 rounded-full border border-border/60 bg-popover/70 backdrop-blur-2xl transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
-            pressed ? "scale-x-[1.035] scale-y-[0.88]" : "scale-100"
-          }`}
-        />
+      <nav
+        className="float-shadow w-full rounded-[28px] bg-popover/80 backdrop-blur-2xl"
+        style={{ willChange: "transform" }}
+      >
         <ul
           ref={trackRef}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
-          className="relative z-10 flex touch-none items-center py-2 select-none"
+          className="relative flex touch-none items-center select-none"
         >
           <span
             className={`pointer-events-none absolute rounded-full bg-foreground/10 transition-[left,top,bottom] duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
-              moving ? "-top-1 -bottom-1" : "top-1.5 bottom-1.5"
+              moving ? "top-1 bottom-1" : "top-2.5 bottom-2.5"
             }`}
             style={{
               width: `${100 / items.length}%`,
@@ -121,11 +119,11 @@ export function BottomNav() {
                   onClick={(e) => {
                     if (draggingRef.current) e.preventDefault();
                   }}
-                  className="flex touch-none items-center justify-center py-2 [-webkit-touch-callout:none]"
+                  className="flex touch-none items-center justify-center py-3 [-webkit-touch-callout:none]"
                   draggable={false}
                 >
                   <Icon
-                    size={22}
+                    size={24}
                     fill={active ? "currentColor" : "none"}
                     strokeWidth={active ? 1.6 : 1.8}
                     className={active ? "text-foreground" : "text-muted-foreground"}
@@ -135,7 +133,7 @@ export function BottomNav() {
             );
           })}
         </ul>
-      </div>
-    </nav>
+      </nav>
+    </div>
   );
 }
