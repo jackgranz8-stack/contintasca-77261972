@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { KeyRound, Loader2 } from "lucide-react";
+import { ArrowBigUp, Eye, EyeOff, KeyRound, Loader2 } from "lucide-react";
 import { db } from "@/integrations/external/client";
 
 export const Route = createFileRoute("/reset-password")({
@@ -30,6 +30,13 @@ function ResetPasswordPage() {
   const [conferma, setConferma] = useState("");
   const [busy, setBusy] = useState(false);
   const [pronto, setPronto] = useState(false);
+  const [mostra, setMostra] = useState(false);
+  const [maiusc, setMaiusc] = useState(false);
+
+  const rilevaMaiusc = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (typeof e.getModifierState !== "function") return;
+    setMaiusc(e.getModifierState("CapsLock"));
+  };
 
   useEffect(() => {
     // Se il link è scaduto o già usato, Supabase reindirizza qui con un
@@ -90,22 +97,43 @@ function ResetPasswordPage() {
       </p>
 
       <form onSubmit={submit} className="mt-8 space-y-3">
+        <div className="relative">
+          <input
+            type={mostra ? "text" : "password"}
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyUp={rilevaMaiusc}
+            onKeyDown={rilevaMaiusc}
+            placeholder="Nuova password"
+            className="w-full rounded-2xl border border-border bg-surface py-4 pr-14 pl-4 text-base outline-none placeholder:text-muted-foreground"
+          />
+          <button
+            type="button"
+            aria-label={mostra ? "Nascondi password" : "Mostra password"}
+            aria-pressed={mostra}
+            onClick={() => setMostra((v) => !v)}
+            className="absolute top-1/2 right-2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl text-muted-foreground"
+          >
+            {mostra ? <EyeOff size={20} /> : <Eye size={20} />}
+          </button>
+        </div>
         <input
-          type="password"
-          autoComplete="new-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Nuova password"
-          className="w-full rounded-2xl border border-border bg-surface px-4 py-4 text-base outline-none placeholder:text-muted-foreground"
-        />
-        <input
-          type="password"
+          type={mostra ? "text" : "password"}
           autoComplete="new-password"
           value={conferma}
           onChange={(e) => setConferma(e.target.value)}
+          onKeyUp={rilevaMaiusc}
+          onKeyDown={rilevaMaiusc}
           placeholder="Conferma password"
           className="w-full rounded-2xl border border-border bg-surface px-4 py-4 text-base outline-none placeholder:text-muted-foreground"
         />
+        {maiusc && (
+          <p className="flex items-center gap-2 px-1 text-xs text-warn">
+            <ArrowBigUp size={16} /> Blocco maiuscole attivo
+          </p>
+        )}
+
         <button
           type="submit"
           disabled={busy || !pronto}

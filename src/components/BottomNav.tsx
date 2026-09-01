@@ -169,15 +169,16 @@ export function BottomNav({ onAdd }: { onAdd: () => void }) {
         <span
           aria-hidden
           className={`pointer-events-none absolute transition-[left,top,bottom] duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
-            moving ? "top-1.5 bottom-1.5" : "top-2.5 bottom-2.5"
+            moving ? "top-0.5 bottom-0.5" : "top-1.5 bottom-1.5"
           }`}
           style={{ width: `${slotWidth}%`, left: `${slotWidth * shownIndex}%` }}
         >
           <span
-            className="mx-2 block h-full rounded-[20px]"
+            className="mx-1 block h-full rounded-[22px]"
             style={{ backgroundColor: "var(--nav-pill)" }}
           />
         </span>
+
 
         {slots.map((slot, i) => {
           if (slot.kind === "add") {
