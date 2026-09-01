@@ -147,7 +147,7 @@ export function Onboarding() {
       </div>
 
       <div
-        className="app-scroll flex-1 touch-pan-y"
+        className="flex-1 touch-pan-y overflow-y-auto"
         onPointerDown={onStepPointerDown}
         onPointerMove={onStepPointerMove}
         onPointerUp={onStepPointerUp}
