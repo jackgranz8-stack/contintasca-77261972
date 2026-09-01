@@ -2,35 +2,46 @@ import { useEffect } from "react";
 
 let locks = 0;
 let removeTouchBlock: (() => void) | null = null;
-let lockedScrollY = 0;
+let previous: { htmlOverflow: string; bodyOverflow: string } | null = null;
 
 /**
- * Blocca l'interazione con lo sfondo mentre un foglio (BottomSheet) è
- * aperto.
+ * Blocca lo scorrimento dello sfondo mentre una tendina (BottomSheet) è
+ * aperta.
  *
- * Prima questa funzione doveva alternare "position: fixed" sul body per
- * bloccarne lo scroll in modo affidabile su iOS Safari. Era proprio quel
- * cambio di layout — unito al ricalcolo della barra degli indirizzi di
- * Safari quando il body tornava "normale" alla chiusura del foglio — a
- * causare lo scatto visibile sugli elementi fissi (barra di navigazione,
- * FAB).
+ * PERCHÉ NON SI USA PIÙ "position: fixed" SUL BODY
+ * Il metodo classico per bloccare lo sfondo è mettere il body in
+ * "position: fixed" con uno scostamento pari alla posizione di scorrimento,
+ * e rimetterlo a posto alla chiusura. Funziona, ma ha un difetto grosso: nel
+ * momento in cui il body diventa (e smette di essere) "fisso", l'intera
+ * pagina viene ricostruita e la posizione di scorrimento va salvata e
+ * ripristinata a mano. Su iPhone questo produce lo scatto visibile della
+ * barra di navigazione all'apertura e alla chiusura della tendina, ed è
+ * anche il momento in cui la barra di Safari può decidere di riaprirsi,
+ * spostando il punto in cui la tendina "atterra".
  *
- * Su mobile la pagina resta legata al viewport reale di Safari. Quando si
- * apre un foglio congeliamo temporaneamente il body nella posizione corrente
- * e la ripristiniamo alla chiusura, evitando sia lo scroll dello sfondo sia
- * alterazioni permanenti all'altezza della pagina.
+ * COSA SI FA INVECE
+ * Niente viene spostato: si dichiara solo che pagina e corpo non scorrono
+ * più ("overflow: hidden"), lasciando tutto esattamente dov'è. La posizione
+ * di scorrimento non va salvata né ripristinata, perché non viene mai persa.
+ * Risultato: la barra di navigazione resta ferma al suo posto e la tendina
+ * sale sempre dallo stesso punto, il bordo inferiore visibile dello schermo.
+ *
+ * Su iPhone "overflow: hidden" da solo non basta a fermare il trascinamento
+ * col dito: a quello pensa il blocco diretto di "touchmove" qui sotto. Gli
+ * elementi marcati con [data-scroll-lock-allow] (il contenuto della tendina)
+ * restano scorribili normalmente.
  */
 export function useScrollLock(active: boolean) {
   useEffect(() => {
     if (!active || typeof document === "undefined") return;
 
+    const html = document.documentElement;
+    const body = document.body;
+
     if (locks === 0) {
-      lockedScrollY = window.scrollY;
-      document.body.style.position = "fixed";
-      document.body.style.top = `-${lockedScrollY}px`;
-      document.body.style.left = "0";
-      document.body.style.right = "0";
-      document.body.style.width = "100%";
+      previous = { htmlOverflow: html.style.overflow, bodyOverflow: body.style.overflow };
+      html.style.overflow = "hidden";
+      body.style.overflow = "hidden";
     }
     locks += 1;
 
@@ -47,12 +58,9 @@ export function useScrollLock(active: boolean) {
     return () => {
       locks = Math.max(0, locks - 1);
       if (locks === 0) {
-        document.body.style.position = "";
-        document.body.style.top = "";
-        document.body.style.left = "";
-        document.body.style.right = "";
-        document.body.style.width = "";
-        window.scrollTo(0, lockedScrollY);
+        html.style.overflow = previous?.htmlOverflow ?? "";
+        body.style.overflow = previous?.bodyOverflow ?? "";
+        previous = null;
         removeTouchBlock?.();
         removeTouchBlock = null;
       }
