@@ -511,8 +511,9 @@
 /* Spazio in fondo alle pagine: barra di navigazione + margine di sicurezza
    del telefono + aria. Ricavato dalla stessa --nav-height della barra. */
 @utility pb-nav {
-  padding-bottom: calc(var(--nav-height) + var(--nav-lift) + 28px);
+  padding-bottom: calc(var(--nav-height) + var(--nav-lift) + 12px);
 }
+
 
 /*
  * BARRA DI NAVIGAZIONE — "nuvola" flottante stile Instagram / Apple

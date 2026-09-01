@@ -122,7 +122,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {/* safe-x: margini laterali che diventano più larghi in orizzontale
               sugli iPhone con la tacca, così il contenuto non ci finisce sotto.
               pb-nav: spazio in fondo pari a barra + barra gesti + aria. */}
-          <div className="safe-x pb-nav mx-auto w-full max-w-[430px] pt-[calc(env(safe-area-inset-top,0px)+28px)]">
+          <div className="safe-x pb-nav mx-auto w-full max-w-[430px] pt-[calc(env(safe-area-inset-top,0px)+8px)]">
             {children}
           </div>
         </div>
