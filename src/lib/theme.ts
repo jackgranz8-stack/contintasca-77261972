@@ -24,7 +24,7 @@ export function applyTheme(pref: ThemePreference) {
   document.documentElement.classList.toggle("light", isLight);
   document.documentElement.classList.toggle("dark", isDark);
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", isLight ? "#F6FAF6" : "#0A0F0C");
+  if (meta) meta.setAttribute("content", isLight ? "#F2F4F2" : "#0A0F0C");
 }
 
 /** Salva la preferenza sul dispositivo e la applica subito. */
