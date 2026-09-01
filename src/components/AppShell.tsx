@@ -1,4 +1,12 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { useApp } from "@/lib/store";
@@ -12,19 +20,47 @@ import { FaceIdGate } from "./FaceIdGate";
 
 const FAB_SIZE = 56;
 const FAB_MARGIN = 16;
-const FAB_BOTTOM_GAP = 84;
+/** Aria fra il pulsante "+" e il bordo superiore della barra di navigazione. */
+const FAB_GAP_OVER_NAV = 14;
 const FAB_TOP_GAP = 12;
+const NAV_HEIGHT_FALLBACK = 58;
 
-function fabRestPosition(corner: FabCorner, safeArea: { top: number; bottom: number }) {
-  const w = typeof window !== "undefined" ? window.innerWidth : 0;
-  const h = typeof window !== "undefined" ? window.innerHeight : 0;
-  if (corner === "bottom-left") {
-    return { x: FAB_MARGIN, y: h - FAB_BOTTOM_GAP - safeArea.bottom - FAB_SIZE };
-  }
-  if (corner === "top-right") {
-    return { x: w - FAB_MARGIN - FAB_SIZE, y: FAB_TOP_GAP + safeArea.top };
-  }
-  return { x: w - FAB_MARGIN - FAB_SIZE, y: h - FAB_BOTTOM_GAP - safeArea.bottom - FAB_SIZE };
+/**
+ * Altezza della barra di navigazione, letta dalla variabile CSS --nav-height
+ * (definita in styles.css). Così barra, spazio in fondo alle pagine e
+ * posizione del "+" restano allineati da soli: si cambia il numero in un
+ * punto solo e si sposta tutto insieme.
+ */
+function readNavHeight(): number {
+  if (typeof document === "undefined") return NAV_HEIGHT_FALLBACK;
+  const raw = getComputedStyle(document.documentElement).getPropertyValue("--nav-height");
+  const n = parseFloat(raw);
+  return Number.isFinite(n) && n > 0 ? n : NAV_HEIGHT_FALLBACK;
+}
+
+type Box = { x: number; y: number; w: number; h: number };
+
+/**
+ * Posizione di riposo del "+" nei tre angoli disponibili.
+ *
+ * Le misure vengono dalla CORNICE dell'app (.app-frame), non dalla finestra
+ * del browser. Sul telefono le due coincidono, ma su tablet/computer la
+ * cornice è un pannello centrato largo 430px: usando la finestra, il
+ * pulsante finiva fuori dal pannello e spariva. Ricalcolando sulla cornice
+ * funziona ovunque, e si riposiziona da solo anche quando si ruota lo
+ * schermo o si ridimensiona la finestra.
+ */
+function fabRestPosition(
+  corner: FabCorner,
+  box: Box,
+  safeArea: { top: number; bottom: number },
+  navHeight: number,
+) {
+  const bottomY = box.h - safeArea.bottom - navHeight - FAB_GAP_OVER_NAV - FAB_SIZE;
+  if (corner === "bottom-left") return { x: FAB_MARGIN, y: bottomY };
+  if (corner === "top-right")
+    return { x: box.w - FAB_MARGIN - FAB_SIZE, y: FAB_TOP_GAP + safeArea.top };
+  return { x: box.w - FAB_MARGIN - FAB_SIZE, y: bottomY };
 }
 
 const UiContext = createContext<{ openAdd: () => void }>({ openAdd: () => {} });
@@ -39,10 +75,18 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const [fabCorner, setFabCorner] = useState<FabCorner>(() => getStoredFabCorner());
   const [safeArea, setSafeArea] = useState({ top: 0, bottom: 0 });
+  const [navHeight, setNavHeight] = useState(NAV_HEIGHT_FALLBACK);
+  const [box, setBox] = useState<Box>(() => ({
+    x: 0,
+    y: 0,
+    w: typeof window !== "undefined" ? window.innerWidth : 390,
+    h: typeof window !== "undefined" ? window.innerHeight : 844,
+  }));
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
   const [fabPressed, setFabPressed] = useState(false);
   const draggingRef = useRef(false);
   const movedRef = useRef(false);
+  const frameElRef = useRef<HTMLDivElement | null>(null);
   const [bannerVisible, setBannerVisible] = useState(offlinePending);
   const [bannerIn, setBannerIn] = useState(false);
 
@@ -58,9 +102,39 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [offlinePending]);
   const startRef = useRef({ x: 0, y: 0, offsetX: 0, offsetY: 0 });
 
-  useEffect(() => {
+  const measure = useCallback(() => {
+    const rect = frameElRef.current?.getBoundingClientRect();
+    setBox({
+      x: rect?.left ?? 0,
+      y: rect?.top ?? 0,
+      w: rect?.width ?? (typeof window !== "undefined" ? window.innerWidth : 390),
+      h: rect?.height ?? (typeof window !== "undefined" ? window.innerHeight : 844),
+    });
     setSafeArea(readSafeArea());
+    setNavHeight(readNavHeight());
   }, []);
+
+  // Ref "a funzione": appena la cornice compare nel DOM la misuriamo, senza
+  // aspettare un altro giro di rendering.
+  const attachFrame = useCallback(
+    (el: HTMLDivElement | null) => {
+      frameElRef.current = el;
+      if (el) measure();
+    },
+    [measure],
+  );
+
+  // Rotazione dello schermo, apertura di un telefono pieghevole, cambio di
+  // dimensione della finestra sul computer: tutte le misure si rifanno.
+  useEffect(() => {
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("orientationchange", measure);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("orientationchange", measure);
+    };
+  }, [measure]);
 
   const onFabPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
@@ -83,9 +157,16 @@ export function AppShell({ children }: { children: ReactNode }) {
     const dy = e.clientY - startRef.current.y;
     if (!movedRef.current && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) movedRef.current = true;
     if (!movedRef.current) return;
+    // Coordinate relative alla cornice (vedi fabRestPosition), e trattenute
+    // dentro i suoi bordi: il "+" non può più essere trascinato fuori.
+    const rawX = e.clientX - startRef.current.offsetX - box.x;
+    const rawY = e.clientY - startRef.current.offsetY - box.y;
     setDragPos({
-      x: e.clientX - startRef.current.offsetX,
-      y: e.clientY - startRef.current.offsetY,
+      x: Math.min(box.w - FAB_MARGIN - FAB_SIZE, Math.max(FAB_MARGIN, rawX)),
+      y: Math.min(
+        box.h - safeArea.bottom - FAB_MARGIN - FAB_SIZE,
+        Math.max(safeArea.top + FAB_TOP_GAP, rawY),
+      ),
     });
   };
 
@@ -99,7 +180,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       let best: FabCorner = "bottom-right";
       let bestDist = Infinity;
       for (const c of corners) {
-        const p = fabRestPosition(c, safeArea);
+        const p = fabRestPosition(c, box, safeArea, navHeight);
         const dist = Math.hypot(
           p.x + FAB_SIZE / 2 - dropCenter.x,
           p.y + FAB_SIZE / 2 - dropCenter.y,
@@ -182,19 +263,25 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const app = (
     <UiContext.Provider value={{ openAdd: () => setAddOpen(true) }}>
-      <div className="app-frame">
+      <div className="app-frame" ref={attachFrame}>
         <div className="app-scroll">
-          <div className="mx-auto w-full max-w-[430px] px-4 pt-[calc(env(safe-area-inset-top,0px)+28px)] pb-32">
+          {/* safe-x: margini laterali che diventano più larghi in orizzontale
+              sugli iPhone con la tacca, così il contenuto non ci finisce sotto.
+              pb-nav: spazio in fondo pari a barra + barra gesti + aria. */}
+          <div className="safe-x pb-nav mx-auto w-full max-w-[430px] pt-[calc(env(safe-area-inset-top,0px)+28px)]">
             {children}
           </div>
         </div>
 
         {bannerVisible && (
           <div
-            className={`fixed inset-x-0 top-0 z-50 bg-warn px-4 py-2 text-center text-xs font-medium text-background transition-transform duration-300 ease-out ${
+            className={`fixed inset-x-0 top-0 z-50 bg-warn px-4 pb-2 text-center text-xs font-medium text-background transition-transform duration-300 ease-out ${
               bannerIn ? "translate-y-0" : "-translate-y-full"
             }`}
-            style={{ willChange: "transform" }}
+            style={{
+              paddingTop: "calc(env(safe-area-inset-top, 0px) + 0.5rem)",
+              willChange: "transform",
+            }}
           >
             Sei offline: le modifiche sono salvate sul telefono e si sincronizzano da sole al
             ritorno della connessione
@@ -202,7 +289,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
 
         {(() => {
-          const pos = dragPos ?? fabRestPosition(fabCorner, safeArea);
+          const pos = dragPos ?? fabRestPosition(fabCorner, box, safeArea, navHeight);
           return (
             <>
               {dragPos && (

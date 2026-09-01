@@ -9,6 +9,28 @@ const items = [
   { to: "/profilo", label: "Profilo", icon: User },
 ] as const;
 
+/** Vibrazione brevissima, solo dove il telefono la supporta (Android). */
+function tap(ms: number) {
+  if (typeof navigator === "undefined") return;
+  if ("vibrate" in navigator) navigator.vibrate?.(ms);
+}
+
+/**
+ * Barra di navigazione in stile Instagram / tab bar iOS.
+ *
+ * Rispetto alla versione precedente (pillola flottante staccata dal bordo):
+ * - occupa tutta la larghezza e si appoggia al bordo inferiore vero dello
+ *   schermo, con il vetro che prosegue sotto la barra gesti del telefono;
+ * - è più alta e ha le etichette sotto le icone, come su iPhone: si capisce
+ *   dove si sta andando senza dover interpretare l'icona;
+ * - resta identica nel comportamento "fluido": si può scorrere il dito sulla
+ *   barra per passare da una sezione all'altra, l'indicatore insegue il dito
+ *   con il rimbalzo elastico e si allunga mentre si muove.
+ *
+ * Tutto il "vetro" (sfondo, sfocatura, riga di separazione, colore
+ * dell'indicatore) vive in styles.css nelle classi .app-nav / .app-nav-track,
+ * così cambia da solo tra tema chiaro e scuro.
+ */
 export function BottomNav() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
@@ -52,16 +74,17 @@ export function BottomNav() {
     if (idx !== null && idx !== dragIndexRef.current) {
       dragIndexRef.current = idx;
       setDragIndex(idx);
-      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-        navigator.vibrate?.(3);
-      }
+      tap(3);
     }
   };
 
   const endDrag = () => {
     if (!draggingRef.current) return;
     draggingRef.current = false;
-    if (dragIndexRef.current !== null) goTo(dragIndexRef.current);
+    if (dragIndexRef.current !== null) {
+      if (dragIndexRef.current !== activeIndex) tap(8);
+      goTo(dragIndexRef.current);
+    }
     dragIndexRef.current = null;
     setDragIndex(null);
   };
@@ -78,62 +101,68 @@ export function BottomNav() {
     return () => window.clearTimeout(timer);
   }, [shownIndex]);
 
-  // Barra flottante arrotondata in stile Instagram (quella sopra i Reel):
-  // quasi tutta larghezza (piccoli margini a sinistra/destra, non centrata
-  // stretta), angoli molto arrotondati, vetro smerigliato semi-trasparente,
-  // una piccola distanza dal bordo vero dello schermo invece di stare a
-  // filo, e un'ombra morbida al posto di un bordo visibile.
+  const slot = 100 / items.length;
+
   return (
-    <div
-      className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-2.5"
-      style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 10px)" }}
-    >
-      <nav
-        className="float-shadow w-full rounded-[28px] bg-popover/80 backdrop-blur-2xl"
-        style={{ willChange: "transform" }}
+    <nav className="app-nav" aria-label="Navigazione principale">
+      <ul
+        ref={trackRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        className="app-nav-track"
       >
-        <ul
-          ref={trackRef}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={endDrag}
-          onPointerCancel={endDrag}
-          className="relative flex touch-none items-center select-none"
+        {/* Indicatore che scorre sotto l'icona attiva. Mentre si muove si
+            allunga leggermente in verticale (effetto elastico), poi si
+            riassesta: è lo stesso comportamento di prima. */}
+        <span
+          aria-hidden
+          className={`pointer-events-none absolute transition-[left,top,bottom] duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+            moving ? "top-1 bottom-1" : "top-[7px] bottom-[7px]"
+          }`}
+          style={{ width: `${slot}%`, left: `${slot * shownIndex}%` }}
         >
           <span
-            className={`pointer-events-none absolute rounded-full bg-foreground/10 transition-[left,top,bottom] duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
-              moving ? "top-1 bottom-1" : "top-2.5 bottom-2.5"
-            }`}
-            style={{
-              width: `${100 / items.length}%`,
-              left: `${(100 / items.length) * shownIndex}%`,
-            }}
+            className="mx-2.5 block h-full rounded-[18px]"
+            style={{ backgroundColor: "var(--nav-pill)" }}
           />
-          {items.map(({ to, label, icon: Icon }, i) => {
-            const active = i === shownIndex;
-            return (
-              <li key={to} className="relative z-10 flex-1">
-                <Link
-                  to={to}
-                  aria-label={label}
-                  onClick={(e) => {
-                    if (draggingRef.current) e.preventDefault();
-                  }}
-                  className="flex touch-none items-center justify-center py-3 [-webkit-touch-callout:none]"
-                  draggable={false}
+        </span>
+
+        {items.map(({ to, label, icon: Icon }, i) => {
+          const active = i === shownIndex;
+          return (
+            <li key={to} className="relative z-10 flex-1">
+              <Link
+                to={to}
+                aria-label={label}
+                aria-current={active ? "page" : undefined}
+                onClick={(e) => {
+                  if (draggingRef.current) e.preventDefault();
+                }}
+                className={`flex h-full touch-none flex-col items-center justify-center gap-[3px] transition-transform duration-300 ease-out [-webkit-touch-callout:none] ${
+                  active && dragIndex !== null ? "scale-[1.06]" : "scale-100"
+                }`}
+                draggable={false}
+              >
+                <Icon
+                  size={23}
+                  fill={active ? "currentColor" : "none"}
+                  strokeWidth={active ? 1.6 : 1.8}
+                  className={active ? "text-foreground" : "text-muted-foreground"}
+                />
+                <span
+                  className={`text-[10px] leading-none tracking-tight ${
+                    active ? "font-semibold text-foreground" : "font-medium text-muted-foreground"
+                  }`}
                 >
-                  <Icon
-                    size={24}
-                    fill={active ? "currentColor" : "none"}
-                    strokeWidth={active ? 1.6 : 1.8}
-                    className={active ? "text-foreground" : "text-muted-foreground"}
-                  />
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
-    </div>
+                  {label}
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
   );
 }
