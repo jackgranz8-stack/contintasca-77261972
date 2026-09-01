@@ -30,6 +30,13 @@ function ResetPasswordPage() {
   const [conferma, setConferma] = useState("");
   const [busy, setBusy] = useState(false);
   const [pronto, setPronto] = useState(false);
+  const [mostra, setMostra] = useState(false);
+  const [maiusc, setMaiusc] = useState(false);
+
+  const rilevaMaiusc = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (typeof e.getModifierState !== "function") return;
+    setMaiusc(e.getModifierState("CapsLock"));
+  };
 
   useEffect(() => {
     // Se il link è scaduto o già usato, Supabase reindirizza qui con un
