@@ -19,16 +19,16 @@ function NotFoundComponent() {
     <div className="flex min-h-dvh items-center justify-center overflow-y-auto bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
+        <h2 className="mt-4 text-xl font-semibold text-foreground">Pagina non trovata</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          The page you're looking for doesn't exist or has been moved.
+          La pagina che cerchi non esiste o è stata spostata.
         </p>
         <div className="mt-6">
           <Link
             to="/"
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            Go home
+            Torna alla home
           </Link>
         </div>
       </div>
@@ -44,10 +44,10 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     <div className="flex min-h-dvh items-center justify-center overflow-y-auto bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
+          Questa pagina non si è caricata
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
+          Qualcosa è andato storto. Puoi riprovare a caricarla oppure tornare alla home.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
@@ -57,13 +57,13 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
             }}
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            Try again
+            Riprova
           </button>
           <a
             href="/"
             className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
-            Go home
+            Torna alla home
           </a>
         </div>
       </div>
@@ -82,13 +82,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "App per gestire spese personali e budget mensile, installabile sul tuo telefono. Dati sincronizzati in modo sicuro sul tuo account.",
       },
       { name: "theme-color", content: "#0A0F0C" },
+      // Dice al sistema che l'app conosce entrambi i temi: caselle, campi data
+      // e barre di scorrimento native seguono il tema invece di restare chiare.
+      { name: "color-scheme", content: "dark light" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
       { name: "apple-mobile-web-app-title", content: "Conti in Tasca" },
       {
         name: "viewport",
-        content: "width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1",
+        content:
+          "width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, interactive-widget=resizes-content",
       },
       { property: "og:title", content: "Conti in Tasca — Spese e budget mensile" },
       {
@@ -125,13 +129,15 @@ const THEME_INIT_SCRIPT = `
     var isDark = stored === "dark";
     if (isLight) document.documentElement.classList.add("light");
     if (isDark) document.documentElement.classList.add("dark");
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", isLight ? "#F2F4F2" : "#0A0F0C");
   } catch (e) {}
 })();
 `;
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="it">
       <head>
         <HeadContent />
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
