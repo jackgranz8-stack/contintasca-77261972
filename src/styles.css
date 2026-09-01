@@ -11,8 +11,12 @@
  * ".dark" = scuro, ".light" = chiaro. Se l'utente non ha scelto esplicitamente
  * (nessuna classe), segue l'impostazione di sistema del telefono via
  * prefers-color-scheme. Tutti i colori in oklch. Nessun colore hardcoded nei
- * componenti (eccetto BottomNav, che usa apposta le stesse variabili semantiche
- * per restare "vetro" coerente in entrambi i temi).
+ * componenti.
+ *
+ * ATTENZIONE ALLA MANUTENZIONE: la palette chiara compare in DUE blocchi
+ * identici (".light" e dentro "@media (prefers-color-scheme: light)"). Se
+ * cambi un colore chiaro, cambialo in tutti e due, altrimenti il tema
+ * "Automatico" e il tema "Chiaro" scelto a mano diventano diversi.
  */
 
 @theme inline {
@@ -51,6 +55,21 @@
 :root {
   --radius: 1.25rem;
 
+  /*
+   * Altezza della barra di navigazione, ESCLUSO il margine di sicurezza in
+   * basso (home indicator iPhone / barra gesti Android), che viene aggiunto
+   * a parte con env(safe-area-inset-bottom).
+   *
+   * Questa è la fonte unica della misura: la barra la usa per la propria
+   * altezza, il contenuto delle pagine per lo spazio da lasciare in fondo, e
+   * il pulsante "+" la legge da qui via JavaScript per posizionarsi appena
+   * sopra. Cambiando questo numero si sposta tutto insieme, senza toccare
+   * nient'altro.
+   */
+  --nav-height: 58px;
+
+  color-scheme: dark;
+
   --background: oklch(0.15 0.014 152);
   --foreground: oklch(0.97 0.008 150);
 
@@ -65,6 +84,9 @@
   --accent-lime: oklch(0.87 0.19 132);
   --primary: oklch(0.87 0.19 132);
   --primary-foreground: oklch(0.19 0.03 152);
+  /* Testo/icone sopra il riempimento lime (bottoni "lime-fill"): sempre scuro,
+     in entrambi i temi, perché il lime è un colore molto chiaro. */
+  --on-lime: oklch(0.19 0.03 152);
 
   --secondary: oklch(0.26 0.018 152);
   --secondary-foreground: oklch(0.97 0.008 150);
@@ -84,16 +106,16 @@
   --input: oklch(0.3 0.016 152);
   --ring: oklch(0.87 0.19 132);
 
-  --gradient-card: linear-gradient(
-    155deg,
-    oklch(0.24 0.02 152) 0%,
-    oklch(0.185 0.014 152) 100%
-  );
-  --gradient-hero: linear-gradient(
-    150deg,
-    oklch(0.31 0.06 145) 0%,
-    oklch(0.2 0.02 152) 70%
-  );
+  /* Sfondo esterno alla "cornice telefono" su tablet/computer. */
+  --backdrop: oklch(0.09 0.008 152);
+  /* Vetro della barra di navigazione. */
+  --nav-bg: oklch(0.17 0.014 152 / 0.7);
+  --nav-bg-solid: oklch(0.175 0.014 152);
+  --nav-border: oklch(0.97 0.008 150 / 0.1);
+  --nav-pill: oklch(0.97 0.008 150 / 0.11);
+
+  --gradient-card: linear-gradient(155deg, oklch(0.24 0.02 152) 0%, oklch(0.185 0.014 152) 100%);
+  --gradient-hero: linear-gradient(150deg, oklch(0.31 0.06 145) 0%, oklch(0.2 0.02 152) 70%);
   --gradient-lime: linear-gradient(135deg, oklch(0.9 0.19 135), oklch(0.79 0.18 148));
   --shadow-card: 0 12px 32px -18px oklch(0 0 0 / 0.9);
   --shadow-float: 0 14px 34px -10px oklch(0.87 0.19 132 / 0.45);
@@ -101,88 +123,110 @@
 
 /* Tema chiaro: scelta esplicita dell'utente ("Chiaro" nel profilo). */
 .light {
-  --background: oklch(0.98 0.006 150);
-  --foreground: oklch(0.19 0.02 152);
+  color-scheme: light;
 
-  --surface: oklch(0.955 0.008 150);
-  --surface-2: oklch(0.91 0.01 150);
+  --background: oklch(0.966 0.004 150);
+  --foreground: oklch(0.22 0.016 152);
 
-  --card: oklch(0.955 0.008 150);
-  --card-foreground: oklch(0.19 0.02 152);
-  --popover: oklch(0.985 0.005 150);
-  --popover-foreground: oklch(0.19 0.02 152);
+  --surface: oklch(1 0 0);
+  --surface-2: oklch(0.932 0.006 150);
 
-  --accent-lime: oklch(0.62 0.19 132);
-  --primary: oklch(0.62 0.19 132);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.22 0.016 152);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.22 0.016 152);
+
+  --accent-lime: oklch(0.52 0.16 145);
+  --primary: oklch(0.52 0.16 145);
   --primary-foreground: oklch(0.99 0.006 150);
+  --on-lime: oklch(0.24 0.05 148);
 
-  --secondary: oklch(0.91 0.01 150);
-  --secondary-foreground: oklch(0.19 0.02 152);
+  --secondary: oklch(0.932 0.006 150);
+  --secondary-foreground: oklch(0.22 0.016 152);
 
-  --muted: oklch(0.91 0.01 150);
-  --muted-foreground: oklch(0.48 0.015 150);
+  --muted: oklch(0.932 0.006 150);
+  --muted-foreground: oklch(0.49 0.012 150);
 
-  --accent: oklch(0.88 0.03 150);
-  --accent-foreground: oklch(0.19 0.02 152);
+  --accent: oklch(0.93 0.02 150);
+  --accent-foreground: oklch(0.22 0.016 152);
 
-  --warn: oklch(0.55 0.15 75);
-  --danger: oklch(0.58 0.2 25);
-  --destructive: oklch(0.58 0.2 25);
-  --destructive-foreground: oklch(0.98 0.005 150);
+  --warn: oklch(0.57 0.14 78);
+  --danger: oklch(0.55 0.2 27);
+  --destructive: oklch(0.55 0.2 27);
+  --destructive-foreground: oklch(0.99 0.005 150);
 
-  --border: oklch(0.88 0.012 150);
-  --input: oklch(0.88 0.012 150);
-  --ring: oklch(0.62 0.19 132);
+  --border: oklch(0.9 0.006 150);
+  --input: oklch(0.9 0.006 150);
+  --ring: oklch(0.52 0.16 145);
 
-  --gradient-card: linear-gradient(155deg, oklch(0.99 0.006 150) 0%, oklch(0.94 0.01 150) 100%);
-  --gradient-hero: linear-gradient(150deg, oklch(0.93 0.05 140) 0%, oklch(0.97 0.02 150) 70%);
-  --gradient-lime: linear-gradient(135deg, oklch(0.68 0.19 130), oklch(0.58 0.18 140));
-  --shadow-card: 0 12px 28px -16px oklch(0.2 0.02 150 / 0.16);
-  --shadow-float: 0 14px 30px -10px oklch(0.62 0.19 132 / 0.35);
+  --backdrop: oklch(0.9 0.006 150);
+  --nav-bg: oklch(1 0 0 / 0.72);
+  --nav-bg-solid: oklch(0.995 0.003 150);
+  --nav-border: oklch(0.22 0.016 152 / 0.1);
+  --nav-pill: oklch(0.22 0.016 152 / 0.07);
+
+  --gradient-card: linear-gradient(160deg, oklch(1 0 0) 0%, oklch(0.988 0.004 150) 100%);
+  --gradient-hero: linear-gradient(150deg, oklch(0.945 0.06 146) 0%, oklch(0.99 0.012 150) 72%);
+  --gradient-lime: linear-gradient(135deg, oklch(0.86 0.19 133) 0%, oklch(0.78 0.185 143) 100%);
+  --shadow-card:
+    0 1px 2px oklch(0.22 0.016 152 / 0.05), 0 10px 26px -14px oklch(0.22 0.016 152 / 0.16);
+  --shadow-float:
+    0 2px 6px oklch(0.22 0.016 152 / 0.08), 0 14px 30px -10px oklch(0.52 0.16 145 / 0.32);
 }
 
 /* Tema chiaro "automatico": si applica solo se l'utente non ha scelto
    esplicitamente né chiaro né scuro, e il telefono è impostato su chiaro. */
 @media (prefers-color-scheme: light) {
   :root:not(.dark):not(.light) {
-    --background: oklch(0.98 0.006 150);
-    --foreground: oklch(0.19 0.02 152);
+    color-scheme: light;
 
-    --surface: oklch(0.955 0.008 150);
-    --surface-2: oklch(0.91 0.01 150);
+    --background: oklch(0.966 0.004 150);
+    --foreground: oklch(0.22 0.016 152);
 
-    --card: oklch(0.955 0.008 150);
-    --card-foreground: oklch(0.19 0.02 152);
-    --popover: oklch(0.985 0.005 150);
-    --popover-foreground: oklch(0.19 0.02 152);
+    --surface: oklch(1 0 0);
+    --surface-2: oklch(0.932 0.006 150);
 
-    --accent-lime: oklch(0.62 0.19 132);
-    --primary: oklch(0.62 0.19 132);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.22 0.016 152);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.22 0.016 152);
+
+    --accent-lime: oklch(0.52 0.16 145);
+    --primary: oklch(0.52 0.16 145);
     --primary-foreground: oklch(0.99 0.006 150);
+    --on-lime: oklch(0.24 0.05 148);
 
-    --secondary: oklch(0.91 0.01 150);
-    --secondary-foreground: oklch(0.19 0.02 152);
+    --secondary: oklch(0.932 0.006 150);
+    --secondary-foreground: oklch(0.22 0.016 152);
 
-    --muted: oklch(0.91 0.01 150);
-    --muted-foreground: oklch(0.48 0.015 150);
+    --muted: oklch(0.932 0.006 150);
+    --muted-foreground: oklch(0.49 0.012 150);
 
-    --accent: oklch(0.88 0.03 150);
-    --accent-foreground: oklch(0.19 0.02 152);
+    --accent: oklch(0.93 0.02 150);
+    --accent-foreground: oklch(0.22 0.016 152);
 
-    --warn: oklch(0.55 0.15 75);
-    --danger: oklch(0.58 0.2 25);
-    --destructive: oklch(0.58 0.2 25);
-    --destructive-foreground: oklch(0.98 0.005 150);
+    --warn: oklch(0.57 0.14 78);
+    --danger: oklch(0.55 0.2 27);
+    --destructive: oklch(0.55 0.2 27);
+    --destructive-foreground: oklch(0.99 0.005 150);
 
-    --border: oklch(0.88 0.012 150);
-    --input: oklch(0.88 0.012 150);
-    --ring: oklch(0.62 0.19 132);
+    --border: oklch(0.9 0.006 150);
+    --input: oklch(0.9 0.006 150);
+    --ring: oklch(0.52 0.16 145);
 
-    --gradient-card: linear-gradient(155deg, oklch(0.99 0.006 150) 0%, oklch(0.94 0.01 150) 100%);
-    --gradient-hero: linear-gradient(150deg, oklch(0.93 0.05 140) 0%, oklch(0.97 0.02 150) 70%);
-    --gradient-lime: linear-gradient(135deg, oklch(0.68 0.19 130), oklch(0.58 0.18 140));
-    --shadow-card: 0 12px 28px -16px oklch(0.2 0.02 150 / 0.16);
-    --shadow-float: 0 14px 30px -10px oklch(0.62 0.19 132 / 0.35);
+    --backdrop: oklch(0.9 0.006 150);
+    --nav-bg: oklch(1 0 0 / 0.72);
+    --nav-bg-solid: oklch(0.995 0.003 150);
+    --nav-border: oklch(0.22 0.016 152 / 0.1);
+    --nav-pill: oklch(0.22 0.016 152 / 0.07);
+
+    --gradient-card: linear-gradient(160deg, oklch(1 0 0) 0%, oklch(0.988 0.004 150) 100%);
+    --gradient-hero: linear-gradient(150deg, oklch(0.945 0.06 146) 0%, oklch(0.99 0.012 150) 72%);
+    --gradient-lime: linear-gradient(135deg, oklch(0.86 0.19 133) 0%, oklch(0.78 0.185 143) 100%);
+    --shadow-card:
+      0 1px 2px oklch(0.22 0.016 152 / 0.05), 0 10px 26px -14px oklch(0.22 0.016 152 / 0.16);
+    --shadow-float:
+      0 2px 6px oklch(0.22 0.016 152 / 0.08), 0 14px 30px -10px oklch(0.52 0.16 145 / 0.32);
   }
 }
 
@@ -193,6 +237,7 @@
 
   html {
     -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
     background-color: var(--color-background);
     height: 100%;
     overflow: hidden;
@@ -243,6 +288,19 @@
     -webkit-appearance: none;
     margin: 0;
   }
+
+  /* Chi ha attivato "Riduci movimento" nelle impostazioni del telefono non
+     deve subire le animazioni elastiche (barra, foglio, swipe). */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 @utility card-surface {
@@ -261,7 +319,7 @@
 
 @utility lime-fill {
   background-image: var(--gradient-lime);
-  color: var(--primary-foreground);
+  color: var(--on-lime);
 }
 
 @utility float-shadow {
@@ -279,7 +337,7 @@
   }
 }
 
-/* Select nativo (rotella iOS) adattato al tema scuro */
+/* Select nativo (rotella iOS) adattato al tema */
 @utility native-select {
   appearance: none;
   -webkit-appearance: none;
@@ -302,7 +360,7 @@
  * .app-frame è il guscio esterno dell'app. Invece di dargli un'altezza
  * calcolata (100dvh, o una variabile misurata via JS) — che su iPhone, in
  * modalità "aggiunta alla schermata Home", in certi casi risultava più
- * corta dello schermo vero, lasciando una striscia nera in fondo — ora è
+ * corta dello schermo vero, lasciando una striscia nera in fondo — è
  * "position: fixed" con "inset: 0": i suoi quattro bordi sono ancorati
  * DIRETTAMENTE ai bordi veri dello schermo dal browser stesso, senza
  * nessun numero da calcolare che possa sbagliare. È la tecnica più
@@ -314,8 +372,9 @@
  * (qui: barra di navigazione, FAB, banner) annidato dentro un contenitore
  * flex con overflow:hidden può, in alcune situazioni, restare "agganciato"
  * ai bordi di QUEL contenitore invece che ai bordi reali dello schermo.
- * .app-scroll — l'UNICO elemento che scorre in tutta l'app — riempie
- * .app-frame con "position: absolute; inset: 0" invece che con flexbox.
+ * .app-scroll — l'UNICO elemento che scorre nelle pagine principali —
+ * riempie .app-frame con "position: absolute; inset: 0" invece che con
+ * flexbox.
  *
  * html e body restano bloccati (overflow: hidden, vedi sopra) e non si
  * muovono mai.
@@ -330,11 +389,97 @@
   inset: 0;
   overflow-y: auto;
   overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
 
 .app-scroll::-webkit-scrollbar {
   display: none;
+}
+
+/*
+ * Pagine "a sé stanti" che non hanno la barra di navigazione (accesso,
+ * reimposta password, onboarding): riempiono lo schermo esattamente come
+ * .app-frame, ma possono scorrere. Prima non potevano: su schermi corti
+ * (iPhone SE, iPhone mini) o con la tastiera aperta il pulsante in fondo
+ * finiva fuori dallo schermo e non c'era modo di raggiungerlo.
+ */
+.app-page {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.app-page::-webkit-scrollbar {
+  display: none;
+}
+
+/*
+ * Margini di sicurezza laterali. In verticale valgono 0 su tutti i telefoni;
+ * servono in orizzontale su iPhone con notch/Dynamic Island, dove una delle
+ * due sponde dello schermo è occupata dalla tacca e il contenuto altrimenti
+ * ci finisce sotto.
+ */
+@utility safe-x {
+  padding-left: max(1rem, env(safe-area-inset-left, 0px));
+  padding-right: max(1rem, env(safe-area-inset-right, 0px));
+}
+
+/* Spazio in fondo alle pagine: barra di navigazione + margine di sicurezza
+   del telefono + aria. Ricavato dalla stessa --nav-height della barra. */
+@utility pb-nav {
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 28px);
+}
+
+/*
+ * BARRA DI NAVIGAZIONE — stile Instagram / Apple
+ *
+ * A tutta larghezza e appoggiata al bordo inferiore vero dello schermo (non
+ * più una "pillola" flottante staccata), con:
+ * - vetro smerigliato: sfondo semi-trasparente + sfocatura di ciò che scorre
+ *   sotto, come la tab bar di iOS e di Instagram;
+ * - una riga di separazione sottilissima in alto (mezzo pixel su schermi
+ *   retina), invece di un bordo pieno;
+ * - il margine di sicurezza in basso incluso nella barra stessa, così il
+ *   vetro arriva fino al bordo dello schermo e passa SOTTO la barra gesti di
+ *   iPhone/Android invece di lasciare una striscia di sfondo.
+ */
+.app-nav {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 40;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  background-color: var(--nav-bg);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  backdrop-filter: blur(28px) saturate(180%);
+  box-shadow:
+    inset 0 0.5px 0 var(--nav-border),
+    0 -14px 34px -26px oklch(0 0 0 / 0.6);
+}
+
+/* Se il browser non sa sfocare (Android datati, Firefox con l'opzione
+   disattivata), lo sfondo diventa pieno: mai testo illeggibile. */
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .app-nav {
+    background-color: var(--nav-bg-solid);
+  }
+}
+
+.app-nav-track {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  height: var(--nav-height);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /*
@@ -351,24 +496,34 @@
  */
 @media (min-width: 640px) {
   body {
-    background-color: #000;
+    background-color: var(--backdrop);
   }
 
-  .app-frame {
+  .app-frame,
+  .app-page {
     position: relative;
     inset: auto;
     transform: translateZ(0);
     margin-inline: auto;
     margin-block: 2.5rem;
+    width: 100%;
     max-width: 430px;
-    height: auto;
-    max-height: calc(100dvh - 5rem);
-    display: flex;
-    flex-direction: column;
-    border-radius: 32px;
+    /* Altezza fissa invece di "auto": la cornice ha sempre la forma di un
+       telefono, anche quando la pagina dentro è corta. */
+    height: min(920px, calc(100dvh - 5rem));
+    border-radius: 40px;
     border: 1px solid var(--color-border);
     box-shadow: 0 40px 90px -20px oklch(0 0 0 / 0.6);
     background-color: var(--color-background);
+  }
+
+  /* Solo la cornice principale diventa un contenitore flex. Le pagine
+     autonome (accesso, onboarding) tengono il display deciso dal loro
+     componente, altrimenti l'onboarding perderebbe i pulsanti ancorati
+     in fondo. */
+  .app-frame {
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
   }
 
@@ -377,5 +532,10 @@
     inset: auto;
     flex: 1 1 auto;
     min-height: 0;
+  }
+
+  .app-nav {
+    border-bottom-left-radius: 39px;
+    border-bottom-right-radius: 39px;
   }
 }
