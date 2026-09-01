@@ -121,7 +121,7 @@
    * sopra. Cambiando questo numero si sposta tutto insieme, senza toccare
    * nient'altro.
    */
-  --nav-height: 56px;
+  --nav-height: 62px;
 
   /* Margini laterali della "nuvola" rispetto ai bordi dello schermo. */
   --nav-inset: 10px;
@@ -139,9 +139,9 @@
    * sicurezza pieno: la barra gesti del telefono passa NELLO spazio sotto la
    * nuvola, dove si vede il contenuto che scorre, esattamente come su
    * Instagram. Su iPhone (34px di margine) la nuvola resta sollevata 18px;
-   * su telefoni senza margine di sicurezza il minimo garantito è 10px.
+   * su telefoni senza margine di sicurezza il minimo garantito è 12px.
    */
-  --nav-lift: max(6px, calc(env(safe-area-inset-bottom, 0px) - 26px));
+  --nav-lift: max(12px, calc(env(safe-area-inset-bottom, 0px) - 16px));
 
   color-scheme: dark;
 
