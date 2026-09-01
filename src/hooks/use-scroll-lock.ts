@@ -2,6 +2,7 @@ import { useEffect } from "react";
 
 let locks = 0;
 let removeTouchBlock: (() => void) | null = null;
+let lockedScrollY = 0;
 
 /**
  * Blocca l'interazione con lo sfondo mentre un foglio (BottomSheet) è
@@ -14,25 +15,22 @@ let removeTouchBlock: (() => void) | null = null;
  * causare lo scatto visibile sugli elementi fissi (barra di navigazione,
  * FAB).
  *
- * Ora html e body sono bloccati in modo permanente (vedi styles.css:
- * overflow: hidden su entrambi) e l'unico elemento che scorre in tutta
- * l'app è .app-scroll (dentro .app-frame, ma separato dagli elementi
- * "fixed" come barra di navigazione e FAB). Per bloccare lo sfondo basta
- * quindi congelare .app-scroll con "overflow: hidden", senza alcun
- * riposizionamento: nessuno scatto, perché nulla si sposta quando il
- * blocco si toglie. Il blocco diretto su "touchmove" a livello di
- * documento resta come rete di sicurezza aggiuntiva (utile anche per non
- * far scorrere lo sfondo se il tocco parte su un elemento con un proprio
- * comportamento di trascinamento).
+ * Su mobile la pagina resta legata al viewport reale di Safari. Quando si
+ * apre un foglio congeliamo temporaneamente il body nella posizione corrente
+ * e la ripristiniamo alla chiusura, evitando sia lo scroll dello sfondo sia
+ * alterazioni permanenti all'altezza della pagina.
  */
 export function useScrollLock(active: boolean) {
   useEffect(() => {
     if (!active || typeof document === "undefined") return;
-    const scroller = document.querySelector<HTMLElement>(".app-scroll");
 
-    if (locks === 0 && scroller) {
-      scroller.style.overflow = "hidden";
-      scroller.style.touchAction = "none";
+    if (locks === 0) {
+      lockedScrollY = window.scrollY;
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${lockedScrollY}px`;
+      document.body.style.left = "0";
+      document.body.style.right = "0";
+      document.body.style.width = "100%";
     }
     locks += 1;
 
@@ -49,10 +47,12 @@ export function useScrollLock(active: boolean) {
     return () => {
       locks = Math.max(0, locks - 1);
       if (locks === 0) {
-        if (scroller) {
-          scroller.style.overflow = "";
-          scroller.style.touchAction = "";
-        }
+        document.body.style.position = "";
+        document.body.style.top = "";
+        document.body.style.left = "";
+        document.body.style.right = "";
+        document.body.style.width = "";
+        window.scrollTo(0, lockedScrollY);
         removeTouchBlock?.();
         removeTouchBlock = null;
       }

@@ -319,8 +319,8 @@
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
     background-color: var(--color-background);
-    height: 100%;
-    overflow: hidden;
+    min-height: 100%;
+    overflow-x: hidden;
     scrollbar-width: none;
   }
 
@@ -338,8 +338,8 @@
     -webkit-user-select: none;
     user-select: none;
     overscroll-behavior-y: none;
-    height: 100%;
-    overflow: hidden;
+    min-height: 100%;
+    overflow-x: hidden;
     scrollbar-width: none;
   }
 
@@ -436,41 +436,18 @@
   }
 }
 
-/*
- * .app-frame è il guscio esterno dell'app. Invece di dargli un'altezza
- * calcolata (100dvh, o una variabile misurata via JS) — che su iPhone, in
- * modalità "aggiunta alla schermata Home", in certi casi risultava più
- * corta dello schermo vero, lasciando una striscia nera in fondo — è
- * "position: fixed" con "inset: 0": i suoi quattro bordi sono ancorati
- * DIRETTAMENTE ai bordi veri dello schermo dal browser stesso, senza
- * nessun numero da calcolare che possa sbagliare. È la tecnica più
- * elementare e più affidabile che esista per riempire lo schermo per
- * intero, e non dipende da nessuna unità CSS o misura via JavaScript.
- *
- * Di proposito NON ha "display: flex" né "overflow: hidden" su mobile: è
- * un'altra precauzione nota su iOS/WebKit — un elemento "position: fixed"
- * (qui: barra di navigazione, FAB, banner) annidato dentro un contenitore
- * flex con overflow:hidden può, in alcune situazioni, restare "agganciato"
- * ai bordi di QUEL contenitore invece che ai bordi reali dello schermo.
- * .app-scroll — l'UNICO elemento che scorre nelle pagine principali —
- * riempie .app-frame con "position: absolute; inset: 0" invece che con
- * flexbox.
- *
- * html e body restano bloccati (overflow: hidden, vedi sopra) e non si
- * muovono mai.
- */
+/* Su mobile è la pagina a seguire il viewport di Safari. Non blocchiamo
+   permanentemente html/body: su iOS la loro altezza al 100% può riferirsi al
+   layout viewport più corto e lasciare una fascia scoperta sotto l'app. */
 .app-frame {
-  position: fixed;
-  inset: 0;
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: var(--color-background);
 }
 
 .app-scroll {
-  position: absolute;
-  inset: 0;
-  overflow-y: auto;
-  overscroll-behavior-y: contain;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
+  min-height: inherit;
 }
 
 .app-scroll::-webkit-scrollbar {
@@ -485,11 +462,8 @@
  * finiva fuori dallo schermo e non c'era modo di raggiungerlo.
  */
 .app-page {
-  position: fixed;
-  inset: 0;
-  overflow-y: auto;
-  overscroll-behavior-y: contain;
-  -webkit-overflow-scrolling: touch;
+  min-height: 100vh;
+  min-height: 100dvh;
   scrollbar-width: none;
 }
 
@@ -618,7 +592,6 @@
   .app-frame,
   .app-page {
     position: relative;
-    inset: auto;
     transform: translateZ(0);
     margin-inline: auto;
     margin-block: 2.5rem;
@@ -645,8 +618,10 @@
 
   .app-scroll {
     position: static;
-    inset: auto;
     flex: 1 1 auto;
     min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
   }
 }
