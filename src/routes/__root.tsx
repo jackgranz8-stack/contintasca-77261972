@@ -129,12 +129,35 @@ const THEME_INIT_SCRIPT = `
 })();
 `;
 
+// Misura l'altezza REALE dello schermo con window.innerHeight (un numero in
+// pixel, sempre affidabile) invece di affidarsi solo all'unità CSS 100dvh:
+// su iPhone, in modalità "aggiunta alla schermata Home" (standalone), certe
+// versioni di iOS calcolano 100dvh più corto dello schermo vero, lasciando
+// una striscia nera in fondo. Il valore viene scritto come variabile CSS
+// (--app-vh) su <html>, e .app-frame la usa al posto di 100dvh. Va rifatto
+// anche al resize/rotazione, ma NON deve reagire alla tastiera che si apre
+// (su iOS window.innerHeight non cambia quando appare la tastiera, quindi
+// il layout resta stabile anche lì).
+const VH_INIT_SCRIPT = `
+(function () {
+  function setAppVh() {
+    document.documentElement.style.setProperty("--app-vh", window.innerHeight + "px");
+  }
+  setAppVh();
+  window.addEventListener("resize", setAppVh);
+  window.addEventListener("orientationchange", function () {
+    setTimeout(setAppVh, 100);
+  });
+})();
+`;
+
 function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
         <HeadContent />
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: VH_INIT_SCRIPT }} />
       </head>
       <body>
         {children}
