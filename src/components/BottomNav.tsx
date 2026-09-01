@@ -56,23 +56,23 @@ export function BottomNav({ onAdd }: { onAdd: () => void }) {
   /*
    * Rimpicciolimento allo scorrimento.
    *
-   * L'elemento che scorre non è la pagina ma .app-scroll (vedi styles.css),
-   * quindi è a lui che ci si aggancia. Le letture sono raggruppate dentro un
-   * requestAnimationFrame: si aggiorna al massimo una volta per fotogramma,
-   * senza appesantire lo scorrimento. La soglia di 6px evita che la barra
-   * "sfarfalli" ai micro-movimenti del dito.
+   * A scorrere è la PAGINA (finestra), non un riquadro interno: prima ci si
+   * agganciava a .app-scroll, che però non è più l'elemento che scorre, e
+   * infatti la barra aveva smesso di rimpicciolirsi. Le letture sono
+   * raggruppate dentro un requestAnimationFrame, così si aggiorna al massimo
+   * una volta per fotogramma senza appesantire lo scorrimento; la soglia di
+   * 6px evita che la barra "sfarfalli" ai micro-movimenti del dito.
    */
   useEffect(() => {
-    const scroller = document.querySelector<HTMLElement>(".app-scroll");
-    if (!scroller) return;
-    let last = scroller.scrollTop;
+    if (typeof window === "undefined") return;
+    let last = window.scrollY;
     let frame = 0;
 
     const onScroll = () => {
       if (frame) return;
       frame = requestAnimationFrame(() => {
         frame = 0;
-        const y = scroller.scrollTop;
+        const y = window.scrollY;
         const delta = y - last;
         if (y < 24) setCompact(false);
         else if (delta > 6) setCompact(true);
@@ -81,9 +81,9 @@ export function BottomNav({ onAdd }: { onAdd: () => void }) {
       });
     };
 
-    scroller.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
-      scroller.removeEventListener("scroll", onScroll);
+      window.removeEventListener("scroll", onScroll);
       if (frame) cancelAnimationFrame(frame);
     };
   }, []);
@@ -178,7 +178,6 @@ export function BottomNav({ onAdd }: { onAdd: () => void }) {
             style={{ backgroundColor: "var(--nav-pill)" }}
           />
         </span>
-
 
         {slots.map((slot, i) => {
           if (slot.kind === "add") {
