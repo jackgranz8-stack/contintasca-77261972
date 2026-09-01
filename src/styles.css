@@ -141,7 +141,7 @@
    * Instagram. Su iPhone (34px di margine) la nuvola resta sollevata 18px;
    * su telefoni senza margine di sicurezza il minimo garantito è 10px.
    */
-  --nav-lift: max(10px, calc(env(safe-area-inset-bottom, 0px) - 16px));
+  --nav-lift: max(6px, calc(env(safe-area-inset-bottom, 0px) - 26px));
 
   color-scheme: dark;
 
