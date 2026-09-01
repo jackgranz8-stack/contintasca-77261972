@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Loader2, Wallet } from "lucide-react";
+import { ArrowBigUp, Eye, EyeOff, Loader2, Wallet } from "lucide-react";
 import { db } from "@/integrations/external/client";
 
 export const Route = createFileRoute("/auth")({
