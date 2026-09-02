@@ -1,5 +1,5 @@
 import type { AppState } from "./types";
-import { currentMonth, monthKey, monthLabel, shiftMonth } from "./format";
+import { currentMonth, monthKey, monthLabel, shiftMonth, todayISO } from "./format";
 
 export type TipAction =
   | { kind: "setBudget"; categoria: string; importo: number }
@@ -26,7 +26,13 @@ export function buildTips(state: AppState): Tip[] {
   const giorniMese = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const prevMonths = [shiftMonth(mk, -1), shiftMonth(mk, -2), shiftMonth(mk, -3)];
 
-  const inMonth = (m: string) => state.transazioni.filter((t) => monthKey(t.data) === m);
+  // I consigli devono basarsi sullo speso REALE: le transazioni con data
+  // futura (spese previste) non sono ancora soldi usciti, e includerle
+  // gonfierebbe percentuali e allarmi ("sei al 90% del budget") con denaro
+  // che non è ancora stato speso.
+  const oggiISO = todayISO();
+  const realizzate = state.transazioni.filter((t) => t.data <= oggiISO);
+  const inMonth = (m: string) => realizzate.filter((t) => monthKey(t.data) === m);
   const total = (arr: { importo: number }[]) => arr.reduce((a, t) => a + t.importo, 0);
   const catName = (id: string) => state.categorie.find((c) => c.id === id)?.nome ?? "Categoria";
 
@@ -128,7 +134,7 @@ export function buildTips(state: AppState): Tip[] {
 
   // d) spese fisse non ancora ricorrenti: stesso importo per 3 mesi di fila
   const groups = new Map<string, { mesi: Set<string>; ultima: string }>();
-  for (const t of state.transazioni) {
+  for (const t of realizzate) {
     const m = monthKey(t.data);
     if (!prevMonths.includes(m) && m !== mk) continue;
     const k = `${t.categoria}|${t.importo}|${(t.nota || "").trim().toLowerCase()}`;
