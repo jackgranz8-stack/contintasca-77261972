@@ -107,7 +107,13 @@ function HomePage() {
             importo: action.importo,
             giorno: action.giorno,
             attiva: true,
-            ultimaGenerazione: currentMonth(),
+            // Suggerimento accettato: si imposta la cadenza classica mensile,
+            // che è quella che il consiglio ha rilevato dai movimenti passati.
+            cadenza: "mesi",
+            intervallo: 1,
+            inizio: `${currentMonth()}-${String(action.giorno).padStart(2, "0")}`,
+            fine: null,
+            ultimaData: `${currentMonth()}-${String(action.giorno).padStart(2, "0")}`,
           },
         ],
       }));

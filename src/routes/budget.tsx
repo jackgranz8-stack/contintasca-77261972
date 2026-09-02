@@ -1,14 +1,16 @@
 import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Check, ChevronDown, Pause, Pencil, Play, Plus } from "lucide-react";
+import { Check, ChevronDown, Pause, Pencil, Play, Plus, Repeat } from "lucide-react";
 import { sum, totalsByCategory, txInMonth, useApp } from "@/lib/store";
 import { useScrollLock } from "@/hooks/use-scroll-lock";
 
-import { currentMonth, eur, monthLabel } from "@/lib/format";
+import { currentMonth, eur, formatDay, monthLabel, todayISO } from "@/lib/format";
 import { ICON_KEYS, iconFor } from "@/lib/icons";
 import { CATEGORY_COLORS, PALETTE, type Category } from "@/lib/types";
 import { ProgressBar } from "@/components/ProgressBar";
+import { RecurrenceFields, type RegoleRicorrenza } from "@/components/RecurrenceFields";
+import { etichettaCadenza } from "@/lib/ricorrenze";
 import {
   previsteByCategoria,
   previsteDelMese,
@@ -53,8 +55,14 @@ function BudgetPage() {
     nome: "",
     categoria: state.categorie[0]?.id ?? "",
     importo: "",
-    giorno: 1,
   });
+  const [regoleRic, setRegoleRic] = useState<RegoleRicorrenza>({
+    cadenza: "mesi",
+    intervallo: 1,
+    giorno: 1,
+    fine: null,
+  });
+  const [ricorrentiAperte, setRicorrentiAperte] = useState(false);
 
   const [editingNomeCat, setEditingNomeCat] = useState(false);
   const [ricEdit, setRicEdit] = useState<string | null>(null);
@@ -74,6 +82,16 @@ function BudgetPage() {
   const previsteMese = previsteDelMese(state, mese);
   const previstiPerCat = previsteByCategoria(previsteMese);
   const previstoTotale = sommaPreviste(previsteMese);
+  // Peso mensile indicativo delle ricorrenti attive. Le cadenze settimanali
+  // vengono riportate su base mensile (52 settimane / 12 mesi ≈ 4,33 volte al
+  // mese) per poter sommare mele con mele: è una stima, ed è per questo che
+  // l'etichetta dice "circa".
+  const pesoMensileRicorrenti = state.ricorrenti
+    .filter((r) => r.attiva)
+    .reduce((tot, r) => {
+      const n = Math.max(1, r.intervallo || 1);
+      return tot + (r.cadenza === "settimane" ? (r.importo * (52 / 12)) / n : r.importo / n);
+    }, 0);
 
   const creaCategoria = () => {
     const n = nuovaCat.trim();
@@ -98,14 +116,21 @@ function BudgetPage() {
       toast.error("Compila nome, importo e categoria");
       return;
     }
+    const giorno = Math.min(28, Math.max(1, regoleRic.giorno));
     addRecurring({
       nome: ric.nome.trim(),
       categoria: ric.categoria,
       importo,
-      giorno: Math.min(28, Math.max(1, ric.giorno)),
+      giorno,
       attiva: true,
+      cadenza: regoleRic.cadenza,
+      intervallo: regoleRic.intervallo,
+      // La serie parte da oggi: le occorrenze passate non vengono inventate.
+      inizio: todayISO(),
+      fine: regoleRic.fine,
     });
-    setRic({ nome: "", categoria: state.categorie[0]?.id ?? "", importo: "", giorno: 1 });
+    setRic({ nome: "", categoria: state.categorie[0]?.id ?? "", importo: "" });
+    setRegoleRic({ cadenza: "mesi", intervallo: 1, giorno: 1, fine: null });
     setFormRic(false);
     toast.success("Spesa ricorrente creata");
   };
@@ -313,132 +338,169 @@ function BudgetPage() {
         edit={state.categorie.find((c) => c.id === catEdit) ?? null}
       />
 
-      <section className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">Spese ricorrenti</h2>
-          <button
-            onClick={() => setFormRic((v) => !v)}
-            className="rounded-full bg-surface-2 px-3 py-1.5 text-xs"
-          >
-            {formRic ? "Chiudi" : "Aggiungi"}
-          </button>
-        </div>
+      {/* Spese ricorrenti come tendina, stesso schema di "Prossime spese"
+          nello Storico: chiusa mostra quante sono e quanto pesano al mese,
+          aperta si gestiscono. Così la pagina Budget si apre compatta invece
+          di srotolare subito l'elenco intero. */}
+      <section className="card-surface overflow-hidden">
+        <button
+          onClick={() => setRicorrentiAperte((v) => !v)}
+          className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
+          aria-expanded={ricorrentiAperte}
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+            <Repeat size={15} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium">
+              Spese ricorrenti ({state.ricorrenti.length})
+            </span>
+            <span className="block text-[11px] text-muted-foreground">
+              {state.ricorrenti.length === 0
+                ? "Nessuna ancora impostata"
+                : `${eur(pesoMensileRicorrenti)} al mese circa`}
+            </span>
+          </span>
+          <ChevronDown
+            size={16}
+            className={`shrink-0 text-muted-foreground transition-transform duration-300 ${
+              ricorrentiAperte ? "rotate-180" : ""
+            }`}
+          />
+        </button>
 
         <div
           className={`grid transition-[grid-template-rows] duration-300 ease-out ${
-            formRic ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+            ricorrentiAperte ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
           }`}
         >
-          <div className="overflow-hidden" aria-hidden={!formRic}>
-            <div className="card-surface space-y-3 p-4">
-              <input
-                value={ric.nome}
-                onChange={(e) => setRic({ ...ric, nome: e.target.value })}
-                placeholder="Nome (es. Affitto)"
-                className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
-              />
-              <select
-                value={ric.categoria}
-                onChange={(e) => setRic({ ...ric, categoria: e.target.value })}
-                className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none"
-              >
-                {state.categorie.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nome}
-                  </option>
-                ))}
-              </select>
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  step="0.01"
-                  min="0"
-                  value={ric.importo}
-                  onFocus={(e) => e.target.select()}
-                  onChange={(e) => setRic({ ...ric, importo: e.target.value })}
-                  placeholder="Importo €"
-                  className="w-full rounded-xl border border-border bg-surface px-3 py-3.5 text-lg font-semibold outline-none placeholder:text-base placeholder:font-normal placeholder:text-muted-foreground"
-                />
-                <select
-                  value={ric.giorno}
-                  onChange={(e) => setRic({ ...ric, giorno: Number(e.target.value) })}
-                  aria-label="Giorno del mese"
-                  className="native-select w-full py-3.5"
-                >
-                  {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
-                    <option key={d} value={d}>
-                      Giorno {d}
-                    </option>
-                  ))}
-                </select>
-              </div>
+          <div className="overflow-hidden">
+            <div className="space-y-2 px-4 pb-4">
               <button
-                onClick={creaRicorrente}
-                className="lime-fill w-full rounded-xl py-2.5 text-sm font-semibold"
+                onClick={() => setFormRic((v) => !v)}
+                className="w-full rounded-xl bg-surface-2 px-3 py-2 text-xs"
               >
-                Crea ricorrente
+                {formRic ? "Chiudi" : "+ Aggiungi spesa ricorrente"}
               </button>
+
+              <div
+                className={`grid transition-[grid-template-rows] duration-300 ease-out ${
+                  formRic ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                }`}
+              >
+                <div className="overflow-hidden" aria-hidden={!formRic}>
+                  <div className="card-surface space-y-3 p-4">
+                    <input
+                      value={ric.nome}
+                      onChange={(e) => setRic({ ...ric, nome: e.target.value })}
+                      placeholder="Nome (es. Affitto)"
+                      className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
+                    />
+                    <select
+                      value={ric.categoria}
+                      onChange={(e) => setRic({ ...ric, categoria: e.target.value })}
+                      className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm outline-none"
+                    >
+                      {state.categorie.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nome}
+                        </option>
+                      ))}
+                    </select>
+                    <div>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        min="0"
+                        value={ric.importo}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setRic({ ...ric, importo: e.target.value })}
+                        placeholder="Importo €"
+                        className="w-full rounded-xl border border-border bg-surface px-3 py-3.5 text-lg font-semibold outline-none placeholder:text-base placeholder:font-normal placeholder:text-muted-foreground"
+                      />
+                    </div>
+                    <RecurrenceFields value={regoleRic} onChange={setRegoleRic} />
+                    <button
+                      onClick={creaRicorrente}
+                      className="lime-fill w-full rounded-xl py-2.5 text-sm font-semibold"
+                    >
+                      Crea ricorrente
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {state.ricorrenti.length === 0 && !formRic && (
+                <p className="card-surface p-4 text-center text-xs text-muted-foreground">
+                  Nessuna spesa ricorrente. Le ricorrenti attive si registrano da sole ogni mese.
+                </p>
+              )}
+
+              {state.ricorrenti.map((r) => {
+                const c = state.categorie.find((x) => x.id === r.categoria);
+                const Icon = iconFor(c?.icona ?? "wallet");
+                return (
+                  <SwipeToDelete
+                    key={r.id}
+                    id={r.id}
+                    openId={openSwipeRicId}
+                    onOpenChange={setOpenSwipeRicId}
+                    className="card-surface"
+                    label={`Elimina ${r.nome}`}
+                    onDelete={() => setRicDaEliminare(r.id)}
+                  >
+                    <div className="flex items-center gap-3 px-4 py-3">
+                      <span
+                        className="flex h-9 w-9 items-center justify-center rounded-full"
+                        style={{
+                          backgroundColor: `${c?.colore ?? "#9AA6A0"}22`,
+                          color: c?.colore ?? "#9AA6A0",
+                        }}
+                      >
+                        <Icon size={16} />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p
+                          className={`truncate text-sm ${r.attiva ? "" : "text-muted-foreground"}`}
+                        >
+                          {r.nome}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {eur(r.importo)} · {etichettaCadenza(r).toLowerCase()}
+                          {r.cadenza === "mesi" ? ` il ${r.giorno}` : ""} · {c?.nome ?? "—"}
+                          {r.fine ? ` · fino al ${formatDay(r.fine)}` : ""}
+                          {r.attiva ? "" : " · in pausa"}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => updateRecurring(r.id, { attiva: !r.attiva })}
+                        className="text-muted-foreground"
+                        aria-label={r.attiva ? "Metti in pausa" : "Riattiva"}
+                      >
+                        {r.attiva ? <Pause size={16} /> : <Play size={16} />}
+                      </button>
+                      <button
+                        onClick={() => setRicEdit(r.id)}
+                        className="text-muted-foreground"
+                        aria-label={`Modifica ${r.nome}`}
+                      >
+                        <Pencil size={16} />
+                      </button>
+                    </div>
+                  </SwipeToDelete>
+                );
+              })}
+
+              {state.ricorrenti.length === 0 && !formRic && (
+                <p className="py-3 text-center text-xs text-muted-foreground">
+                  Le spese fisse (affitto, bollette, abbonamenti) si registrano da sole alla data
+                  che scegli.
+                </p>
+              )}
             </div>
           </div>
         </div>
-
-        {state.ricorrenti.length === 0 && !formRic && (
-          <p className="card-surface p-4 text-center text-xs text-muted-foreground">
-            Nessuna spesa ricorrente. Le ricorrenti attive si registrano da sole ogni mese.
-          </p>
-        )}
-
-        {state.ricorrenti.map((r) => {
-          const c = state.categorie.find((x) => x.id === r.categoria);
-          const Icon = iconFor(c?.icona ?? "wallet");
-          return (
-            <SwipeToDelete
-              key={r.id}
-              id={r.id}
-              openId={openSwipeRicId}
-              onOpenChange={setOpenSwipeRicId}
-              className="card-surface"
-              label={`Elimina ${r.nome}`}
-              onDelete={() => setRicDaEliminare(r.id)}
-            >
-              <div className="flex items-center gap-3 px-4 py-3">
-                <span
-                  className="flex h-9 w-9 items-center justify-center rounded-full"
-                  style={{
-                    backgroundColor: `${c?.colore ?? "#9AA6A0"}22`,
-                    color: c?.colore ?? "#9AA6A0",
-                  }}
-                >
-                  <Icon size={16} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className={`truncate text-sm ${r.attiva ? "" : "text-muted-foreground"}`}>
-                    {r.nome}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {eur(r.importo)} · giorno {r.giorno} · {c?.nome ?? "—"}
-                    {r.attiva ? "" : " · in pausa"}
-                  </p>
-                </div>
-                <button
-                  onClick={() => updateRecurring(r.id, { attiva: !r.attiva })}
-                  className="text-muted-foreground"
-                  aria-label={r.attiva ? "Metti in pausa" : "Riattiva"}
-                >
-                  {r.attiva ? <Pause size={16} /> : <Play size={16} />}
-                </button>
-                <button
-                  onClick={() => setRicEdit(r.id)}
-                  className="text-muted-foreground"
-                  aria-label={`Modifica ${r.nome}`}
-                >
-                  <Pencil size={16} />
-                </button>
-              </div>
-            </SwipeToDelete>
-          );
-        })}
       </section>
 
       <EditRecurringModal
