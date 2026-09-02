@@ -185,6 +185,12 @@
   --backdrop: oklch(0.09 0.008 152);
   /* Vetro della barra di navigazione. */
   --nav-bg: oklch(0.17 0.014 152 / 0.7);
+  /* Vetro "liquido" per i pannelli in evidenza: sfondo semi-trasparente,
+     filo di luce sul bordo alto, ombra interna sul bordo basso. */
+  --glass-bg: oklch(0.24 0.02 152 / 0.55);
+  --glass-rim: oklch(1 0 0 / 0.14);
+  --glass-sheen: oklch(1 0 0 / 0.1);
+  --glass-shade: oklch(0 0 0 / 0.25);
   --nav-bg-solid: oklch(0.175 0.014 152);
   --nav-border: oklch(0.97 0.008 150 / 0.1);
   --nav-pill: oklch(0.97 0.008 150 / 0.11);
@@ -239,6 +245,10 @@
 
   --backdrop: oklch(0.9 0.006 150);
   --nav-bg: oklch(1 0 0 / 0.72);
+  --glass-bg: oklch(1 0 0 / 0.55);
+  --glass-rim: oklch(1 0 0 / 0.85);
+  --glass-sheen: oklch(1 0 0 / 0.9);
+  --glass-shade: oklch(0.22 0.016 152 / 0.08);
   --nav-bg-solid: oklch(0.995 0.003 150);
   --nav-border: oklch(0.22 0.016 152 / 0.1);
   --nav-pill: oklch(0.22 0.016 152 / 0.07);
@@ -295,6 +305,10 @@
 
     --backdrop: oklch(0.9 0.006 150);
     --nav-bg: oklch(1 0 0 / 0.72);
+    --glass-bg: oklch(1 0 0 / 0.55);
+    --glass-rim: oklch(1 0 0 / 0.85);
+    --glass-sheen: oklch(1 0 0 / 0.9);
+    --glass-shade: oklch(0.22 0.016 152 / 0.08);
     --nav-bg-solid: oklch(0.995 0.003 150);
     --nav-border: oklch(0.22 0.016 152 / 0.1);
     --nav-pill: oklch(0.22 0.016 152 / 0.07);
@@ -512,6 +526,84 @@
   padding-bottom: calc(var(--nav-height) + var(--nav-lift) + 12px);
 }
 
+
+/*
+ * VETRO "LIQUIDO" stile Apple, per i pannelli che devono staccarsi dal resto.
+ *
+ * Cosa lo fa leggere come vetro, e non come una semplice trasparenza:
+ * 1. SFOCATURA + SATURAZIONE di ciò che passa sotto (i colori dietro restano
+ *    vivi invece di ingrigirsi);
+ * 2. FILO DI LUCE sul bordo alto e ombra sul bordo basso: è così che il
+ *    cervello legge "lastra spessa illuminata dall'alto";
+ * 3. RIFLESSO diagonale appena accennato sulla superficie;
+ * 4. ANGOLI MOLTO ARROTONDATI, più delle schede normali, così si distingue
+ *    a colpo d'occhio dalle altre.
+ *
+ * NOTA IMPORTANTE, per non aspettarsi il miracolo: il vetro può rifrangere
+ * solo ciò che ha dietro. Su Control Center di Apple dietro c'è la foto dello
+ * sfondo, piena di colori, e l'effetto è vistoso. Qui dietro c'è uno sfondo
+ * quasi uniforme, quindi ci sarebbe pochissimo da rifrangere. Per questo la
+ * classe aggiunge da sé, con ::before, due aloni di colore sfocati sotto la
+ * lastra: danno al vetro qualcosa da "raccogliere" e restituiscono la
+ * sfumatura viva dell'effetto Apple invece di un grigio piatto.
+ */
+.glass-card {
+  position: relative;
+  isolation: isolate;
+  border-radius: 28px;
+  background-color: var(--glass-bg);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  box-shadow:
+    inset 0 0 0 0.5px var(--glass-rim),
+    inset 0 1.5px 0 var(--glass-sheen),
+    inset 0 -1px 0 var(--glass-shade),
+    0 16px 40px -20px oklch(0 0 0 / 0.5);
+}
+
+/* Gli aloni di colore dietro la lastra: è ciò che il vetro rifrange. */
+.glass-card::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 55% at 18% 12%, color-mix(in oklab, var(--accent-lime) 34%, transparent), transparent 70%),
+    /* Il secondo alone usa il turchese della palette categorie: è già nel
+       linguaggio visivo dell'app, non un colore inventato per l'occasione. */
+    radial-gradient(42% 60% at 88% 84%, color-mix(in oklab, #62d5e5 26%, transparent), transparent 72%);
+  filter: blur(26px);
+  opacity: 0.55;
+}
+
+/* Riflesso diagonale sulla superficie, tenuto molto leggero. */
+.glass-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    118deg,
+    color-mix(in oklab, var(--glass-sheen) 60%, transparent) 0%,
+    transparent 32%,
+    transparent 68%,
+    color-mix(in oklab, var(--glass-sheen) 30%, transparent) 100%
+  );
+  opacity: 0.5;
+}
+
+/* Se il browser non sa sfocare, si passa a un pannello pieno: mai testo
+   illeggibile sopra una trasparenza non sfocata. */
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .glass-card {
+    background-color: var(--color-popover);
+  }
+  .glass-card::before {
+    display: none;
+  }
+}
 
 /*
  * BARRA DI NAVIGAZIONE — "nuvola" flottante stile Instagram / Apple
