@@ -5,6 +5,7 @@ import { useApp } from "@/lib/store";
 import { iconFor } from "@/lib/icons";
 import type { Recurring } from "@/lib/types";
 import { BottomSheet } from "./BottomSheet";
+import { RecurrenceFields, type RegoleRicorrenza } from "./RecurrenceFields";
 
 export function EditRecurringModal({
   open,
@@ -19,7 +20,12 @@ export function EditRecurringModal({
   const [nome, setNome] = useState("");
   const [categoria, setCategoria] = useState("");
   const [importo, setImporto] = useState("");
-  const [giorno, setGiorno] = useState(1);
+  const [regole, setRegole] = useState<RegoleRicorrenza>({
+    cadenza: "mesi",
+    intervallo: 1,
+    giorno: 1,
+    fine: null,
+  });
   const [campo, setCampo] = useState<"importo" | "nome" | null>(null);
   // Resta con l'ultima ricorrente valida durante l'animazione di chiusura,
   // così il contenuto non sparisce di scatto mentre il foglio scorre giù.
@@ -34,7 +40,12 @@ export function EditRecurringModal({
     setNome(edit.nome);
     setCategoria(edit.categoria);
     setImporto(String(edit.importo));
-    setGiorno(Math.min(28, Math.max(1, edit.giorno)));
+    setRegole({
+      cadenza: edit.cadenza,
+      intervallo: edit.intervallo,
+      giorno: Math.min(28, Math.max(1, edit.giorno)),
+      fine: edit.fine ?? null,
+    });
     setCampo(null);
   }, [open, edit]);
 
@@ -51,7 +62,10 @@ export function EditRecurringModal({
       nome: nome.trim(),
       categoria,
       importo: valore,
-      giorno: Math.min(28, Math.max(1, giorno)),
+      giorno: Math.min(28, Math.max(1, regole.giorno)),
+      cadenza: regole.cadenza,
+      intervallo: regole.intervallo,
+      fine: regole.fine,
     });
     toast.success("Spesa ricorrente aggiornata");
     onClose();
@@ -142,20 +156,8 @@ export function EditRecurringModal({
           })}
         </div>
 
-        <div className="mb-3 flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-2.5">
-          <span className="flex-1 truncate text-sm">Giorno del mese</span>
-          <select
-            value={giorno}
-            onChange={(e) => setGiorno(Number(e.target.value))}
-            aria-label="Giorno del mese"
-            className="native-select w-20 shrink-0"
-          >
-            {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </select>
+        <div className="mb-3 rounded-2xl border border-border bg-surface p-3.5">
+          <RecurrenceFields value={regole} onChange={setRegole} />
         </div>
       </div>
 

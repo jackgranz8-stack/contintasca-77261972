@@ -4,6 +4,7 @@ import { Repeat, X } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { iconFor } from "@/lib/icons";
 import { formatDay, todayISO, uid } from "@/lib/format";
+import { RecurrenceFields, type RegoleRicorrenza } from "./RecurrenceFields";
 import type { Transaction } from "@/lib/types";
 import { BottomSheet } from "./BottomSheet";
 import { ConfirmPopup } from "./ConfirmPopup";
@@ -37,7 +38,12 @@ export function AddExpenseModal({
   const [data, setData] = useState(todayISO());
   const [nota, setNota] = useState("");
   const [ripeti, setRipeti] = useState(false);
-  const [giorno, setGiorno] = useState(1);
+  const [regole, setRegole] = useState<RegoleRicorrenza>({
+    cadenza: "mesi",
+    intervallo: 1,
+    giorno: 1,
+    fine: null,
+  });
   const [confermaStop, setConfermaStop] = useState(false);
   const [campo, setCampo] = useState<"importo" | "nota" | null>(null);
 
@@ -60,21 +66,30 @@ export function AddExpenseModal({
         ? state.ricorrenti.find((r) => r.id === edit.ricorrenteId)
         : undefined;
       setRipeti(Boolean(linked && linked.attiva));
-      setGiorno(linked ? linked.giorno : dayOf(edit.data));
+      setRegole(
+        linked
+          ? {
+              cadenza: linked.cadenza,
+              intervallo: linked.intervallo,
+              giorno: linked.giorno,
+              fine: linked.fine ?? null,
+            }
+          : { cadenza: "mesi", intervallo: 1, giorno: dayOf(edit.data), fine: null },
+      );
     } else if (preset) {
       setImporto(String(preset.importo).replace(".", ","));
       setNota(preset.nota ?? "");
       setData(todayISO());
       setCategoria(preset.categoria || state.categorie[0]?.id || "");
       setRipeti(false);
-      setGiorno(Math.min(28, new Date().getDate()));
+      setRegole({ cadenza: "mesi", intervallo: 1, giorno: dayOf(todayISO()), fine: null });
     } else {
       setImporto("");
       setNota("");
       setData(todayISO());
       setCategoria(state.categorie[0]?.id ?? "");
       setRipeti(false);
-      setGiorno(Math.min(28, new Date().getDate()));
+      setRegole({ cadenza: "mesi", intervallo: 1, giorno: dayOf(todayISO()), fine: null });
     }
   }, [open, edit, preset, state.categorie, state.ricorrenti]);
 
@@ -111,9 +126,15 @@ export function AddExpenseModal({
             nome: nomeRegola(),
             categoria,
             importo: valore,
-            giorno,
+            giorno: regole.giorno,
             attiva: true,
-            ultimaGenerazione: data.slice(0, 7),
+            cadenza: regole.cadenza,
+            intervallo: regole.intervallo,
+            // La spesa che si sta salvando è la prima della serie: da qui
+            // partono i conteggi della cadenza, e risulta già registrata.
+            inizio: data,
+            fine: regole.fine,
+            ultimaData: data,
           },
         ],
         transazioni: s.transazioni.map((t) =>
@@ -141,7 +162,16 @@ export function AddExpenseModal({
         ...s,
         ricorrenti: s.ricorrenti.map((r) =>
           r.id === edit.ricorrenteId
-            ? { ...r, categoria, importo: valore, giorno, attiva: true }
+            ? {
+                ...r,
+                categoria,
+                importo: valore,
+                giorno: regole.giorno,
+                cadenza: regole.cadenza,
+                intervallo: regole.intervallo,
+                fine: regole.fine,
+                attiva: true,
+              }
             : r,
         ),
         transazioni: s.transazioni.map((t) => (t.id === edit.id ? { ...t, ...patch } : t)),
@@ -183,9 +213,15 @@ export function AddExpenseModal({
             nome: nomeRegola(),
             categoria,
             importo: valore,
-            giorno,
+            giorno: regole.giorno,
             attiva: true,
-            ultimaGenerazione: data.slice(0, 7),
+            cadenza: regole.cadenza,
+            intervallo: regole.intervallo,
+            // La spesa che si sta salvando è la prima della serie: da qui
+            // partono i conteggi della cadenza, e risulta già registrata.
+            inizio: data,
+            fine: regole.fine,
+            ultimaData: data,
           },
         ],
       }));
@@ -326,21 +362,7 @@ export function AddExpenseModal({
         }`}
       >
         <Repeat size={15} className="shrink-0 text-primary" />
-        <span className="flex-1 truncate text-sm">Ripeti ogni mese</span>
-        {ripeti && (
-          <select
-            value={giorno}
-            onChange={(e) => setGiorno(Number(e.target.value))}
-            aria-label="Giorno del mese"
-            className="native-select w-20 shrink-0"
-          >
-            {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </select>
-        )}
+        <span className="flex-1 truncate text-sm">Spesa ricorrente</span>
         <button
           type="button"
           onClick={() => setRipeti((v) => !v)}
@@ -352,6 +374,20 @@ export function AddExpenseModal({
             className={`block h-5 w-5 rounded-full bg-background transition-transform ${ripeti ? "translate-x-5" : ""}`}
           />
         </button>
+      </div>
+
+      {/* Le opzioni della ricorrenza si aprono solo quando serve: chi
+          registra una spesa singola non le vede nemmeno. */}
+      <div
+        className={`grid transition-[grid-template-rows] duration-300 ease-out ${
+          ripeti ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        }`}
+      >
+        <div className="overflow-hidden" aria-hidden={!ripeti}>
+          <div className="mb-3 rounded-2xl border border-border bg-surface p-3.5">
+            <RecurrenceFields value={regole} onChange={setRegole} />
+          </div>
+        </div>
       </div>
 
       <button
