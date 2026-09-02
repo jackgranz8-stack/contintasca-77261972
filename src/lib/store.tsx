@@ -19,7 +19,8 @@ import {
   type Recurring,
   type Transaction,
 } from "./types";
-import { currentMonth, monthKey, shiftMonth, uid } from "./format";
+import { currentMonth, monthKey, shiftMonth, todayISO, uid } from "./format";
+import { giornoDopo, occorrenzeTra, ultimoGiornoDelMese } from "./ricorrenze";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const sameState = (a: AppState, b: AppState) => JSON.stringify(a) === JSON.stringify(b);
@@ -88,44 +89,52 @@ type Ctx = {
 
 const AppContext = createContext<Ctx | null>(null);
 
-/** Genera le transazioni delle spese ricorrenti attive già scadute nel mese corrente. */
+/**
+ * Registra le spese ricorrenti che sono già scadute e non ancora inserite.
+ *
+ * Prima si ragionava per MESI (un segnaposto "ultimo mese generato"): non
+ * bastava più, perché con la cadenza settimanale una ricorrenza può cadere
+ * più volte nello stesso mese. Ora si ragiona per DATE: si guarda l'ultima
+ * occorrenza registrata e si recuperano tutte quelle cadute da allora a oggi,
+ * chiedendo a lib/ricorrenze.ts quando cade la serie — la stessa funzione che
+ * usano le spese previste, così le due non possono discordare.
+ */
 function runRecurring(s: AppState): { next: AppState; created: number } {
-  const now = new Date();
-  const mk = currentMonth();
-  const day = now.getDate();
+  const oggi = todayISO();
   let created = 0;
   const transazioni = [...s.transazioni];
   const ricorrenti = s.ricorrenti.map((r) => {
-    if (!r.attiva || r.ultimaGenerazione === mk) return r;
+    if (!r.attiva) return r;
     if (!s.categorie.some((c) => c.id === r.categoria)) return r;
 
-    // Se l'app non viene aperta per un po', al riapertura recuperiamo anche i
-    // mesi pienamente trascorsi da ultimaGenerazione (non solo quello attuale,
-    // come prima), per non perdere silenziosamente le ricorrenti saltate. Un
-    // tetto di 12 mesi evita un recupero assurdo in casi limite.
-    const mesi: string[] = [];
-    let cursore = r.ultimaGenerazione ? shiftMonth(r.ultimaGenerazione, 1) : mk;
-    let guardia = 0;
-    while (cursore < mk && guardia < 12) {
-      mesi.push(cursore);
-      cursore = shiftMonth(cursore, 1);
-      guardia++;
+    let da: string;
+    if (r.ultimaData) {
+      da = giornoDopo(r.ultimaData);
+    } else if (r.ultimaGenerazione) {
+      // Ricorrenza creata prima delle cadenze personalizzate: si sapeva solo
+      // il MESE fino al quale era stata registrata. Si riprende dal giorno
+      // successivo alla fine di quel mese, altrimenti si ricreerebbero spese
+      // di mesi già registrati (doppioni sul passato).
+      da = giornoDopo(ultimoGiornoDelMese(r.ultimaGenerazione));
+    } else {
+      da = r.inizio;
     }
-    if (r.giorno <= day) mesi.push(mk);
-    if (mesi.length === 0) return r;
 
-    for (const m of mesi) {
+    const occorrenze = occorrenzeTra(r, da, oggi);
+    if (occorrenze.length === 0) return r;
+
+    for (const d of occorrenze) {
       transazioni.push({
         id: uid(),
         importo: r.importo,
         categoria: r.categoria,
-        data: `${m}-${String(r.giorno).padStart(2, "0")}`,
+        data: d,
         nota: r.nome,
         ricorrenteId: r.id,
       });
       created++;
     }
-    return { ...r, ultimaGenerazione: mesi[mesi.length - 1] ?? mk };
+    return { ...r, ultimaData: occorrenze[occorrenze.length - 1] as string };
   });
   return { next: { ...s, transazioni, ricorrenti }, created };
 }

@@ -15,14 +15,38 @@ export type Transaction = {
   ricorrenteId?: string | null;
 };
 
+/** Unità della cadenza di una spesa ricorrente. */
+export type Cadenza = "settimane" | "mesi";
+
 export type Recurring = {
   id: string;
   nome: string;
   categoria: string;
   importo: number;
-  giorno: number; // 1-28
+  /**
+   * Giorno del mese (1-28), usato solo con cadenza "mesi". Limitato a 28 di
+   * proposito: così la spesa cade in ogni mese, febbraio compreso, senza casi
+   * particolari da gestire.
+   */
+  giorno: number;
   attiva: boolean;
-  ultimaGenerazione?: string; // YYYY-MM
+  /** "mesi" = ogni N mesi al giorno indicato; "settimane" = ogni N settimane dalla data di inizio. */
+  cadenza: Cadenza;
+  /** Ogni quanto: 1 = ogni mese/settimana, 2 = ogni due, ecc. */
+  intervallo: number;
+  /** Data della prima occorrenza: ancora della serie (YYYY-MM-DD). */
+  inizio: string;
+  /** Data oltre la quale la ricorrenza non vale più. Assente/null = per sempre. */
+  fine?: string | null;
+  /** Data dell'ultima occorrenza già registrata (YYYY-MM-DD). */
+  ultimaData?: string;
+  /**
+   * Vecchio segnaposto per mese (YYYY-MM), da prima che esistessero le cadenze
+   * diverse da quella mensile. Non viene più aggiornato: resta solo per
+   * riconoscere le ricorrenze create prima e non registrarne di nuovo i mesi
+   * già passati (vedi runRecurring in store.tsx).
+   */
+  ultimaGenerazione?: string;
 };
 
 export type Housing = "affitto" | "mutuo" | "proprieta" | "famiglia";

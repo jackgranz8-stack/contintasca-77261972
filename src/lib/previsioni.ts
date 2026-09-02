@@ -1,5 +1,6 @@
 import type { AppState, Transaction } from "./types";
 import { currentMonth, monthKey, todayISO } from "./format";
+import { giornoDopo, occorrenzeTra, ultimoGiornoDelMese } from "./ricorrenze";
 
 /**
  * SPESE PREVISTE
@@ -53,33 +54,46 @@ export function txFuture(txs: Transaction[], oggi = todayISO()) {
 /**
  * Ricorrenti attive che scatteranno più avanti in questo mese.
  *
- * Una ricorrente è "in attesa" se: è attiva, la sua categoria esiste ancora,
- * il suo giorno non è ancora arrivato, e non è già stata generata per questo
- * mese. L'ultimo controllo evita il doppio conteggio nel caso limite in cui
- * l'utente sposti il giorno più in avanti DOPO che la spesa del mese è già
- * stata registrata: in quel caso la transazione vera esiste già, e contarla
- * anche come previsto la conterebbe due volte.
+ * Con le cadenze personalizzate una ricorrenza può cadere più volte nello
+ * stesso mese (es. ogni due settimane), quindi si enumerano tutte le
+ * occorrenze da domani a fine mese chiedendole a lib/ricorrenze.ts — la
+ * stessa funzione usata per registrare quelle passate.
  */
 export function ricorrentiInAttesa(state: AppState, oggi = todayISO()): Previsione[] {
   const mk = currentMonth();
-  const giornoOggi = Number(oggi.slice(8, 10));
-  return state.ricorrenti
-    .filter(
-      (r) =>
-        r.attiva &&
-        state.categorie.some((c) => c.id === r.categoria) &&
-        r.giorno > giornoOggi &&
-        r.ultimaGenerazione !== mk,
-    )
-    .map((r) => ({
-      id: `ric:${r.id}`,
-      importo: r.importo,
-      categoria: r.categoria,
-      data: `${mk}-${String(r.giorno).padStart(2, "0")}`,
-      nota: r.nome,
-      fonte: "ricorrente" as const,
-      ricorrenteId: r.id,
-    }));
+  const fineMese = ultimoGiornoDelMese(mk);
+  const out: Previsione[] = [];
+
+  for (const r of state.ricorrenti) {
+    if (!r.attiva) continue;
+    if (!state.categorie.some((c) => c.id === r.categoria)) continue;
+
+    // Da domani a fine mese: tutte le volte in cui la ricorrenza cadrà. Con
+    // la cadenza settimanale possono essere più di una nello stesso mese,
+    // motivo per cui non basta più guardare "il giorno del mese".
+    const occorrenze = occorrenzeTra(r, giornoDopo(oggi), fineMese);
+
+    for (const data of occorrenze) {
+      // Se la spesa di quella data è già stata registrata, non va contata
+      // anche come prevista: succede quando si sposta la ricorrenza a un
+      // giorno più avanti dopo che era già scattata.
+      const giaRegistrata = state.transazioni.some(
+        (t) => t.ricorrenteId === r.id && t.data === data,
+      );
+      if (giaRegistrata) continue;
+
+      out.push({
+        id: `ric:${r.id}:${data}`,
+        importo: r.importo,
+        categoria: r.categoria,
+        data,
+        nota: r.nome,
+        fonte: "ricorrente" as const,
+        ricorrenteId: r.id,
+      });
+    }
+  }
+  return out;
 }
 
 /**

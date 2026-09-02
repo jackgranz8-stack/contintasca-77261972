@@ -1,5 +1,13 @@
 import { db } from "@/integrations/external/client";
-import { initialState, type AppState, type Category, type Housing, type Recurring, type Transaction } from "./types";
+import {
+  initialState,
+  type AppState,
+  type Category,
+  type Housing,
+  type Recurring,
+  type Transaction,
+} from "./types";
+import { currentMonth } from "./format";
 
 /* ---------- mapping riga DB <-> modello app ---------- */
 
@@ -28,6 +36,14 @@ type RecurringRow = {
   day: number | null;
   active: boolean | null;
   last_generated_month: string | null;
+  // Colonne aggiunte con le cadenze personalizzate. Lette in modo tollerante
+  // (vedi toRecurring): se il database non fosse ancora aggiornato, la
+  // ricorrenza si comporta come una mensile classica invece di rompersi.
+  cadence?: string | null;
+  interval_count?: number | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  last_generated_date?: string | null;
 };
 
 type ProfileRow = {
@@ -64,13 +80,22 @@ function toTransaction(r: TransactionRow): Transaction {
 }
 
 function toRecurring(r: RecurringRow): Recurring {
+  const giorno = Math.min(28, Math.max(1, r.day ?? 1));
   return {
     id: r.id,
     nome: r.name ?? "Spesa",
     categoria: r.category_id ?? "",
     importo: num(r.amount),
-    giorno: r.day ?? 1,
+    giorno,
     attiva: r.active ?? true,
+    // Valori di ripiego pensati per le ricorrenze create prima delle cadenze
+    // personalizzate: erano tutte "ogni mese al giorno indicato", quindi si
+    // comportano esattamente come prima.
+    cadenza: r.cadence === "settimane" ? "settimane" : "mesi",
+    intervallo: Math.max(1, r.interval_count ?? 1),
+    inizio: r.start_date ?? `${currentMonth()}-${String(giorno).padStart(2, "0")}`,
+    fine: r.end_date ?? null,
+    ...(r.last_generated_date ? { ultimaData: r.last_generated_date } : {}),
     ...(r.last_generated_month ? { ultimaGenerazione: r.last_generated_month } : {}),
   };
 }
@@ -102,7 +127,14 @@ const recurringPayload = (r: Recurring, userId: string) => ({
   amount: r.importo,
   day: r.giorno,
   active: r.attiva,
-  last_generated_month: r.ultimaGenerazione ?? null,
+  cadence: r.cadenza,
+  interval_count: r.intervallo,
+  start_date: r.inizio,
+  end_date: r.fine ?? null,
+  last_generated_date: r.ultimaData ?? null,
+  // Tenuto aggiornato al mese dell'ultima occorrenza per non lasciare la
+  // colonna vecchia in uno stato incoerente con la nuova.
+  last_generated_month: r.ultimaData ? r.ultimaData.slice(0, 7) : (r.ultimaGenerazione ?? null),
 });
 
 /* ---------- lettura ---------- */
@@ -204,7 +236,11 @@ export async function persistDiff(prev: AppState, next: AppState, userId: string
   }
   if (catsDelete.length) {
     ops.push(
-      db.from("categories").delete().in("id", catsDelete).then(({ error }) => fail(error)),
+      db
+        .from("categories")
+        .delete()
+        .in("id", catsDelete)
+        .then(({ error }) => fail(error)),
     );
   }
 
@@ -241,7 +277,11 @@ export async function persistDiff(prev: AppState, next: AppState, userId: string
   }
   if (tipRemove.length) {
     ops.push(
-      db.from("dismissed_insights").delete().in("key", tipRemove).then(({ error }) => fail(error)),
+      db
+        .from("dismissed_insights")
+        .delete()
+        .in("key", tipRemove)
+        .then(({ error }) => fail(error)),
     );
   }
 
