@@ -11,10 +11,9 @@ export function ProgressBar({
   value: number;
   max: number;
   /**
-   * Spesa PREVISTA (non ancora realizzata): disegnata in continuità con
-   * quella reale, senza stacchi, in tinta molto tenue e con un tratteggio
-   * appena accennato. Deve leggersi come "in arrivo", senza mai dare
-   * l'impressione che quei soldi siano già usciti.
+   * Spesa PREVISTA (non ancora realizzata): in tinta molto tenue e con un
+   * tratteggio appena accennato. Deve leggersi come "in arrivo", senza mai
+   * dare l'impressione che quei soldi siano già usciti.
    */
   forecast?: number;
   /**
@@ -36,38 +35,41 @@ export function ProgressBar({
 
   const tonoReale = color ?? barTone(p);
   const tintaPrevisto = forecastColor ?? "var(--accent-lime)";
+  // Raggio della punta arrotondata: metà dell'altezza, come in una pillola.
+  const raggio = height / 2;
 
   return (
     <div
-      className="flex w-full overflow-hidden rounded-full bg-surface-2"
+      className="relative flex w-full overflow-hidden rounded-full bg-surface-2"
       style={{ height }}
       role="progressbar"
       aria-valuenow={Math.round(p)}
       aria-valuemin={0}
       aria-valuemax={100}
     >
-      <div
-        // Con il previsto accanto, il lato destro resta squadrato: così la
-        // parte prevista riprende esattamente da dove finisce quella reale,
-        // senza il gradino che si vedeva quando entrambe erano arrotondate.
-        className={`h-full transition-all duration-500 ${
-          mostraPrevisto ? "rounded-l-full" : "rounded-full"
-        }`}
-        style={{ width: `${pReale}%`, background: tonoReale }}
-      />
+      {/*
+        La parte prevista viene disegnata PRIMA e tirata indietro di un raggio,
+        così scivola SOTTO la punta arrotondata di quella reale (che le sta
+        sopra, essendo disegnata dopo con z-index maggiore). In questo modo la
+        parte reale conserva la sua punta tonda e il previsto sembra
+        continuare esattamente da dove quella finisce, senza gradini né
+        spazi vuoti in mezzo.
+      */}
       {mostraPrevisto && (
         <div
-          className="h-full rounded-r-full transition-all duration-500"
+          className="absolute top-0 h-full rounded-full transition-all duration-500"
           style={{
-            width: `${pPrevisto}%`,
-            // Velo molto leggero della tinta di riferimento...
+            left: `calc(${pReale}% - ${raggio}px)`,
+            width: `calc(${pPrevisto}% + ${raggio}px)`,
             backgroundColor: `color-mix(in oklab, ${tintaPrevisto} 16%, transparent)`,
-            // ...più righine sottili e distanziate: si intuisce il tratteggio
-            // senza che diventi un motivo invadente.
             backgroundImage: `repeating-linear-gradient(135deg, color-mix(in oklab, ${tintaPrevisto} 28%, transparent) 0 1px, transparent 1px 7px)`,
           }}
         />
       )}
+      <div
+        className="relative z-10 h-full rounded-full transition-all duration-500"
+        style={{ width: `${pReale}%`, background: tonoReale }}
+      />
     </div>
   );
 }

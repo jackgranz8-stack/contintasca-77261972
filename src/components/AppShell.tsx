@@ -137,8 +137,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               willChange: "transform",
             }}
           >
-            Sei offline: le modifiche sono salvate sul telefono e si sincronizzano da sole al
-            ritorno della connessione
+            Modifiche salvate sul telefono: si sincronizzano da sole appena la connessione lo
+            permette
           </div>
         )}
 

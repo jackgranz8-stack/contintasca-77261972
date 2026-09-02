@@ -91,34 +91,41 @@ export function TrendBars({
             >
               {/* Previsto: sta in cima, a righine leggere. La distinzione non è
                   solo di colore ma di trama, così si capisce anche a colpo
-                  d'occhio veloce o con difficoltà nel distinguere i colori. */}
-              {forecast > 0 && (
+                  d'occhio veloce o con difficoltà nel distinguere i colori.
+                  Viene tirato giù di un raggio così da scivolare SOTTO la cima
+                  arrotondata della parte reale (che gli sta sopra): la parte
+                  reale conserva la sua cima tonda e il previsto sembra
+                  continuare da lì, senza gradini. */}
+              {forecast > 0 && !segments && (
                 <span
-                  className="w-full shrink-0"
+                  className="absolute inset-x-0 rounded-t-lg"
                   style={{
-                    height: `${(forecast / totale) * 100}%`,
+                    bottom: `calc(${(d.value / totale) * 100}% - 8px)`,
+                    height: `calc(${(forecast / totale) * 100}% + 8px)`,
                     backgroundColor: `color-mix(in oklab, ${tintaPrevisto} 16%, transparent)`,
                     backgroundImage: `repeating-linear-gradient(135deg, color-mix(in oklab, ${tintaPrevisto} 28%, transparent) 0 1px, transparent 1px 7px)`,
                   }}
                 />
               )}
-              {segments
-                ? segments.map((seg, i) => (
-                    <span
-                      key={i}
-                      className="w-full shrink-0"
-                      style={{
-                        height: `${(seg.value / totale) * 100}%`,
-                        backgroundColor: seg.color,
-                      }}
-                    />
-                  ))
-                : forecast > 0 && (
-                    <span
-                      className={`w-full shrink-0 ${active ? "lime-fill" : "bg-surface-2 opacity-70"}`}
-                      style={{ height: `${(d.value / totale) * 100}%` }}
-                    />
-                  )}
+              {segments ? (
+                segments.map((seg, i) => (
+                  <span
+                    key={i}
+                    className="relative z-10 w-full shrink-0"
+                    style={{
+                      height: `${(seg.value / totale) * 100}%`,
+                      backgroundColor: seg.color,
+                    }}
+                  />
+                ))
+              ) : forecast > 0 ? (
+                <span
+                  className={`absolute inset-x-0 bottom-0 z-10 rounded-t-lg ${
+                    active ? "lime-fill" : "bg-surface-2 opacity-70"
+                  }`}
+                  style={{ height: `${(d.value / totale) * 100}%` }}
+                />
+              ) : null}
             </span>
             <span
               className={`text-[11px] capitalize ${
