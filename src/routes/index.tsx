@@ -73,6 +73,11 @@ function HomePage() {
     catSel === "all" ? previsteMese : previsteMese.filter((p) => p.categoria === catSel);
   const previsto = sommaPreviste(previsteFiltrate);
   const previstiPerCat = useMemo(() => previsteByCategoria(previsteMese), [previsteMese]);
+  // Con una categoria filtrata il previsto prende il SUO colore: resta
+  // riconoscibile come spesa di quella categoria. Senza filtro (più categorie
+  // insieme) nessun colore sarebbe corretto, quindi si usa il verde dell'app.
+  const catColore =
+    catSel === "all" ? undefined : state.categorie.find((c) => c.id === catSel)?.colore;
 
   const budgetTotale = state.categorie.reduce((a, c) => a + c.budget, 0);
   const budgetRif =
@@ -134,7 +139,13 @@ function HomePage() {
         </p>
         <p className="mt-1 text-4xl font-semibold tracking-tight">{eur(speso)}</p>
         <div className="mt-4">
-          <ProgressBar value={speso} max={budgetRif} forecast={previsto} height={12} />
+          <ProgressBar
+            value={speso}
+            max={budgetRif}
+            forecast={previsto}
+            forecastColor={catSel === "all" ? undefined : catColore}
+            height={12}
+          />
         </div>
         <p className="mt-2.5 text-sm" style={{ color: barTone(perc) }}>
           {budgetRif > 0
@@ -249,7 +260,7 @@ function HomePage() {
                     ),
                   )
                 : 0;
-            return { key: m, value: sum(reali), forecast: prev };
+            return { key: m, value: sum(reali), forecast: prev, forecastColor: catColore };
           })}
           selected={mese}
           onSelect={setMese}
@@ -326,6 +337,7 @@ function HomePage() {
                           value={val}
                           max={c.budget}
                           forecast={previstiPerCat.get(c.id) ?? 0}
+                          forecastColor={c.colore}
                           height={8}
                         />
                       </button>
@@ -372,6 +384,7 @@ function HomePage() {
                         value={val}
                         max={c.budget}
                         forecast={previstiPerCat.get(c.id) ?? 0}
+                        forecastColor={c.colore}
                         height={8}
                       />
                     </div>

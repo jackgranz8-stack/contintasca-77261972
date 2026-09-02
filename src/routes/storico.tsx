@@ -29,7 +29,8 @@ import { TrendBars } from "@/components/TrendBars";
 import { exportTransactions } from "@/lib/excel";
 import { AddExpenseModal } from "@/components/AddExpenseModal";
 import { ConfirmPopup } from "@/components/ConfirmPopup";
-import type { Transaction } from "@/lib/types";
+import { EditRecurringModal } from "@/components/EditRecurringModal";
+import type { Recurring, Transaction } from "@/lib/types";
 
 export const Route = createFileRoute("/storico")({
   head: () => ({
@@ -57,7 +58,7 @@ function chipClass(active: boolean) {
 }
 
 function StoricoPage() {
-  const { state, deleteTransaction } = useApp();
+  const { state, deleteTransaction, deleteRecurring } = useApp();
   const [meseSel, setMeseSel] = useState<Set<string>>(() => new Set([monthKey(new Date())]));
   const [catSel, setCatSel] = useState<Set<string>>(new Set());
   const [daEliminare, setDaEliminare] = useState<string | null>(null);
@@ -80,6 +81,8 @@ function StoricoPage() {
   > | null>(null);
   const [ricerca, setRicerca] = useState("");
   const [prossimeAperte, setProssimeAperte] = useState(false);
+  const [ricDaModificare, setRicDaModificare] = useState<Recurring | null>(null);
+  const [ricDaEliminare, setRicDaEliminare] = useState<string | null>(null);
 
   // Chip sempre visibili: solo gli ultimi 12 mesi, dal più recente al meno
   // recente, per non allungarsi all'infinito con l'uso nel tempo. Per periodi
@@ -354,40 +357,77 @@ function StoricoPage() {
                 {prossime.map((p) => {
                   const c = state.categorie.find((x) => x.id === p.categoria);
                   const Icon = iconFor(c?.icona ?? "wallet");
+                  const ricorrente = p.fonte === "ricorrente";
                   return (
-                    <li
-                      key={p.id}
-                      className="flex items-center gap-3 rounded-xl border border-dashed border-border bg-surface/50 px-3 py-2.5"
-                    >
-                      <span
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-                        style={{
-                          backgroundColor: `${c?.colore ?? "#9AA6A0"}18`,
-                          color: c?.colore ?? "#9AA6A0",
+                    <li key={p.id}>
+                      <SwipeToDelete
+                        id={p.id}
+                        openId={openSwipeId}
+                        onOpenChange={setOpenSwipeId}
+                        className="rounded-xl border border-dashed border-border bg-surface/50"
+                        label={
+                          ricorrente
+                            ? `Elimina la ricorrenza ${p.nota}`
+                            : `Elimina ${p.nota || c?.nome || "spesa prevista"}`
+                        }
+                        onDelete={() => {
+                          // Due cose diverse: una spesa prevista inserita a mano
+                          // è una transazione singola; una ricorrente è la regola
+                          // che le genera tutte. Eliminarle non ha lo stesso peso,
+                          // quindi si chiede conferma con parole diverse.
+                          if (ricorrente) setRicDaEliminare(p.ricorrenteId ?? null);
+                          else setDaEliminare(p.id);
                         }}
                       >
-                        <Icon size={14} />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="flex items-center gap-1.5 truncate text-sm text-muted-foreground">
-                          <span className="truncate">{p.nota || (c?.nome ?? "Spesa")}</span>
-                          {p.fonte === "ricorrente" && (
-                            <span
-                              title="Spesa ricorrente non ancora scattata"
-                              aria-label="Spesa ricorrente non ancora scattata"
-                              className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary"
-                            >
-                              <Repeat size={10} />
-                            </span>
-                          )}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {formatDay(p.data)} · {c?.nome ?? "Categoria eliminata"}
-                        </p>
-                      </div>
-                      <span className="text-sm font-semibold text-muted-foreground">
-                        {eur(p.importo)}
-                      </span>
+                        <div className="flex items-center gap-3 px-3 py-2.5">
+                          <span
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+                            style={{
+                              backgroundColor: `${c?.colore ?? "#9AA6A0"}18`,
+                              color: c?.colore ?? "#9AA6A0",
+                            }}
+                          >
+                            <Icon size={14} />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="flex items-center gap-1.5 truncate text-sm text-muted-foreground">
+                              <span className="truncate">{p.nota || (c?.nome ?? "Spesa")}</span>
+                              {ricorrente && (
+                                <span
+                                  title="Spesa ricorrente non ancora scattata"
+                                  aria-label="Spesa ricorrente non ancora scattata"
+                                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary"
+                                >
+                                  <Repeat size={10} />
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {formatDay(p.data)} · {c?.nome ?? "Categoria eliminata"}
+                            </p>
+                          </div>
+                          <span className="text-sm font-semibold text-muted-foreground">
+                            {eur(p.importo)}
+                          </span>
+                          <button
+                            onClick={() => {
+                              if (ricorrente) {
+                                const r = state.ricorrenti.find((x) => x.id === p.ricorrenteId);
+                                if (r) setRicDaModificare(r);
+                                return;
+                              }
+                              // Le previste manuali SONO transazioni vere (con data
+                              // futura): si modificano con lo stesso foglio delle altre.
+                              const t = state.transazioni.find((x) => x.id === p.id);
+                              if (t) setDaModificare(t);
+                            }}
+                            className="p-1.5 text-muted-foreground"
+                            aria-label={ricorrente ? "Modifica ricorrenza" : "Modifica"}
+                          >
+                            <Pencil size={16} />
+                          </button>
+                        </div>
+                      </SwipeToDelete>
                     </li>
                   );
                 })}
@@ -487,6 +527,30 @@ function StoricoPage() {
         onConfirm={() => {
           setConfermaExport(false);
           esporta();
+        }}
+      />
+
+      <EditRecurringModal
+        open={ricDaModificare !== null}
+        edit={ricDaModificare}
+        onClose={() => setRicDaModificare(null)}
+      />
+
+      {/* Eliminare una ricorrente non è come eliminare una spesa: si cancella la
+          regola che la genera, quindi sparisce anche da tutti i mesi a venire.
+          Va detto chiaramente, altrimenti sembra di stare togliendo solo la
+          voce di questo mese. */}
+      <ConfirmPopup
+        open={ricDaEliminare !== null}
+        onClose={() => setRicDaEliminare(null)}
+        title="Eliminare la spesa ricorrente?"
+        description="Non verrà più registrata in automatico nei prossimi mesi. Le spese già registrate in passato restano nello storico."
+        confirmLabel="Elimina"
+        onConfirm={() => {
+          if (!ricDaEliminare) return;
+          deleteRecurring(ricDaEliminare);
+          setRicDaEliminare(null);
+          toast.success("Spesa ricorrente eliminata");
         }}
       />
 

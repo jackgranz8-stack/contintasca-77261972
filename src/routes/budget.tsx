@@ -201,6 +201,7 @@ function BudgetPage() {
                     value={speso}
                     max={c.budget}
                     forecast={previstiPerCat.get(c.id) ?? 0}
+                    forecastColor={c.colore}
                     height={6}
                   />
                 </div>
