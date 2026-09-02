@@ -305,7 +305,16 @@ function HomePage() {
           <>
             <Donut
               slices={slices}
-              total={sum(txMeseReali)}
+              // Con una categoria filtrata al centro va il totale DI QUELLA
+              // categoria, non quello del mese: se ha solo spese previste il
+              // suo speso reale è 0, e 0 è la risposta giusta a "quanto ho
+              // speso qui finora".
+              total={catSel === "all" ? sum(txMeseReali) : speso}
+              centerLabel={
+                catSel === "all"
+                  ? "Totale"
+                  : (state.categorie.find((c) => c.id === catSel)?.nome ?? "Totale")
+              }
               selected={catSel === "all" ? null : catSel}
               onSelect={(id) => setCatSel((v) => (v === id ? "all" : id))}
             />
