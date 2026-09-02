@@ -32,6 +32,18 @@ const sameState = (a: AppState, b: AppState) => JSON.stringify(a) === JSON.strin
  * tenendo l'app ferma sulla schermata di caricamento anche quando sul
  * telefono c'era già una copia dei dati pronta da usare.
  */
+/*
+ * Il limite di tempo si applica SOLO al caricamento iniziale, dove serve per
+ * non restare bloccati sull'euro che gira quando manca la rete: dopo la
+ * scadenza si riparte dalla copia salvata sul telefono.
+ *
+ * Sui SALVATAGGI invece non va messo, ed è una lezione imparata sul campo: un
+ * salvataggio che supera il tempo limite viene comunque, molto spesso,
+ * completato dal server. Interromperlo qui non lo annulla — lo fa solo
+ * sembrare fallito, e questo produceva l'avviso "modifica non salvata" per
+ * modifiche che in realtà erano andate a buon fine (si ritrovavano infatti
+ * uscendo e rientrando dall'app).
+ */
 const NETWORK_TIMEOUT_MS = 3000;
 function withTimeout<T>(promise: Promise<T>, ms = NETWORK_TIMEOUT_MS): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -311,15 +323,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const maxAttempts = 3;
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           try {
-            await withTimeout(persistDiff(prev, attempted, acc.id));
+            // Nessun limite di tempo qui: vedi la nota su NETWORK_TIMEOUT_MS.
+            await persistDiff(prev, attempted, acc.id);
             return;
           } catch (err) {
-            const stillOnline = typeof navigator === "undefined" || navigator.onLine;
-            if (attempt < maxAttempts && stillOnline) {
-              // Il browser dice di essere online, ma la richiesta è comunque fallita:
-              // spesso è solo un intoppo di rete momentaneo. Riprova in silenzio
-              // prima di considerarlo un vero fallimento e annullare la modifica.
-              await sleep(500 * attempt);
+            if (attempt < maxAttempts) {
+              // Intoppo di rete momentaneo: si riprova in silenzio, con attese
+              // via via più lunghe. Nessun avviso all'utente: finché la
+              // modifica resta in coda non è persa.
+              await sleep(600 * attempt);
               continue;
             }
             throw err;
@@ -333,41 +345,75 @@ export function AppProvider({ children }: { children: ReactNode }) {
         saveOfflineCache(acc.id, attempted, attempted);
       })
       .catch(() => {
-        if (typeof navigator !== "undefined" && !navigator.onLine) {
-          pending.current = attempted;
-          setOfflinePending(true);
-        } else {
-          setState(prev);
-          toast.error("Connessione assente: la modifica non è stata salvata, riprova");
-        }
+        // La modifica NON viene più annullata e nessun errore viene mostrato.
+        // Prima, se il browser si diceva online, si tornava indietro e si
+        // avvisava "modifica non salvata": ma la scrittura poteva essere
+        // comunque arrivata al server (le operazioni partono in parallelo e
+        // possono riuscire in parte), e infatti ricomparivano riaprendo l'app.
+        // Ora resta semplicemente in coda e riparte da sola: vedi l'effetto
+        // di riprova automatica più sotto.
+        pending.current = attempted;
+        setOfflinePending(true);
       })
       .finally(() => setSyncing(false));
   }, [state, loaded]);
 
-  // Non appena la connessione torna disponibile, riprova a salvare la modifica in coda.
+  /*
+   * RIPROVA AUTOMATICA delle modifiche in coda.
+   *
+   * Parte da sola in tre occasioni:
+   * 1. quando il telefono segnala che la connessione è tornata;
+   * 2. quando si torna sull'app dopo averla lasciata in secondo piano;
+   * 3. ogni 15 secondi, come rete di sicurezza — perché il caso più
+   *    fastidioso è quello in cui il telefono si dice online ma la
+   *    connessione è di fatto assente per qualche istante: in quel caso
+   *    l'evento "connessione tornata" non arriva mai, e prima l'unico modo
+   *    per far ripartire il salvataggio era uscire e rientrare dall'app.
+   *
+   * Il messaggio di conferma compare solo quando la modifica viene davvero
+   * salvata, e mai un errore: se un tentativo non riesce, semplicemente si
+   * riproverà, senza allarmare per nulla.
+   */
   useEffect(() => {
+    let inCorso = false;
+
     function retry() {
       const acc = accountRef.current;
       const prev = baseline.current;
       const attempted = pending.current;
-      if (!acc || !prev || !attempted) return;
+      if (!acc || !prev || !attempted || inCorso) return;
+      inCorso = true;
       setSyncing(true);
       queue.current = queue.current
-        .then(() => withTimeout(persistDiff(prev, attempted, acc.id)))
+        .then(() => persistDiff(prev, attempted, acc.id))
         .then(() => {
           baseline.current = attempted;
           pending.current = null;
           setOfflinePending(false);
           saveOfflineCache(acc.id, attempted, attempted);
-          toast.success("Connessione tornata: modifiche sincronizzate");
+          toast.success("Modifiche sincronizzate");
         })
         .catch(() => {
-          toast.error("Ancora offline: riproverò più tardi");
+          // Silenzio voluto: resta in coda, si riprova al giro successivo.
         })
-        .finally(() => setSyncing(false));
+        .finally(() => {
+          inCorso = false;
+          setSyncing(false);
+        });
     }
+
+    function onVisibile() {
+      if (document.visibilityState === "visible") retry();
+    }
+
     window.addEventListener("online", retry);
-    return () => window.removeEventListener("online", retry);
+    document.addEventListener("visibilitychange", onVisibile);
+    const timer = window.setInterval(retry, 15000);
+    return () => {
+      window.removeEventListener("online", retry);
+      document.removeEventListener("visibilitychange", onVisibile);
+      window.clearInterval(timer);
+    };
   }, []);
 
   const update = useCallback((fn: (s: AppState) => AppState) => setState((s) => fn(s)), []);
