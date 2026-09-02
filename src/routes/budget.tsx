@@ -342,7 +342,10 @@ function BudgetPage() {
           nello Storico: chiusa mostra quante sono e quanto pesano al mese,
           aperta si gestiscono. Così la pagina Budget si apre compatta invece
           di srotolare subito l'elenco intero. */}
-      <section className="card-surface overflow-hidden">
+      {/* Vetro invece della scheda piena delle categorie: le ricorrenti non
+          sono "una categoria in più", sono un meccanismo che agisce su tutte.
+          Il materiale diverso lo dice senza bisogno di spiegarlo. */}
+      <section className="glass-card overflow-hidden">
         <button
           onClick={() => setRicorrentiAperte((v) => !v)}
           className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
