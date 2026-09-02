@@ -9,6 +9,12 @@ import { currentMonth, eur, monthLabel } from "@/lib/format";
 import { ICON_KEYS, iconFor } from "@/lib/icons";
 import { CATEGORY_COLORS, PALETTE, type Category } from "@/lib/types";
 import { ProgressBar } from "@/components/ProgressBar";
+import {
+  previsteByCategoria,
+  previsteDelMese,
+  sommaPreviste,
+  txRealizzate,
+} from "@/lib/previsioni";
 import { EditRecurringModal } from "@/components/EditRecurringModal";
 import { EditCategoryModal } from "@/components/EditCategoryModal";
 import { SwipeToDelete } from "@/components/SwipeToDelete";
@@ -60,8 +66,14 @@ function BudgetPage() {
 
   const totale = state.categorie.reduce((a, c) => a + c.budget, 0);
   const mese = currentMonth();
-  const spesiMese = totalsByCategory(txInMonth(state.transazioni, mese));
-  const spesoTotale = sum(txInMonth(state.transazioni, mese));
+  // Speso = solo transazioni già realizzate. Le date future e le ricorrenti
+  // non ancora scattate sono "previste" e restano fuori dai totali.
+  const txMeseReali = txRealizzate(txInMonth(state.transazioni, mese));
+  const spesiMese = totalsByCategory(txMeseReali);
+  const spesoTotale = sum(txMeseReali);
+  const previsteMese = previsteDelMese(state, mese);
+  const previstiPerCat = previsteByCategoria(previsteMese);
+  const previstoTotale = sommaPreviste(previsteMese);
 
   const creaCategoria = () => {
     const n = nuovaCat.trim();
@@ -121,8 +133,16 @@ function BudgetPage() {
             </span>
           </div>
           <div className="mt-2">
-            <ProgressBar value={spesoTotale} max={totale} height={8} />
+            <ProgressBar value={spesoTotale} max={totale} forecast={previstoTotale} height={8} />
           </div>
+          {previstoTotale > 0 && (
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              + {eur(previstoTotale)} previsti entro fine mese
+              {spesoTotale <= totale &&
+                spesoTotale + previstoTotale > totale &&
+                ` · sforerebbero di ${eur(spesoTotale + previstoTotale - totale)}`}
+            </p>
+          )}
         </section>
       )}
 
@@ -177,7 +197,12 @@ function BudgetPage() {
                   </button>
                 </div>
                 <div className="mt-2">
-                  <ProgressBar value={speso} max={c.budget} height={6} />
+                  <ProgressBar
+                    value={speso}
+                    max={c.budget}
+                    forecast={previstiPerCat.get(c.id) ?? 0}
+                    height={6}
+                  />
                 </div>
               </div>
             </SwipeToDelete>

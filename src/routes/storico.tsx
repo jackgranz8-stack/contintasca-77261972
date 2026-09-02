@@ -1,8 +1,18 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Calendar, ChevronDown, Copy, FileSpreadsheet, Pencil, Repeat, Search } from "lucide-react";
+import {
+  CalendarClock,
+  Calendar,
+  ChevronDown,
+  Copy,
+  FileSpreadsheet,
+  Pencil,
+  Repeat,
+  Search,
+} from "lucide-react";
 import { sum, txInMonth, useApp } from "@/lib/store";
+import { prossimePreviste, sommaPreviste, txRealizzate } from "@/lib/previsioni";
 import { SwipeToDelete } from "@/components/SwipeToDelete";
 
 import {
@@ -69,6 +79,7 @@ function StoricoPage() {
     "importo" | "categoria" | "nota"
   > | null>(null);
   const [ricerca, setRicerca] = useState("");
+  const [prossimeAperte, setProssimeAperte] = useState(false);
 
   // Chip sempre visibili: solo gli ultimi 12 mesi, dal più recente al meno
   // recente, per non allungarsi all'infinito con l'uso nel tempo. Per periodi
@@ -84,6 +95,12 @@ function StoricoPage() {
   };
 
   const mesiGrafico = useMemo(() => lastMonths(6), []);
+  const oggi = todayISO();
+
+  // Guarda al futuro, quindi NON segue i filtri per mese (pensati per il
+  // passato): mostra sempre tutto quello che sta per uscire, da qualsiasi mese.
+  const prossime = useMemo(() => prossimePreviste(state, oggi), [state, oggi]);
+  const prossimeTotale = sommaPreviste(prossime);
 
   const toggleMese = (m: string) => {
     setPeriodoRange(null);
@@ -103,11 +120,15 @@ function StoricoPage() {
       return next;
     });
 
+  // La lista principale mostra solo le spese GIÀ realizzate: quelle con data
+  // futura vivono nella sezione "Prossime spese" qui sopra, altrimenti
+  // comparirebbero due volte e falserebbero i totali del periodo.
+  const realizzate = txRealizzate(state.transazioni, oggi);
   const base = periodoRange
-    ? state.transazioni.filter((t) => t.data >= periodoRange.da && t.data <= periodoRange.a)
+    ? realizzate.filter((t) => t.data >= periodoRange.da && t.data <= periodoRange.a)
     : meseSel.size === 0
-      ? state.transazioni
-      : state.transazioni.filter((t) => meseSel.has(monthKey(t.data)));
+      ? realizzate
+      : realizzate.filter((t) => meseSel.has(monthKey(t.data)));
   const q = ricerca.trim().toLowerCase();
   const scoped = catSel.size === 0 ? base : base.filter((t) => catSel.has(t.categoria));
   const filtrate = scoped
@@ -251,7 +272,7 @@ function StoricoPage() {
         <h2 className="mb-4 text-sm font-semibold">Andamento nel tempo</h2>
         <TrendBars
           data={mesiGrafico.map((m) => {
-            const txMese = txInMonth(state.transazioni, m);
+            const txMese = txRealizzate(txInMonth(state.transazioni, m), oggi);
             if (catSel.size === 0) {
               return { key: m, value: sum(txMese) };
             }
@@ -295,6 +316,86 @@ function StoricoPage() {
           Esporta in Excel
         </button>
       </div>
+
+      {/* Prossime spese: sezione a parte, collassabile, sopra la lista. Unisce
+          le spese inserite con data futura e le ricorrenti che non sono ancora
+          scattate questo mese (queste ultime non esistono nei dati finché non
+          scattano: sono una proiezione, vedi lib/previsioni.ts). */}
+      {prossime.length > 0 && (
+        <section className="card-surface overflow-hidden">
+          <button
+            onClick={() => setProssimeAperte((v) => !v)}
+            className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
+            aria-expanded={prossimeAperte}
+          >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+              <CalendarClock size={15} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium">Prossime spese ({prossime.length})</span>
+              <span className="block text-[11px] text-muted-foreground">
+                {eur(prossimeTotale)} in arrivo · non ancora conteggiate
+              </span>
+            </span>
+            <ChevronDown
+              size={16}
+              className={`shrink-0 text-muted-foreground transition-transform duration-300 ${
+                prossimeAperte ? "rotate-180" : ""
+              }`}
+            />
+          </button>
+          <div
+            className={`grid transition-[grid-template-rows] duration-300 ease-out ${
+              prossimeAperte ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+            }`}
+          >
+            <div className="overflow-hidden">
+              <ul className="space-y-2 px-4 pb-4">
+                {prossime.map((p) => {
+                  const c = state.categorie.find((x) => x.id === p.categoria);
+                  const Icon = iconFor(c?.icona ?? "wallet");
+                  return (
+                    <li
+                      key={p.id}
+                      className="flex items-center gap-3 rounded-xl border border-dashed border-border bg-surface/50 px-3 py-2.5"
+                    >
+                      <span
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+                        style={{
+                          backgroundColor: `${c?.colore ?? "#9AA6A0"}18`,
+                          color: c?.colore ?? "#9AA6A0",
+                        }}
+                      >
+                        <Icon size={14} />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="flex items-center gap-1.5 truncate text-sm text-muted-foreground">
+                          <span className="truncate">{p.nota || (c?.nome ?? "Spesa")}</span>
+                          {p.fonte === "ricorrente" && (
+                            <span
+                              title="Spesa ricorrente non ancora scattata"
+                              aria-label="Spesa ricorrente non ancora scattata"
+                              className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary"
+                            >
+                              <Repeat size={10} />
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {formatDay(p.data)} · {c?.nome ?? "Categoria eliminata"}
+                        </p>
+                      </div>
+                      <span className="text-sm font-semibold text-muted-foreground">
+                        {eur(p.importo)}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="space-y-2">
         {filtrate.length === 0 && (

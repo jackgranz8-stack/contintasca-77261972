@@ -1,8 +1,14 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Lightbulb, TrendingUp, X } from "lucide-react";
+import { Lightbulb, Repeat, TrendingUp, X } from "lucide-react";
 import { sum, totalsByCategory, txInMonth, useApp } from "@/lib/store";
+import {
+  previsteByCategoria,
+  previsteDelMese,
+  sommaPreviste,
+  txRealizzate,
+} from "@/lib/previsioni";
 import { buildTips, type TipAction } from "@/lib/advice";
 import {
   currentMonth,
@@ -13,6 +19,7 @@ import {
   pct,
   barTone,
   uid,
+  todayISO,
 } from "@/lib/format";
 import { iconFor } from "@/lib/icons";
 import { ProgressBar } from "@/components/ProgressBar";
@@ -47,15 +54,31 @@ function HomePage() {
   const [openSwipeTipId, setOpenSwipeTipId] = useState<string | null>(null);
 
   const mesi = useMemo(() => lastMonths(6), []);
+  const oggi = todayISO();
+
+  // Lo speso conta SOLO le transazioni già realizzate (data <= oggi): quelle
+  // con data futura sono "previste" e vivono a parte, per non falsare la
+  // risposta a "quanto ho speso davvero questo mese".
   const txMese = txInMonth(state.transazioni, mese);
-  const txFiltrate = catSel === "all" ? txMese : txMese.filter((t) => t.categoria === catSel);
+  const txMeseReali = txRealizzate(txMese, oggi);
+  const txFiltrate =
+    catSel === "all" ? txMeseReali : txMeseReali.filter((t) => t.categoria === catSel);
   const speso = sum(txFiltrate);
+
+  // Previsto = transazioni future inserite a mano + ricorrenti non ancora
+  // scattate (queste ultime non esistono nei dati finché non scattano, quindi
+  // vengono proiettate al volo — vedi lib/previsioni.ts).
+  const previsteMese = useMemo(() => previsteDelMese(state, mese, oggi), [state, mese, oggi]);
+  const previsteFiltrate =
+    catSel === "all" ? previsteMese : previsteMese.filter((p) => p.categoria === catSel);
+  const previsto = sommaPreviste(previsteFiltrate);
+  const previstiPerCat = useMemo(() => previsteByCategoria(previsteMese), [previsteMese]);
 
   const budgetTotale = state.categorie.reduce((a, c) => a + c.budget, 0);
   const budgetRif =
     catSel === "all" ? budgetTotale : (state.categorie.find((c) => c.id === catSel)?.budget ?? 0);
   const perc = pct(speso, budgetRif);
-  const totali = totalsByCategory(txMese);
+  const totali = totalsByCategory(txMeseReali);
   const tips = useMemo(() => buildTips(state), [state]);
 
   const applica = (action: TipAction) => {
@@ -111,7 +134,7 @@ function HomePage() {
         </p>
         <p className="mt-1 text-4xl font-semibold tracking-tight">{eur(speso)}</p>
         <div className="mt-4">
-          <ProgressBar value={speso} max={budgetRif} height={12} />
+          <ProgressBar value={speso} max={budgetRif} forecast={previsto} height={12} />
         </div>
         <p className="mt-2.5 text-sm" style={{ color: barTone(perc) }}>
           {budgetRif > 0
@@ -120,6 +143,18 @@ function HomePage() {
               : `Hai superato il budget di ${eur(speso - budgetRif)} su ${eur(budgetRif)}`
             : "Nessun budget impostato per questa selezione"}
         </p>
+        {/* Riga leggera, non una card a sé: il previsto va visto, ma non deve
+            mettersi in competizione con il numero dello speso reale. */}
+        {previsto > 0 && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            + {eur(previsto)} previsti{" "}
+            {mese === currentMonth() ? "entro fine mese" : `in ${monthLabel(mese)}`}
+            {budgetRif > 0 &&
+              speso <= budgetRif &&
+              speso + previsto > budgetRif &&
+              ` · sforerebbero il budget di ${eur(speso + previsto - budgetRif)}`}
+          </p>
+        )}
       </section>
 
       {/* 2. Consigli intelligenti */}
@@ -200,14 +235,22 @@ function HomePage() {
           <span className="ml-auto text-[11px] text-muted-foreground">ultimi 6 mesi</span>
         </div>
         <TrendBars
-          data={mesi.map((m) => ({
-            key: m,
-            value: sum(
-              txInMonth(state.transazioni, m).filter(
-                (t) => catSel === "all" || t.categoria === catSel,
-              ),
-            ),
-          }))}
+          data={mesi.map((m) => {
+            const reali = txRealizzate(txInMonth(state.transazioni, m), oggi).filter(
+              (t) => catSel === "all" || t.categoria === catSel,
+            );
+            // Solo il mese in corso ha un "previsto": i mesi passati sono
+            // chiusi, non c'è più nulla in arrivo da mostrare.
+            const prev =
+              m === currentMonth()
+                ? sommaPreviste(
+                    previsteDelMese(state, m, oggi).filter(
+                      (p) => catSel === "all" || p.categoria === catSel,
+                    ),
+                  )
+                : 0;
+            return { key: m, value: sum(reali), forecast: prev };
+          })}
           selected={mese}
           onSelect={setMese}
         />
@@ -251,7 +294,7 @@ function HomePage() {
           <>
             <Donut
               slices={slices}
-              total={sum(txMese)}
+              total={sum(txMeseReali)}
               selected={catSel === "all" ? null : catSel}
               onSelect={(id) => setCatSel((v) => (v === id ? "all" : id))}
             />
@@ -279,7 +322,12 @@ function HomePage() {
                             {eur(val)} / {eur(c.budget)}
                           </span>
                         </div>
-                        <ProgressBar value={val} max={c.budget} height={8} />
+                        <ProgressBar
+                          value={val}
+                          max={c.budget}
+                          forecast={previstiPerCat.get(c.id) ?? 0}
+                          height={8}
+                        />
                       </button>
                     </li>
                   );
@@ -291,9 +339,13 @@ function HomePage() {
                 if (!c) return null;
                 const Icon = iconFor(c.icona);
                 const val = totali.get(c.id) ?? 0;
-                const txCat = txMese
+                // Nella lista di dettaglio le previste ci sono, ma marcate: qui
+                // serve il quadro completo della categoria, cosa è uscito e cosa
+                // sta per uscire. Le più imminenti stanno in cima.
+                const txCat = txRealizzate(txMese, oggi)
                   .filter((t) => t.categoria === catSel)
                   .sort((a, b) => (a.data < b.data ? 1 : -1));
+                const prevCat = previsteMese.filter((p) => p.categoria === catSel);
                 return (
                   <div className="mt-2 border-t border-border pt-4">
                     <div className="flex items-center gap-2">
@@ -316,10 +368,42 @@ function HomePage() {
                       </button>
                     </div>
                     <div className="mt-2.5">
-                      <ProgressBar value={val} max={c.budget} height={8} />
+                      <ProgressBar
+                        value={val}
+                        max={c.budget}
+                        forecast={previstiPerCat.get(c.id) ?? 0}
+                        height={8}
+                      />
                     </div>
                     <div className="mt-4 space-y-2">
-                      {txCat.length === 0 ? (
+                      {prevCat.map((p) => (
+                        <div
+                          key={p.id}
+                          className="flex items-center gap-3 rounded-xl border border-dashed border-border bg-surface/50 px-3 py-2.5"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="flex items-center gap-1.5 truncate text-sm text-muted-foreground">
+                              <span className="truncate">{p.nota || c.nome}</span>
+                              {p.fonte === "ricorrente" && (
+                                <span
+                                  title="Spesa ricorrente non ancora scattata"
+                                  aria-label="Spesa ricorrente non ancora scattata"
+                                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary"
+                                >
+                                  <Repeat size={10} />
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {formatDay(p.data)} · prevista
+                            </p>
+                          </div>
+                          <span className="text-sm font-semibold text-muted-foreground">
+                            {eur(p.importo)}
+                          </span>
+                        </div>
+                      ))}
+                      {txCat.length === 0 && prevCat.length === 0 ? (
                         <p className="py-4 text-center text-xs text-muted-foreground">
                           Nessuna transazione in {c.nome} in {monthLabel(mese)}
                         </p>
