@@ -4,18 +4,26 @@ export function ProgressBar({
   value,
   max,
   forecast = 0,
+  forecastColor,
   color,
   height = 10,
 }: {
   value: number;
   max: number;
   /**
-   * Spesa PREVISTA (non ancora realizzata): disegnata subito dopo quella
-   * reale, nello stesso colore ma a tratto leggero e con righine diagonali.
-   * Serve a rispondere a colpo d'occhio a "se anche il previsto si realizza,
-   * sforo il budget?", senza mai far sembrare quei soldi già usciti.
+   * Spesa PREVISTA (non ancora realizzata): disegnata in continuità con
+   * quella reale, senza stacchi, in tinta molto tenue e con un tratteggio
+   * appena accennato. Deve leggersi come "in arrivo", senza mai dare
+   * l'impressione che quei soldi siano già usciti.
    */
   forecast?: number;
+  /**
+   * Colore di riferimento della parte prevista. Quando la barra riguarda UNA
+   * categoria si passa il colore di quella categoria, così il previsto resta
+   * riconoscibile come suo; quando la barra è complessiva (più categorie
+   * insieme) si lascia vuoto e viene usato il verde dell'app.
+   */
+  forecastColor?: string | undefined;
   color?: string;
   height?: number;
 }) {
@@ -24,11 +32,10 @@ export function ProgressBar({
   // Il previsto occupa lo spazio che resta: non deve mai spingere la parte
   // reale fuori dalla barra né far sembrare che si sia speso più del vero.
   const pPrevisto = Math.min(100 - pReale, pct(forecast, max));
+  const mostraPrevisto = pPrevisto > 0;
+
   const tonoReale = color ?? barTone(p);
-  // Tonalità del previsto: quella che avrebbe la barra SE il previsto si
-  // realizzasse. Così se il totale sfora, la parte leggera vira già al rosso
-  // e l'avviso arriva prima, non a cose fatte.
-  const tonoPrevisto = color ?? barTone(pct(value + forecast, max));
+  const tintaPrevisto = forecastColor ?? "var(--accent-lime)";
 
   return (
     <div
@@ -40,19 +47,24 @@ export function ProgressBar({
       aria-valuemax={100}
     >
       <div
-        className="h-full rounded-full transition-all duration-500"
+        // Con il previsto accanto, il lato destro resta squadrato: così la
+        // parte prevista riprende esattamente da dove finisce quella reale,
+        // senza il gradino che si vedeva quando entrambe erano arrotondate.
+        className={`h-full transition-all duration-500 ${
+          mostraPrevisto ? "rounded-l-full" : "rounded-full"
+        }`}
         style={{ width: `${pReale}%`, background: tonoReale }}
       />
-      {pPrevisto > 0 && (
+      {mostraPrevisto && (
         <div
-          className="h-full rounded-full transition-all duration-500"
+          className="h-full rounded-r-full transition-all duration-500"
           style={{
             width: `${pPrevisto}%`,
-            // Righine diagonali sul colore di base, tenuto trasparente: si
-            // legge come "in arrivo" anche da chi non distingue bene i colori,
-            // perché la differenza non è solo di tinta ma di trama.
-            backgroundColor: `color-mix(in oklab, ${tonoPrevisto} 32%, transparent)`,
-            backgroundImage: `repeating-linear-gradient(135deg, color-mix(in oklab, ${tonoPrevisto} 55%, transparent) 0 2px, transparent 2px 5px)`,
+            // Velo molto leggero della tinta di riferimento...
+            backgroundColor: `color-mix(in oklab, ${tintaPrevisto} 16%, transparent)`,
+            // ...più righine sottili e distanziate: si intuisce il tratteggio
+            // senza che diventi un motivo invadente.
+            backgroundImage: `repeating-linear-gradient(135deg, color-mix(in oklab, ${tintaPrevisto} 28%, transparent) 0 1px, transparent 1px 7px)`,
           }}
         />
       )}

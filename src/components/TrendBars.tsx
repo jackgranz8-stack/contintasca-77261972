@@ -14,6 +14,12 @@ export type BarDatum = {
    * chiusi, non hanno nulla da prevedere.
    */
   forecast?: number;
+  /**
+   * Colore di riferimento del previsto: il colore della categoria quando il
+   * grafico ne mostra una sola, altrimenti si lascia vuoto e viene usato il
+   * verde dell'app.
+   */
+  forecastColor?: string | undefined;
 };
 
 export function TrendBars({
@@ -37,6 +43,7 @@ export function TrendBars({
         const active = selectedKeys.includes(d.key);
         const shown = hover === d.key;
         const forecast = d.forecast ?? 0;
+        const tintaPrevisto = d.forecastColor ?? "var(--accent-lime)";
         const totale = d.value + forecast;
         const h = Math.max(6, (totale / max) * 96);
         const segments = d.value > 0 && d.segments && d.segments.length > 0 ? d.segments : null;
@@ -90,9 +97,8 @@ export function TrendBars({
                   className="w-full shrink-0"
                   style={{
                     height: `${(forecast / totale) * 100}%`,
-                    backgroundColor: "color-mix(in oklab, var(--accent-lime) 26%, transparent)",
-                    backgroundImage:
-                      "repeating-linear-gradient(135deg, color-mix(in oklab, var(--accent-lime) 52%, transparent) 0 2px, transparent 2px 5px)",
+                    backgroundColor: `color-mix(in oklab, ${tintaPrevisto} 16%, transparent)`,
+                    backgroundImage: `repeating-linear-gradient(135deg, color-mix(in oklab, ${tintaPrevisto} 28%, transparent) 0 1px, transparent 1px 7px)`,
                   }}
                 />
               )}
