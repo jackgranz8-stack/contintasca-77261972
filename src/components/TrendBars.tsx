@@ -2,7 +2,19 @@ import { useState } from "react";
 import { eur, monthLabel } from "@/lib/format";
 
 export type BarSegment = { color: string; value: number };
-export type BarDatum = { key: string; value: number; segments?: BarSegment[] };
+export type BarDatum = {
+  key: string;
+  value: number;
+  segments?: BarSegment[];
+  /**
+   * Spesa PREVISTA del mese (non ancora realizzata): disegnata come blocco a
+   * tratto leggero SOPRA la parte reale, così l'altezza totale mostra dove si
+   * arriverebbe, ma il numero sopra la barra continua a indicare solo lo
+   * speso vero. Usato di norma solo sul mese in corso: i mesi passati sono
+   * chiusi, non hanno nulla da prevedere.
+   */
+  forecast?: number;
+};
 
 export function TrendBars({
   data,
@@ -14,7 +26,9 @@ export function TrendBars({
   onSelect?: (key: string) => void;
 }) {
   const [hover, setHover] = useState<string | null>(null);
-  const max = Math.max(1, ...data.map((d) => d.value));
+  // L'altezza si scala sul totale (reale + previsto), altrimenti un previsto
+  // alto sforerebbe fuori dal grafico.
+  const max = Math.max(1, ...data.map((d) => d.value + (d.forecast ?? 0)));
   const selectedKeys = Array.isArray(selected) ? selected : selected ? [selected] : [];
 
   return (
@@ -22,7 +36,9 @@ export function TrendBars({
       {data.map((d) => {
         const active = selectedKeys.includes(d.key);
         const shown = hover === d.key;
-        const h = Math.max(6, (d.value / max) * 96);
+        const forecast = d.forecast ?? 0;
+        const totale = d.value + forecast;
+        const h = Math.max(6, (totale / max) * 96);
         const segments = d.value > 0 && d.segments && d.segments.length > 0 ? d.segments : null;
         return (
           <button
@@ -42,6 +58,9 @@ export function TrendBars({
                   {monthLabel(d.key, true).toLowerCase()}
                 </span>{" "}
                 <span className="font-semibold">{eur(d.value)}</span>
+                {forecast > 0 && (
+                  <span className="text-muted-foreground"> + {eur(forecast)} previsti</span>
+                )}
               </span>
             )}
             <span
@@ -55,7 +74,7 @@ export function TrendBars({
             </span>
             <span
               className={`relative flex w-full flex-col overflow-hidden rounded-t-lg transition-all duration-300 ${
-                segments
+                segments || forecast > 0
                   ? `bg-surface-2 ${active ? "ring-2 ring-foreground/50" : ""}`
                   : active
                     ? "lime-fill"
@@ -63,15 +82,37 @@ export function TrendBars({
               }`}
               style={{ height: h }}
             >
-              {segments?.map((seg, i) => (
+              {/* Previsto: sta in cima, a righine leggere. La distinzione non è
+                  solo di colore ma di trama, così si capisce anche a colpo
+                  d'occhio veloce o con difficoltà nel distinguere i colori. */}
+              {forecast > 0 && (
                 <span
-                  key={i}
+                  className="w-full shrink-0"
                   style={{
-                    height: `${(seg.value / d.value) * 100}%`,
-                    backgroundColor: seg.color,
+                    height: `${(forecast / totale) * 100}%`,
+                    backgroundColor: "color-mix(in oklab, var(--accent-lime) 26%, transparent)",
+                    backgroundImage:
+                      "repeating-linear-gradient(135deg, color-mix(in oklab, var(--accent-lime) 52%, transparent) 0 2px, transparent 2px 5px)",
                   }}
                 />
-              ))}
+              )}
+              {segments
+                ? segments.map((seg, i) => (
+                    <span
+                      key={i}
+                      className="w-full shrink-0"
+                      style={{
+                        height: `${(seg.value / totale) * 100}%`,
+                        backgroundColor: seg.color,
+                      }}
+                    />
+                  ))
+                : forecast > 0 && (
+                    <span
+                      className={`w-full shrink-0 ${active ? "lime-fill" : "bg-surface-2 opacity-70"}`}
+                      style={{ height: `${(d.value / totale) * 100}%` }}
+                    />
+                  )}
             </span>
             <span
               className={`text-[11px] capitalize ${

@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { Repeat, X } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { iconFor } from "@/lib/icons";
-import { todayISO, uid } from "@/lib/format";
+import { formatDay, todayISO, uid } from "@/lib/format";
 import type { Transaction } from "@/lib/types";
 import { BottomSheet } from "./BottomSheet";
 import { ConfirmPopup } from "./ConfirmPopup";
@@ -195,10 +195,15 @@ export function AddExpenseModal({
   };
 
   const dateChips: { label: string; value: string }[] = [
-    { label: "Oggi", value: todayISO() },
     { label: "Ieri", value: shiftDay(-1) },
-    { label: "2 gg fa", value: shiftDay(-2) },
+    { label: "Oggi", value: todayISO() },
+    { label: "Domani", value: shiftDay(1) },
   ];
+
+  // Una data futura non entra nello speso del mese: diventa una "spesa
+  // prevista". Va detto subito, altrimenti l'utente la cerca nei totali e non
+  // la trova, pensando che l'app non l'abbia salvata.
+  const isFutura = data > todayISO();
 
   return (
     <BottomSheet open={open} onClose={onClose}>
@@ -293,6 +298,11 @@ export function AddExpenseModal({
             className="shrink-0 rounded-full border border-border bg-surface px-3 py-2 text-xs outline-none"
           />
         </div>
+        {isFutura && (
+          <p className="mb-2.5 text-[11px] text-muted-foreground">
+            Data futura: sarà una spesa prevista e verrà conteggiata dal {formatDay(data)}.
+          </p>
+        )}
       </div>
 
       <input
