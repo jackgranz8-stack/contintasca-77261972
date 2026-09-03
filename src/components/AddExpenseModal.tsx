@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Repeat, X } from "lucide-react";
 import { useApp } from "@/lib/store";
@@ -45,6 +45,15 @@ export function AddExpenseModal({
     fine: null,
   });
   const [confermaStop, setConfermaStop] = useState(false);
+  const importoRef = useRef<HTMLInputElement | null>(null);
+  /*
+   * Il fuoco dato dall'app (non dal dito dell'utente) non deve attivare la
+   * modalità "sto scrivendo l'importo", che oscura e disattiva il resto del
+   * foglio: altrimenti all'apertura categoria e data risulterebbero
+   * inutilizzabili finché non si chiude la tastiera. Così invece la tastiera
+   * è pronta per scrivere, ma si può anche toccare subito una categoria.
+   */
+  const fuocoAutomatico = useRef(false);
   const [campo, setCampo] = useState<"importo" | "nota" | null>(null);
 
   const regola = edit?.ricorrenteId
@@ -92,6 +101,26 @@ export function AddExpenseModal({
       setRegole({ cadenza: "mesi", intervallo: 1, giorno: dayOf(todayISO()), fine: null });
     }
   }, [open, edit, preset, state.categorie, state.ricorrenti]);
+
+  /*
+   * Passaggio del fuoco al campo importo, così si può digitare subito.
+   *
+   * Solo per una spesa NUOVA: quando si modifica una spesa esistente
+   * l'importo è già scritto e più spesso si vuole cambiare categoria o data,
+   * quindi alzare la tastiera sarebbe d'impiccio.
+   *
+   * L'attesa serve a dare il tempo al foglio di salire: la tastiera è già
+   * aperta grazie al campo preparatore in AppShell, quindi qui si sta solo
+   * spostando il fuoco, senza rischio che si chiuda.
+   */
+  useEffect(() => {
+    if (!open || edit) return;
+    const timer = window.setTimeout(() => {
+      fuocoAutomatico.current = true;
+      importoRef.current?.focus({ preventScroll: true });
+    }, 260);
+    return () => window.clearTimeout(timer);
+  }, [open, edit]);
 
   const valore = Number(importo.replace(",", "."));
 
@@ -267,9 +296,14 @@ export function AddExpenseModal({
           step="0.01"
           min="0"
           value={importo.replace(",", ".")}
+          ref={importoRef}
           onFocus={(e) => {
-            setCampo("importo");
             e.target.select();
+            if (fuocoAutomatico.current) {
+              fuocoAutomatico.current = false;
+              return;
+            }
+            setCampo("importo");
           }}
           onBlur={() => setCampo((v) => (v === "importo" ? null : v))}
           onKeyDown={(e) => {

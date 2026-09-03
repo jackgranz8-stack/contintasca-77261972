@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useApp } from "@/lib/store";
 import { isFaceIdEnabled } from "@/lib/webauthn";
@@ -14,6 +14,26 @@ export const useUi = () => useContext(UiContext);
 export function AppShell({ children }: { children: ReactNode }) {
   const { state, loaded, loadError, retryLoad, account, syncing, offlinePending } = useApp();
   const [addOpen, setAddOpen] = useState(false);
+  const primerRef = useRef<HTMLInputElement | null>(null);
+
+  /*
+   * Apre "Nuova spesa" con la tastiera già alzata.
+   *
+   * Su iPhone la tastiera si apre solo se il fuoco viene dato a un campo
+   * DENTRO il gesto del dito. Il foglio però compare dopo, e in quel momento
+   * il campo importo non esiste ancora nella pagina: metterlo a fuoco più
+   * tardi darebbe il cursore ma non la tastiera.
+   *
+   * Si usa quindi un campo invisibile sempre presente ("preparatore"): lo si
+   * mette a fuoco subito, nello stesso istante del tocco, e la tastiera si
+   * apre. Quando poi il foglio è pronto, il fuoco passa al campo importo — e
+   * il passaggio da un campo all'altro a tastiera già aperta è consentito,
+   * quindi la tastiera resta su senza sfarfallare.
+   */
+  const apriAggiungi = () => {
+    primerRef.current?.focus();
+    setAddOpen(true);
+  };
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const isAuthRoute = pathname.startsWith("/auth") || pathname.startsWith("/reset-password");
@@ -116,7 +136,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   const app = (
-    <UiContext.Provider value={{ openAdd: () => setAddOpen(true) }}>
+    <UiContext.Provider value={{ openAdd: apriAggiungi }}>
       <div className="app-frame">
         <div className="app-scroll">
           {/* safe-x: margini laterali che diventano più larghi in orizzontale
@@ -142,7 +162,22 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         )}
 
-        <BottomNav onAdd={() => setAddOpen(true)} />
+        {/* Campo "preparatore" della tastiera: invisibile e non raggiungibile
+            con la navigazione, serve solo a far aprire la tastiera dentro il
+            gesto del dito (vedi apriAggiungi). Il carattere da 16px evita che
+            iPhone ingrandisca la pagina quando riceve il fuoco. */}
+        <input
+          ref={primerRef}
+          type="text"
+          inputMode="decimal"
+          tabIndex={-1}
+          aria-hidden="true"
+          readOnly
+          className="pointer-events-none fixed bottom-0 left-0 h-px w-px opacity-0"
+          style={{ fontSize: 16 }}
+        />
+
+        <BottomNav onAdd={apriAggiungi} />
         <AddExpenseModal open={addOpen} onClose={() => setAddOpen(false)} />
       </div>
     </UiContext.Provider>
