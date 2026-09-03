@@ -30,3 +30,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Variabili d'ambiente: NON devono stare nel repository.
+# I valori veri vanno impostati su Vercel (Settings → Environment Variables)
+# e, per lo sviluppo locale, in un file .env sul proprio computer, che questa
+# regola tiene fuori da git.
+.env
+.env.*
+!.env.example
