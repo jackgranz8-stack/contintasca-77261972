@@ -87,7 +87,7 @@ export function BottomSheet({
       />
       <div
         data-scroll-lock-allow
-        className="no-scrollbar relative z-10 max-h-[92svh] w-full max-w-[430px] overflow-y-auto overscroll-contain rounded-t-[28px] border border-border bg-popover pb-[max(env(safe-area-inset-bottom),14px)]"
+        className="no-scrollbar relative z-10 max-h-[92svh] w-full max-w-[430px] overflow-y-auto overscroll-contain rounded-t-3xl border border-border bg-popover pb-[max(env(safe-area-inset-bottom),14px)]"
         style={{ transform, transition }}
       >
         <div
