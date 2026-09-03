@@ -1,0 +1,44 @@
+# Controlli automatici a ogni modifica caricata su GitHub.
+#
+# A cosa serve: dato che le modifiche si caricano direttamente
+# dall'interfaccia web (senza compilare nulla sul computer), questo è il
+# punto in cui si scopre un errore PRIMA che finisca online su Vercel.
+# Se qualcosa non torna, appare una spunta rossa sul commit e arriva una
+# email da GitHub.
+name: Controlli
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  verifica:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      # "npm ci" installa esattamente le versioni bloccate: se manca il
+      # file di blocco si ricade su "npm install", così il controllo
+      # funziona comunque.
+      - name: Installa le dipendenze
+        run: npm ci || npm install
+
+      - name: Controllo dei tipi
+        run: npx tsc --noEmit
+
+      - name: Controllo dello stile del codice
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      # Ultimo perché è il più lento: se i controlli sopra passano, questo
+      # conferma che il progetto si compila davvero.
+      - name: Compilazione
+        run: npm run build
