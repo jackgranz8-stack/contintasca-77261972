@@ -10,6 +10,7 @@ import { ICON_KEYS, iconFor } from "@/lib/icons";
 import { CATEGORY_COLORS, PALETTE, type Category } from "@/lib/types";
 import { ProgressBar } from "@/components/ProgressBar";
 import { RecurrenceFields, type RegoleRicorrenza } from "@/components/RecurrenceFields";
+import { EmptyState } from "@/components/EmptyState";
 import { etichettaCadenza } from "@/lib/ricorrenze";
 import {
   previsteByCategoria,
@@ -435,9 +436,14 @@ function BudgetPage() {
               </div>
 
               {state.ricorrenti.length === 0 && !formRic && (
-                <p className="card-surface p-4 text-center text-xs text-muted-foreground">
-                  Nessuna spesa ricorrente. Le ricorrenti attive si registrano da sole ogni mese.
-                </p>
+                <EmptyState
+                  compact
+                  icon={Repeat}
+                  title="Nessuna spesa ricorrente"
+                  description="Affitto, bollette, abbonamenti: impostale una volta e si registrano da sole alla scadenza."
+                  actionLabel="Aggiungi la prima"
+                  onAction={() => setFormRic(true)}
+                />
               )}
 
               {state.ricorrenti.map((r) => {
@@ -494,13 +500,6 @@ function BudgetPage() {
                   </SwipeToDelete>
                 );
               })}
-
-              {state.ricorrenti.length === 0 && !formRic && (
-                <p className="py-3 text-center text-xs text-muted-foreground">
-                  Le spese fisse (affitto, bollette, abbonamenti) si registrano da sole alla data
-                  che scegli.
-                </p>
-              )}
             </div>
           </div>
         </div>

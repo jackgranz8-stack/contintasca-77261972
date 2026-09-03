@@ -3,6 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
   CalendarClock,
+  ListFilter,
+  SearchX,
   Calendar,
   ChevronDown,
   Copy,
@@ -30,6 +32,7 @@ import { exportTransactions } from "@/lib/excel";
 import { AddExpenseModal } from "@/components/AddExpenseModal";
 import { ConfirmPopup } from "@/components/ConfirmPopup";
 import { EditRecurringModal } from "@/components/EditRecurringModal";
+import { EmptyState } from "@/components/EmptyState";
 import type { Recurring, Transaction } from "@/lib/types";
 
 export const Route = createFileRoute("/storico")({
@@ -133,6 +136,18 @@ function StoricoPage() {
       ? realizzate
       : realizzate.filter((t) => meseSel.has(monthKey(t.data)));
   const q = ricerca.trim().toLowerCase();
+
+  // Un filtro è "attivo" se restringe qualcosa: solo così ha senso proporre
+  // di azzerarlo. Con nessun filtro attivo il pulsante prometterebbe una
+  // soluzione che non cambia nulla.
+  const filtriAttivi = q !== "" || catSel.size > 0 || periodoRange !== null || meseSel.size > 0;
+
+  const azzeraFiltri = () => {
+    setRicerca("");
+    setCatSel(new Set());
+    setMeseSel(new Set());
+    setPeriodoRange(null);
+  };
   const scoped = catSel.size === 0 ? base : base.filter((t) => catSel.has(t.categoria));
   const filtrate = scoped
     .filter((t) => (q ? (t.nota ?? "").toLowerCase().includes(q) : true))
@@ -313,7 +328,7 @@ function StoricoPage() {
         <button
           onClick={() => setConfermaExport(true)}
           disabled={filtrate.length === 0}
-          className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-muted-foreground disabled:opacity-40"
+          className="flex items-center gap-1.5 chip bg-surface text-muted-foreground disabled:opacity-40"
         >
           <FileSpreadsheet size={13} className="text-primary" />
           Esporta in Excel
@@ -439,9 +454,16 @@ function StoricoPage() {
 
       <section className="space-y-2">
         {filtrate.length === 0 && (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            {q ? "Nessuna transazione trovata" : "Nessuna transazione con questi filtri"}
-          </p>
+          <EmptyState
+            icon={q ? SearchX : ListFilter}
+            title={q ? "Nessun risultato" : "Nessuna spesa in questo periodo"}
+            description={
+              q
+                ? `Nessuna spesa corrisponde a "${q}". Prova con un altro termine o cambia periodo.`
+                : "Prova ad allargare i filtri: un altro mese, oppure tutte le categorie."
+            }
+            {...(filtriAttivi ? { actionLabel: "Azzera i filtri", onAction: azzeraFiltri } : {})}
+          />
         )}
         {filtrate.map((t) => {
           const c = state.categorie.find((x) => x.id === t.categoria);

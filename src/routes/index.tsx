@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Lightbulb, Repeat, TrendingUp, X } from "lucide-react";
+import { Lightbulb, Repeat, TrendingUp, Wallet, X } from "lucide-react";
 import { sum, totalsByCategory, txInMonth, useApp } from "@/lib/store";
 import {
   previsteByCategoria,
@@ -23,6 +23,8 @@ import {
 } from "@/lib/format";
 import { iconFor } from "@/lib/icons";
 import { ProgressBar } from "@/components/ProgressBar";
+import { EmptyState } from "@/components/EmptyState";
+import { useUi } from "@/components/AppShell";
 import { TrendBars } from "@/components/TrendBars";
 import { Donut } from "@/components/Donut";
 import { SwipeToDelete } from "@/components/SwipeToDelete";
@@ -48,6 +50,9 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const { state, update, dismissTip } = useApp();
+  // Il pulsante dello stato vuoto apre lo stesso foglio del "+" nella barra,
+  // con la tastiera già pronta (vedi apriAggiungi in AppShell).
+  const { openAdd } = useUi();
   const navigate = useNavigate();
   const [mese, setMese] = useState(currentMonth());
   const [catSel, setCatSel] = useState<string | "all">("all");
@@ -432,9 +437,12 @@ function HomePage() {
                         </div>
                       ))}
                       {txCat.length === 0 && prevCat.length === 0 ? (
-                        <p className="py-4 text-center text-xs text-muted-foreground">
-                          Nessuna transazione in {c.nome} in {monthLabel(mese)}
-                        </p>
+                        <EmptyState
+                          compact
+                          icon={iconFor(c.icona)}
+                          title={`Niente in ${c.nome}`}
+                          description={`Nessun movimento in ${monthLabel(mese)} per questa categoria.`}
+                        />
                       ) : (
                         txCat.map((t) => (
                           <div
@@ -458,9 +466,18 @@ function HomePage() {
             )}
           </>
         ) : (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            Nessuna spesa in {monthLabel(mese)}
-          </p>
+          <EmptyState
+            icon={Wallet}
+            title={`Nessuna spesa in ${monthLabel(mese)}`}
+            description={
+              mese === currentMonth()
+                ? "Registra la prima spesa del mese: bastano l'importo e la categoria."
+                : "In questo mese non risulta nessun movimento."
+            }
+            {...(mese === currentMonth()
+              ? { actionLabel: "Aggiungi spesa", onAction: openAdd }
+              : {})}
+          />
         )}
       </section>
     </div>
