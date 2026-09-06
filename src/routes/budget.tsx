@@ -11,7 +11,7 @@ import { CATEGORY_COLORS, PALETTE, type Category } from "@/lib/types";
 import { ProgressBar } from "@/components/ProgressBar";
 import { RecurrenceFields, type RegoleRicorrenza } from "@/components/RecurrenceFields";
 import { EmptyState } from "@/components/EmptyState";
-import { etichettaCadenza } from "@/lib/ricorrenze";
+import { dataInizioSettimanale, etichettaCadenza } from "@/lib/ricorrenze";
 import {
   previsteByCategoria,
   previsteDelMese,
@@ -61,6 +61,7 @@ function BudgetPage() {
     cadenza: "mesi",
     intervallo: 1,
     giorno: 1,
+    giornoSettimana: new Date().getDay(),
     fine: null,
   });
   const [ricorrentiAperte, setRicorrentiAperte] = useState(false);
@@ -118,6 +119,20 @@ function BudgetPage() {
       return;
     }
     const giorno = Math.min(28, Math.max(1, regoleRic.giorno));
+    /*
+     * Data di inizio della serie:
+     * - MESI: oggi. Se il giorno scelto è oggi o più avanti in questo mese,
+     *   la prima occorrenza sarà proprio quella di questo mese (e comparirà
+     *   subito, grazie al richiamo automatico dentro addRecurring); se il
+     *   giorno è già passato questo mese, la prima occorrenza calcolata è
+     *   già quella del mese prossimo.
+     * - SETTIMANE: il giorno della settimana scelto, portato a oggi o al più
+     *   vicino giorno futuro che corrisponde (mai nel passato).
+     */
+    const inizio =
+      regoleRic.cadenza === "settimane"
+        ? dataInizioSettimanale(todayISO(), regoleRic.giornoSettimana)
+        : todayISO();
     addRecurring({
       nome: ric.nome.trim(),
       categoria: ric.categoria,
@@ -126,12 +141,17 @@ function BudgetPage() {
       attiva: true,
       cadenza: regoleRic.cadenza,
       intervallo: regoleRic.intervallo,
-      // La serie parte da oggi: le occorrenze passate non vengono inventate.
-      inizio: todayISO(),
+      inizio,
       fine: regoleRic.fine,
     });
     setRic({ nome: "", categoria: state.categorie[0]?.id ?? "", importo: "" });
-    setRegoleRic({ cadenza: "mesi", intervallo: 1, giorno: 1, fine: null });
+    setRegoleRic({
+      cadenza: "mesi",
+      intervallo: 1,
+      giorno: 1,
+      giornoSettimana: new Date().getDay(),
+      fine: null,
+    });
     setFormRic(false);
     toast.success("Spesa ricorrente creata");
   };
