@@ -4,6 +4,8 @@ import { X } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { iconFor } from "@/lib/icons";
 import type { Recurring } from "@/lib/types";
+import { todayISO } from "@/lib/format";
+import { dataInizioSettimanale, fromISO } from "@/lib/ricorrenze";
 import { BottomSheet } from "./BottomSheet";
 import { RecurrenceFields, type RegoleRicorrenza } from "./RecurrenceFields";
 
@@ -24,6 +26,7 @@ export function EditRecurringModal({
     cadenza: "mesi",
     intervallo: 1,
     giorno: 1,
+    giornoSettimana: new Date().getDay(),
     fine: null,
   });
   const [campo, setCampo] = useState<"importo" | "nome" | null>(null);
@@ -44,6 +47,11 @@ export function EditRecurringModal({
       cadenza: edit.cadenza,
       intervallo: edit.intervallo,
       giorno: Math.min(28, Math.max(1, edit.giorno)),
+      // Precompilato dal giorno della settimana della ricorrenza esistente,
+      // ricavato dalla sua data di inizio: così riaprendo una ricorrenza
+      // settimanale si vede già selezionato il giorno giusto, invece che
+      // quello di oggi.
+      giornoSettimana: fromISO(edit.inizio).getDay(),
       fine: edit.fine ?? null,
     });
     setCampo(null);
@@ -58,6 +66,20 @@ export function EditRecurringModal({
       toast.error("Compila nome, importo e categoria");
       return;
     }
+    /*
+     * La data di inizio (l'ancora da cui si contano le settimane) va
+     * ricalcolata SOLO se il giorno della settimana è stato davvero
+     * cambiato — o se si passa da mensile a settimanale. Se si modifica solo
+     * nome o importo, senza toccare il giorno, l'inizio resta quello di
+     * sempre: ricalcolarlo a ogni salvataggio sposterebbe silenziosamente
+     * l'ancora della serie, che con un intervallo maggiore di 1 (es. ogni 2
+     * settimane) cambierebbe quali settimane sono "buone" per la ricorrenza.
+     */
+    const giornoSettimanaAttuale = fromISO(shown.inizio).getDay();
+    const inizio =
+      regole.cadenza === "settimane" && regole.giornoSettimana !== giornoSettimanaAttuale
+        ? dataInizioSettimanale(todayISO(), regole.giornoSettimana)
+        : shown.inizio;
     updateRecurring(shown.id, {
       nome: nome.trim(),
       categoria,
@@ -65,6 +87,7 @@ export function EditRecurringModal({
       giorno: Math.min(28, Math.max(1, regole.giorno)),
       cadenza: regole.cadenza,
       intervallo: regole.intervallo,
+      inizio,
       fine: regole.fine,
     });
     toast.success("Spesa ricorrente aggiornata");

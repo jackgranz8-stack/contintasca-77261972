@@ -6,9 +6,24 @@ import { todayISO } from "@/lib/format";
 export type RegoleRicorrenza = {
   cadenza: Cadenza;
   intervallo: number;
+  /** Giorno del mese (1-28), usato solo con cadenza "mesi". */
   giorno: number;
+  /** Giorno della settimana, usato solo con cadenza "settimane". Convenzione
+   *  JavaScript: 0 = domenica, 1 = lunedì, ... 6 = sabato. */
+  giornoSettimana: number;
   fine: string | null;
 };
+
+/** Lunedì per primo, come sui calendari italiani; il valore resta 0-6 di JS. */
+const GIORNI_SETTIMANA = [
+  { valore: 1, sigla: "L", nome: "Lunedì" },
+  { valore: 2, sigla: "M", nome: "Martedì" },
+  { valore: 3, sigla: "M", nome: "Mercoledì" },
+  { valore: 4, sigla: "G", nome: "Giovedì" },
+  { valore: 5, sigla: "V", nome: "Venerdì" },
+  { valore: 6, sigla: "S", nome: "Sabato" },
+  { valore: 0, sigla: "D", nome: "Domenica" },
+];
 
 const INTERVALLI = [1, 2, 3, 4, 6, 12];
 
@@ -75,10 +90,7 @@ export function RecurrenceFields({
         </div>
       </div>
 
-      {/* Il giorno del mese serve solo alla cadenza mensile: con quella
-          settimanale il giorno lo decide la data di inizio (sempre lo stesso
-          giorno della settimana), quindi chiederlo confonderebbe. */}
-      {value.cadenza === "mesi" && (
+      {value.cadenza === "mesi" ? (
         <div>
           <p className="mb-1.5 text-[11px] text-muted-foreground">Giorno del mese</p>
           <select
@@ -96,6 +108,28 @@ export function RecurrenceFields({
           <p className="mt-1 text-[10px] text-muted-foreground">
             Fino al 28, così la spesa cade in ogni mese, febbraio compreso.
           </p>
+        </div>
+      ) : (
+        <div>
+          <p className="mb-1.5 text-[11px] text-muted-foreground">Giorno della settimana</p>
+          <div className="flex gap-1">
+            {GIORNI_SETTIMANA.map((g) => (
+              <button
+                key={g.valore}
+                type="button"
+                onClick={() => set({ giornoSettimana: g.valore })}
+                aria-label={g.nome}
+                aria-pressed={value.giornoSettimana === g.valore}
+                className={`flex h-9 flex-1 items-center justify-center rounded-lg text-xs font-semibold transition-colors ${
+                  value.giornoSettimana === g.valore
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-surface-2 text-muted-foreground"
+                }`}
+              >
+                {g.sigla}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

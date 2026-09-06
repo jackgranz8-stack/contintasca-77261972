@@ -4,6 +4,7 @@ import { Repeat, X } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { iconFor } from "@/lib/icons";
 import { formatDay, todayISO, uid } from "@/lib/format";
+import { dataInizioSettimanale, fromISO } from "@/lib/ricorrenze";
 import { RecurrenceFields, type RegoleRicorrenza } from "./RecurrenceFields";
 import type { Transaction } from "@/lib/types";
 import { BottomSheet } from "./BottomSheet";
@@ -42,6 +43,7 @@ export function AddExpenseModal({
     cadenza: "mesi",
     intervallo: 1,
     giorno: 1,
+    giornoSettimana: new Date().getDay(),
     fine: null,
   });
   const [confermaStop, setConfermaStop] = useState(false);
@@ -81,9 +83,16 @@ export function AddExpenseModal({
               cadenza: linked.cadenza,
               intervallo: linked.intervallo,
               giorno: linked.giorno,
+              giornoSettimana: fromISO(linked.inizio).getDay(),
               fine: linked.fine ?? null,
             }
-          : { cadenza: "mesi", intervallo: 1, giorno: dayOf(edit.data), fine: null },
+          : {
+              cadenza: "mesi",
+              intervallo: 1,
+              giorno: dayOf(edit.data),
+              giornoSettimana: fromISO(edit.data).getDay(),
+              fine: null,
+            },
       );
     } else if (preset) {
       setImporto(String(preset.importo).replace(".", ","));
@@ -91,14 +100,26 @@ export function AddExpenseModal({
       setData(todayISO());
       setCategoria(preset.categoria || state.categorie[0]?.id || "");
       setRipeti(false);
-      setRegole({ cadenza: "mesi", intervallo: 1, giorno: dayOf(todayISO()), fine: null });
+      setRegole({
+        cadenza: "mesi",
+        intervallo: 1,
+        giorno: dayOf(todayISO()),
+        giornoSettimana: new Date().getDay(),
+        fine: null,
+      });
     } else {
       setImporto("");
       setNota("");
       setData(todayISO());
       setCategoria(state.categorie[0]?.id ?? "");
       setRipeti(false);
-      setRegole({ cadenza: "mesi", intervallo: 1, giorno: dayOf(todayISO()), fine: null });
+      setRegole({
+        cadenza: "mesi",
+        intervallo: 1,
+        giorno: dayOf(todayISO()),
+        giornoSettimana: new Date().getDay(),
+        fine: null,
+      });
     }
   }, [open, edit, preset, state.categorie, state.ricorrenti]);
 
@@ -365,7 +386,7 @@ export function AddExpenseModal({
             type="date"
             value={data}
             onChange={(e) => setData(e.target.value)}
-            className="shrink-0 rounded-full border border-border bg-surface px-3 py-2 text-xs outline-none"
+            className="chip shrink-0 bg-surface outline-none"
           />
         </div>
         {isFutura && (
