@@ -99,7 +99,7 @@ const AppContext = createContext<Ctx | null>(null);
  * chiedendo a lib/ricorrenze.ts quando cade la serie — la stessa funzione che
  * usano le spese previste, così le due non possono discordare.
  */
-function runRecurring(s: AppState): { next: AppState; created: number } {
+export function runRecurring(s: AppState): { next: AppState; created: number } {
   const oggi = todayISO();
   let created = 0;
   const transazioni = [...s.transazioni];
@@ -476,13 +476,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
         update((s) => ({ ...s, categorie: s.categorie.filter((c) => c.id !== id) }));
         return true;
       },
+      /*
+       * Creare o riattivare una ricorrenza può renderla già "in ritardo" da
+       * subito: es. giorno 6 con cadenza mensile, creata proprio il 6. Prima
+       * qui si aggiungeva solo la regola, e la spesa del mese in corso
+       * arrivava soltanto alla PROSSIMA apertura dell'app (unico punto in cui
+       * girava runRecurring) — nella stessa sessione sembrava che la
+       * ricorrenza "non funzionasse". Ora si richiama subito la stessa
+       * funzione che genera le spese scadute, così l'eventuale occorrenza di
+       * oggi (o di date già passate) compare all'istante, senza dover
+       * chiudere e riaprire l'app.
+       */
       addRecurring: (r) =>
-        update((s) => ({ ...s, ricorrenti: [...s.ricorrenti, { ...r, id: uid() }] })),
+        update((s) => {
+          const conNuova: AppState = {
+            ...s,
+            ricorrenti: [...s.ricorrenti, { ...r, id: uid() }],
+          };
+          return runRecurring(conNuova).next;
+        }),
       updateRecurring: (id, patch) =>
-        update((s) => ({
-          ...s,
-          ricorrenti: s.ricorrenti.map((r) => (r.id === id ? { ...r, ...patch } : r)),
-        })),
+        update((s) => {
+          const aggiornata: AppState = {
+            ...s,
+            ricorrenti: s.ricorrenti.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+          };
+          return runRecurring(aggiornata).next;
+        }),
       deleteRecurring: (id) =>
         update((s) => ({ ...s, ricorrenti: s.ricorrenti.filter((r) => r.id !== id) })),
       dismissTip: (id) => update((s) => ({ ...s, consigliIgnorati: [...s.consigliIgnorati, id] })),

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { occorrenzeTra, prossimaOccorrenza, etichettaCadenza } from "./ricorrenze";
+import {
+  occorrenzeTra,
+  prossimaOccorrenza,
+  etichettaCadenza,
+  dataInizioSettimanale,
+} from "./ricorrenze";
 import type { Recurring } from "./types";
 
 /**
@@ -141,5 +146,26 @@ describe("etichettaCadenza", () => {
     expect(etichettaCadenza({ ...base, cadenza: "settimane", intervallo: 2 })).toBe(
       "Ogni 2 settimane",
     );
+  });
+});
+
+describe("dataInizioSettimanale", () => {
+  // Martedì 8 settembre 2026.
+  const martedi = "2026-09-08";
+
+  it("se il giorno scelto è oggi, l'inizio è oggi stesso", () => {
+    expect(dataInizioSettimanale(martedi, 2)).toBe(martedi); // 2 = martedì
+  });
+
+  it("se il giorno scelto è più avanti in questa settimana, resta questa settimana", () => {
+    expect(dataInizioSettimanale(martedi, 5)).toBe("2026-09-11"); // venerdì stessa settimana
+  });
+
+  it("se il giorno scelto è già passato questa settimana, salta alla prossima", () => {
+    expect(dataInizioSettimanale(martedi, 1)).toBe("2026-09-14"); // lunedì prossimo, non quello passato
+  });
+
+  it("funziona anche con la domenica (valore 0 in convenzione JS)", () => {
+    expect(dataInizioSettimanale(martedi, 0)).toBe("2026-09-13"); // domenica prossima
   });
 });

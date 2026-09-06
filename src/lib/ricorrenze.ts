@@ -39,6 +39,28 @@ export function ultimoGiornoDelMese(mk: string): string {
   return toISO(new Date(y ?? 1970, m ?? 1, 0));
 }
 
+/**
+ * La data di inizio giusta per una cadenza SETTIMANALE con un giorno della
+ * settimana scelto esplicitamente.
+ *
+ * Segue la stessa regola già usata per il giorno del mese: se il giorno
+ * scelto cade oggi o più avanti in questa settimana, la ricorrenza parte da
+ * questa settimana; se è già passato, parte dalla settimana prossima. Così
+ * creare "ogni martedì" di giovedì non manca il martedì di questa settimana
+ * per sbaglio, ma non lo fa nemmeno comparire nel passato.
+ *
+ * "giornoSettimana" segue la convenzione di JavaScript: 0 = domenica,
+ * 1 = lunedì, ... 6 = sabato.
+ */
+export function dataInizioSettimanale(oggi: string, giornoSettimana: number): string {
+  const d = fromISO(oggi);
+  const oggiSettimana = d.getDay();
+  let scarto = giornoSettimana - oggiSettimana;
+  if (scarto < 0) scarto += 7;
+  d.setDate(d.getDate() + scarto);
+  return toISO(d);
+}
+
 /** Valori di sicurezza: una ricorrenza mal configurata non deve poter creare migliaia di spese. */
 const MAX_OCCORRENZE = 60;
 

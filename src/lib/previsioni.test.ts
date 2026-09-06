@@ -7,9 +7,10 @@ import {
   txFuture,
   txRealizzate,
 } from "./previsioni";
-import { currentMonth } from "./format";
-import { ultimoGiornoDelMese } from "./ricorrenze";
+import { currentMonth, todayISO } from "./format";
+import { fromISO, ultimoGiornoDelMese } from "./ricorrenze";
 import type { AppState, Recurring, Transaction } from "./types";
+import { runRecurring } from "./store";
 import { emptyProfile } from "./types";
 
 /**
@@ -164,5 +165,29 @@ describe("prossimePreviste", () => {
     const s = stato({ transazioni: [tx("a", annoProssimo, 99)] });
     expect(previsteDelMese(s, mese, g(15))).toHaveLength(0);
     expect(prossimePreviste(s, g(15))).toHaveLength(1);
+  });
+});
+
+describe("runRecurring — il bug segnalato: creare una ricorrente il giorno stesso", () => {
+  it("una ricorrente mensile creata oggi, con oggi come giorno scelto, genera subito la spesa di questo mese", () => {
+    // Riproduce esattamente il caso segnalato: giorno 6, oggi è il 6.
+    const oggiGiorno = Number(todayISO().slice(8, 10));
+    const s = stato({
+      ricorrenti: [ric({ giorno: oggiGiorno, inizio: todayISO() })],
+    });
+    const { next, created } = runRecurring(s);
+    expect(created).toBe(1);
+    expect(next.transazioni.some((t) => t.data === todayISO() && t.ricorrenteId === "r1")).toBe(
+      true,
+    );
+  });
+
+  it("se il giorno scelto è già passato questo mese, non genera nulla finché non arriva il mese giusto", () => {
+    const oggi = fromISO(todayISO());
+    const ieri = oggi.getDate() > 1 ? oggi.getDate() - 1 : 1;
+    if (oggi.getDate() === 1) return; // caso raro: il test non ha senso il giorno 1
+    const s = stato({ ricorrenti: [ric({ giorno: ieri, inizio: todayISO() })] });
+    const { created } = runRecurring(s);
+    expect(created).toBe(0);
   });
 });
