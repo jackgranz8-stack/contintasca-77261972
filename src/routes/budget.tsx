@@ -11,7 +11,7 @@ import { CATEGORY_COLORS, PALETTE, type Category } from "@/lib/types";
 import { ProgressBar } from "@/components/ProgressBar";
 import { RecurrenceFields, type RegoleRicorrenza } from "@/components/RecurrenceFields";
 import { EmptyState } from "@/components/EmptyState";
-import { dataInizioSettimanale, etichettaCadenza } from "@/lib/ricorrenze";
+import { dataInizioSettimanale, etichettaCadenza, giornoRicorrenzaOggi } from "@/lib/ricorrenze";
 import {
   previsteByCategoria,
   previsteDelMese,
@@ -60,7 +60,7 @@ function BudgetPage() {
   const [regoleRic, setRegoleRic] = useState<RegoleRicorrenza>({
     cadenza: "mesi",
     intervallo: 1,
-    giorno: 1,
+    giorno: giornoRicorrenzaOggi(),
     giornoSettimana: new Date().getDay(),
     fine: null,
   });
@@ -148,7 +148,7 @@ function BudgetPage() {
     setRegoleRic({
       cadenza: "mesi",
       intervallo: 1,
-      giorno: 1,
+      giorno: giornoRicorrenzaOggi(),
       giornoSettimana: new Date().getDay(),
       fine: null,
     });
