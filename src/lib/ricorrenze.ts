@@ -61,6 +61,26 @@ export function dataInizioSettimanale(oggi: string, giornoSettimana: number): st
   return toISO(d);
 }
 
+/**
+ * Il giorno del mese da proporre a chi crea una spesa ricorrente.
+ *
+ * È il giorno della data indicata (di norma oggi), riportato dentro
+ * l'intervallo 1-28 ammesso dalle ricorrenze mensili: chi crea una spesa il
+ * 30 del mese se la vede proposta al 28, così cade comunque in ogni mese,
+ * febbraio compreso. Vale sia per la proposta iniziale sia per i controlli
+ * di sicurezza al salvataggio, perciò sta qui e non duplicato nelle schermate.
+ */
+export function giornoRicorrenzaDa(iso: string): number {
+  const n = Number(iso.slice(8, 10));
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return Math.min(28, Math.trunc(n));
+}
+
+/** Come sopra, riferito a oggi: è la proposta usata da tutte le schermate. */
+export function giornoRicorrenzaOggi(): number {
+  return Math.min(28, new Date().getDate());
+}
+
 /** Valori di sicurezza: una ricorrenza mal configurata non deve poter creare migliaia di spese. */
 const MAX_OCCORRENZE = 60;
 

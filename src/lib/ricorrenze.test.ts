@@ -4,6 +4,8 @@ import {
   prossimaOccorrenza,
   etichettaCadenza,
   dataInizioSettimanale,
+  giornoRicorrenzaDa,
+  giornoRicorrenzaOggi,
 } from "./ricorrenze";
 import type { Recurring } from "./types";
 
@@ -167,5 +169,41 @@ describe("dataInizioSettimanale", () => {
 
   it("funziona anche con la domenica (valore 0 in convenzione JS)", () => {
     expect(dataInizioSettimanale(martedi, 0)).toBe("2026-09-13"); // domenica prossima
+  });
+});
+
+describe("giornoRicorrenzaDa", () => {
+  it("propone il giorno della data indicata", () => {
+    expect(giornoRicorrenzaDa("2026-09-18")).toBe(18);
+    expect(giornoRicorrenzaDa("2026-09-01")).toBe(1);
+  });
+
+  it("si ferma a 28 per i giorni successivi, così la spesa cade in ogni mese", () => {
+    expect(giornoRicorrenzaDa("2026-01-29")).toBe(28);
+    expect(giornoRicorrenzaDa("2026-01-30")).toBe(28);
+    expect(giornoRicorrenzaDa("2026-01-31")).toBe(28);
+  });
+
+  it("il 28 resta 28", () => {
+    expect(giornoRicorrenzaDa("2026-02-28")).toBe(28);
+  });
+
+  it("su una data malformata ripiega su 1 invece di rompersi", () => {
+    expect(giornoRicorrenzaDa("2026-09-")).toBe(1);
+    expect(giornoRicorrenzaDa("")).toBe(1);
+  });
+});
+
+describe("giornoRicorrenzaOggi", () => {
+  it("resta sempre dentro l'intervallo ammesso dalle ricorrenze mensili", () => {
+    const g = giornoRicorrenzaOggi();
+    expect(g).toBeGreaterThanOrEqual(1);
+    expect(g).toBeLessThanOrEqual(28);
+  });
+
+  it("coincide con il giorno di oggi quando oggi è entro il 28", () => {
+    const oggi = new Date().getDate();
+    if (oggi <= 28) expect(giornoRicorrenzaOggi()).toBe(oggi);
+    else expect(giornoRicorrenzaOggi()).toBe(28);
   });
 });
