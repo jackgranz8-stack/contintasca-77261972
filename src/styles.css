@@ -554,6 +554,35 @@
 }
 
 /*
+ * Variante per le pagine costruite a tre fasce: intestazione, contenuto che
+ * scorre, pulsanti ancorati in fondo (oggi: l'onboarding).
+ *
+ * PERCHÉ SERVE UN'ALTEZZA VERA E NON SOLO "min-height"
+ * Con il solo "min-height" la pagina non ha un'altezza definita: cresce con
+ * il contenuto. Di conseguenza la fascia centrale, che dovrebbe scorrere per
+ * conto suo, non ha un limite entro cui scorrere e si allunga anche lei. I
+ * pulsanti, che stanno dopo, finiscono così sotto il bordo dello schermo:
+ * l'unico modo per raggiungerli diventa scorrere l'intera pagina.
+ *
+ * Su iPhone la cosa passava inosservata perché lo scorrimento di pagina
+ * funziona e il pulsante si raggiunge comunque. Su Android, tra barra di
+ * navigazione a gesti e schermi più corti, il pulsante restava
+ * irraggiungibile e la pagina sembrava semplicemente bloccata.
+ *
+ * Con "height: 100dvh" la pagina vale esattamente lo schermo visibile: la
+ * fascia centrale riceve un'altezza precisa entro cui scorrere e i pulsanti
+ * restano sempre al loro posto, su qualsiasi telefono. Quando su Android si
+ * apre la tastiera, "dvh" si riduce da solo (il manifest dichiara
+ * "interactive-widget=resizes-content") e il contenuto continua a scorrere
+ * sopra la tastiera invece di finirci sotto.
+ */
+.app-page-fill {
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/*
  * Margini di sicurezza laterali. In verticale valgono 0 su tutti i telefoni;
  * servono in orizzontale su iPhone con notch/Dynamic Island, dove una delle
  * due sponde dello schermo è occupata dalla tacca e il contenuto altrimenti
