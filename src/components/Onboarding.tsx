@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, ChevronDown, Plus } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { ICON_KEYS, iconFor } from "@/lib/icons";
@@ -30,6 +30,21 @@ export function Onboarding() {
   const [nuovaIcona, setNuovaIcona] = useState("cart");
   const [nuovaColore, setNuovaColore] = useState<string | null>(null);
   const [formCat, setFormCat] = useState(false);
+  const formRef = useRef<HTMLDivElement>(null);
+
+  /*
+   * Aprendo "Aggiungi categoria" il riquadro si apre in fondo alla schermata,
+   * spesso sotto il bordo visibile: icone e colori restano fuori vista e
+   * sembra che manchino. Lo si porta in vista da soli, così la scelta del
+   * colore è raggiungibile subito senza cercarla a tentoni.
+   */
+  useEffect(() => {
+    if (!formCat) return;
+    const t = setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }, 80);
+    return () => clearTimeout(t);
+  }, [formCat]);
 
   const totaleNum = Math.max(0, Number(totale.replace(",", ".")) || 0);
   const attive = cats.filter((c) => c.attiva);
@@ -136,8 +151,8 @@ export function Onboarding() {
   };
 
   return (
-    <div className="app-page mx-auto flex w-full max-w-[430px] flex-col px-5 pt-[calc(env(safe-area-inset-top,0px)+40px)] pb-[calc(env(safe-area-inset-bottom,0px)+24px)]">
-      <div className="mb-6 flex gap-1.5">
+    <div className="app-page app-page-fill mx-auto flex w-full max-w-[430px] flex-col px-5 pt-[calc(env(safe-area-inset-top,0px)+40px)] pb-[calc(max(env(safe-area-inset-bottom,0px),12px)+24px)]">
+      <div className="mb-6 flex shrink-0 gap-1.5">
         {[0, 1, 2, 3, 4].map((i) => (
           <span
             key={i}
@@ -147,7 +162,7 @@ export function Onboarding() {
       </div>
 
       <div
-        className="flex-1 touch-pan-y overflow-y-auto"
+        className="min-h-0 flex-1 touch-pan-y overflow-x-hidden overflow-y-auto overscroll-y-contain"
         onPointerDown={onStepPointerDown}
         onPointerMove={onStepPointerMove}
         onPointerUp={onStepPointerUp}
@@ -300,7 +315,7 @@ export function Onboarding() {
                 })}
               </div>
 
-              <div className="card-surface mt-5 overflow-hidden">
+              <div ref={formRef} className="card-surface mt-5 overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setFormCat((v) => !v)}
@@ -447,7 +462,7 @@ export function Onboarding() {
         </div>
       </div>
 
-      <div className="mt-8 flex items-center gap-3">
+      <div className="mt-8 flex shrink-0 items-center gap-3">
         {step > 0 && (
           <button
             onClick={back}
