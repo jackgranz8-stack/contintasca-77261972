@@ -3,6 +3,7 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useApp } from "@/lib/store";
 import { isFaceIdEnabled } from "@/lib/webauthn";
 import { applyTheme, getStoredTheme } from "@/lib/theme";
+import { segnalaPresenza } from "@/lib/presenza";
 import { Onboarding } from "./Onboarding";
 import { BottomNav } from "./BottomNav";
 import { AddExpenseModal } from "./AddExpenseModal";
@@ -69,6 +70,24 @@ export function AppShell({ children }: { children: ReactNode }) {
     // normalmente, solo senza copia offline.
     void navigator.serviceWorker.register("/sw.js").catch(() => {});
   }, []);
+
+  /*
+   * Segna l'ultima apertura dell'app, che è ciò su cui si basa il promemoria
+   * "non ti fai vedere da due giorni". Si registra all'avvio e ogni volta che
+   * l'app torna in primo piano (su iPhone l'app non viene chiusa davvero: si
+   * passa ad altro e si torna, quindi senza questo secondo aggancio la data
+   * resterebbe ferma per giorni pur usandola). La funzione si limita da sola
+   * a una scrittura all'ora.
+   */
+  useEffect(() => {
+    if (!account) return;
+    void segnalaPresenza(account.id);
+    const alRitorno = () => {
+      if (document.visibilityState === "visible") void segnalaPresenza(account.id);
+    };
+    document.addEventListener("visibilitychange", alRitorno);
+    return () => document.removeEventListener("visibilitychange", alRitorno);
+  }, [account]);
 
   // Senza account si accede prima di tutto: nessun onboarding, nessun dato.
   useEffect(() => {

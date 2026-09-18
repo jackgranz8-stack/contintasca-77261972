@@ -5,7 +5,7 @@ import { useApp } from "@/lib/store";
 import { iconFor } from "@/lib/icons";
 import type { Recurring } from "@/lib/types";
 import { todayISO } from "@/lib/format";
-import { dataInizioSettimanale, fromISO } from "@/lib/ricorrenze";
+import { dataInizioSettimanale, fromISO, giornoRicorrenzaOggi } from "@/lib/ricorrenze";
 import { BottomSheet } from "./BottomSheet";
 import { RecurrenceFields, type RegoleRicorrenza } from "./RecurrenceFields";
 
@@ -25,7 +25,7 @@ export function EditRecurringModal({
   const [regole, setRegole] = useState<RegoleRicorrenza>({
     cadenza: "mesi",
     intervallo: 1,
-    giorno: 1,
+    giorno: giornoRicorrenzaOggi(),
     giornoSettimana: new Date().getDay(),
     fine: null,
   });

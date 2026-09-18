@@ -4,7 +4,7 @@ import { Repeat, X } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { iconFor } from "@/lib/icons";
 import { formatDay, todayISO, uid } from "@/lib/format";
-import { dataInizioSettimanale, fromISO } from "@/lib/ricorrenze";
+import { dataInizioSettimanale, fromISO, giornoRicorrenzaDa } from "@/lib/ricorrenze";
 import { RecurrenceFields, type RegoleRicorrenza } from "./RecurrenceFields";
 import type { Transaction } from "@/lib/types";
 import { BottomSheet } from "./BottomSheet";
@@ -14,11 +14,6 @@ function shiftDay(days: number) {
   const d = new Date();
   d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
-}
-
-function dayOf(iso: string) {
-  const n = Number(iso.slice(8, 10));
-  return Math.min(28, Math.max(1, Number.isFinite(n) && n > 0 ? n : 1));
 }
 
 export function AddExpenseModal({
@@ -42,7 +37,7 @@ export function AddExpenseModal({
   const [regole, setRegole] = useState<RegoleRicorrenza>({
     cadenza: "mesi",
     intervallo: 1,
-    giorno: 1,
+    giorno: giornoRicorrenzaDa(todayISO()),
     giornoSettimana: new Date().getDay(),
     fine: null,
   });
@@ -89,7 +84,7 @@ export function AddExpenseModal({
           : {
               cadenza: "mesi",
               intervallo: 1,
-              giorno: dayOf(edit.data),
+              giorno: giornoRicorrenzaDa(edit.data),
               giornoSettimana: fromISO(edit.data).getDay(),
               fine: null,
             },
@@ -103,7 +98,7 @@ export function AddExpenseModal({
       setRegole({
         cadenza: "mesi",
         intervallo: 1,
-        giorno: dayOf(todayISO()),
+        giorno: giornoRicorrenzaDa(todayISO()),
         giornoSettimana: new Date().getDay(),
         fine: null,
       });
@@ -116,7 +111,7 @@ export function AddExpenseModal({
       setRegole({
         cadenza: "mesi",
         intervallo: 1,
-        giorno: dayOf(todayISO()),
+        giorno: giornoRicorrenzaDa(todayISO()),
         giornoSettimana: new Date().getDay(),
         fine: null,
       });
