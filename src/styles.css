@@ -532,6 +532,25 @@
   min-height: inherit;
 }
 
+/*
+ * Fascia sotto la barra di stato di iPhone (vedi AppShell). Alta
+ * esattamente quanto la zona di ora e batteria: sui dispositivi senza tacca
+ * o su computer l'inset vale 0 e la fascia non esiste.
+ *
+ * Sta sotto alla barra di navigazione (z 40) e alle tendine (z 50): copre
+ * solo il contenuto che scorre, non gli elementi che devono restare sopra.
+ */
+.status-bar-scrim {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  height: env(safe-area-inset-top, 0px);
+  background-color: var(--color-background);
+  pointer-events: none;
+}
+
 .app-scroll::-webkit-scrollbar {
   display: none;
 }
