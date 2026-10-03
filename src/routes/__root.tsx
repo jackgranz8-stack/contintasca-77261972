@@ -7,6 +7,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
+import type { ErrorComponentProps } from "@tanstack/react-router";
 import { type ReactNode } from "react";
 
 import { Toaster } from "@/components/ui/sonner";
@@ -36,7 +37,14 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+/*
+ * Il tipo dei parametri lo detta il router: dalla versione 1.170 "error" è
+ * dichiarato "unknown" invece che "Error", perché un throw può portare
+ * qualsiasi valore. Si usa quindi il tipo della libreria, così un prossimo
+ * aggiornamento che cambia ancora la forma lo segnala il controllo dei tipi
+ * invece di passare inosservato.
+ */
+function ErrorComponent({ error, reset }: ErrorComponentProps) {
   console.error(error);
   const router = useRouter();
 
