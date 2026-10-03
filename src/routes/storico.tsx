@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
@@ -33,7 +33,10 @@ import { AddExpenseModal } from "@/components/AddExpenseModal";
 import { ConfirmPopup } from "@/components/ConfirmPopup";
 import { EditRecurringModal } from "@/components/EditRecurringModal";
 import { EmptyState } from "@/components/EmptyState";
-import { SuggerimentiDescrizione } from "@/components/SuggerimentiDescrizione";
+import {
+  CHIUSURA_RITARDATA_MS,
+  SuggerimentiDescrizione,
+} from "@/components/SuggerimentiDescrizione";
 import { suggerimentiDescrizione } from "@/lib/descrizioni";
 import type { Recurring, Transaction } from "@/lib/types";
 
@@ -86,6 +89,14 @@ function StoricoPage() {
   > | null>(null);
   const [ricerca, setRicerca] = useState("");
   const [ricercaAttiva, setRicercaAttiva] = useState(false);
+  const ricercaInputRef = useRef<HTMLInputElement | null>(null);
+  const chiusuraRicerca = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (chiusuraRicerca.current) window.clearTimeout(chiusuraRicerca.current);
+    },
+    [],
+  );
   const [prossimeAperte, setProssimeAperte] = useState(false);
   const [ricDaModificare, setRicDaModificare] = useState<Recurring | null>(null);
   const [ricDaEliminare, setRicDaEliminare] = useState<string | null>(null);
@@ -206,9 +217,26 @@ function StoricoPage() {
         <div className="flex items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3">
           <Search size={16} className="shrink-0 text-muted-foreground" />
           <input
+            ref={ricercaInputRef}
             value={ricerca}
-            onFocus={() => setRicercaAttiva(true)}
-            onBlur={() => setRicercaAttiva(false)}
+            onFocus={() => {
+              if (chiusuraRicerca.current) {
+                window.clearTimeout(chiusuraRicerca.current);
+                chiusuraRicerca.current = null;
+              }
+              setRicercaAttiva(true);
+            }}
+            onBlur={() => {
+              // Chiusura un attimo dopo, non subito: su iPhone il tocco su
+              // un suggerimento fa perdere il fuoco al campo prima del
+              // "click", e chiudendo subito il suggerimento non verrebbe
+              // mai inserito.
+              if (chiusuraRicerca.current) window.clearTimeout(chiusuraRicerca.current);
+              chiusuraRicerca.current = window.setTimeout(() => {
+                chiusuraRicerca.current = null;
+                setRicercaAttiva(false);
+              }, CHIUSURA_RITARDATA_MS);
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter") e.currentTarget.blur();
             }}
@@ -224,7 +252,9 @@ function StoricoPage() {
             digitato={ricerca}
             onScegli={(testo) => {
               setRicerca(testo);
-              setRicercaAttiva(false);
+              // Si chiude la tastiera per mostrare subito i risultati: la
+              // tendina si chiude da sola con la perdita del fuoco.
+              ricercaInputRef.current?.blur();
             }}
           />
         )}
