@@ -26,6 +26,14 @@ function shiftDay(days: number) {
  */
 const SPAZIO_SOPRA_CAMPO = 10;
 
+/**
+ * Margine in alto della fascia che scorre. La fascia taglia tutto ciò che
+ * esce dai suoi bordi, e l'importo sta proprio in cima: senza questo margine
+ * l'anello verde che compare toccandolo veniva tagliato di netto in alto.
+ * 6px superano l'anello (2px) con un po' d'aria.
+ */
+const MARGINE_ALTO_CORPO = 6;
+
 export function AddExpenseModal({
   open,
   onClose,
@@ -391,6 +399,7 @@ export function AddExpenseModal({
       <div
         ref={corpoRef}
         data-scroll-lock-allow
+        style={{ paddingTop: MARGINE_ALTO_CORPO }}
         className={`no-scrollbar -mx-4 min-h-0 flex-1 px-4 ${
           campo ? "overflow-hidden" : "overflow-y-auto overscroll-contain"
         }`}
@@ -444,8 +453,27 @@ export function AddExpenseModal({
                 setCampo("importo");
               }}
               onBlur={() => setCampo((v) => (v === "importo" ? null : v))}
+              /*
+               * Confermato l'importo si passa alla descrizione, con la
+               * tastiera che resta aperta.
+               *
+               * - Tastiere con il tasto Invio (Android, iPad, tastiere
+               *   esterne): il tasto mostra "Avanti" e porta alla
+               *   descrizione. Lo spostamento avviene DENTRO la pressione del
+               *   tasto: è questo che permette alla tastiera di restare
+               *   aperta, passando solo da numerica a testuale.
+               * - iPhone: il tastierino decimale non ha il tasto Invio. Lo fa
+               *   la freccia "giù" nella barra sopra la tastiera, che porta al
+               *   campo successivo: la descrizione, perché sta subito sotto.
+               *   "Fine" invece chiude la tastiera, e iOS non permette di
+               *   riaprirla da soli: spostare lì il fuoco lascerebbe la
+               *   descrizione selezionata ma senza tastiera.
+               */
+              enterKeyHint="next"
               onKeyDown={(e) => {
-                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                descrizioneInputRef.current?.focus();
               }}
               onChange={(e) => setImporto(e.target.value.replace(".", ","))}
               placeholder="0"
@@ -489,8 +517,18 @@ export function AddExpenseModal({
                 // esattamente al bordo della fascia, che taglia tutto ciò che
                 // sporge, si perdevano l'anello di evidenziazione e il bordo
                 // superiore, e il campo sembrava tagliato in alto.
+                //
+                // Il margine in alto della fascia sposta già tutto in basso di
+                // MARGINE_ALTO_CORPO, quindi lo si aggiunge alla salita: così
+                // il campo arriva comunque a SPAZIO_SOPRA_CAMPO dal bordo, e
+                // dell'importo scivolato via non resta una striscia visibile.
                 setSalita(
-                  Math.max(0, (descrizioneRef.current?.offsetTop ?? 0) - SPAZIO_SOPRA_CAMPO),
+                  Math.max(
+                    0,
+                    (descrizioneRef.current?.offsetTop ?? 0) +
+                      MARGINE_ALTO_CORPO -
+                      SPAZIO_SOPRA_CAMPO,
+                  ),
                 );
                 setCampo("nota");
               }}
