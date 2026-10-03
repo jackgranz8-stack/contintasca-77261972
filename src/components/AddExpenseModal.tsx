@@ -19,20 +19,21 @@ function shiftDay(days: number) {
 }
 
 /**
- * Margine lasciato sopra la descrizione quando sale in cima al foglio. Deve
- * superare l'anello di evidenziazione (2px) con un po' d'aria, ma restare
- * sotto lo spazio fra importo e descrizione (12px), altrimenti dell'importo
- * scivolato via resterebbe visibile una striscia.
- */
-const SPAZIO_SOPRA_CAMPO = 10;
-
-/**
  * Margine in alto della fascia che scorre. La fascia taglia tutto ciò che
  * esce dai suoi bordi, e l'importo sta proprio in cima: senza questo margine
  * l'anello verde che compare toccandolo veniva tagliato di netto in alto.
  * 6px superano l'anello (2px) con un po' d'aria.
  */
 const MARGINE_ALTO_CORPO = 6;
+
+/**
+ * Quanti suggerimenti mostrare sotto la descrizione. Il campo resta fermo a
+ * metà schermo e la tastiera copre la metà bassa: su iPhone 13 / 14 / 15 ne
+ * restano visibili 3, gli altri finirebbero dietro la tastiera, dove non si
+ * vedono né si possono toccare. Meglio 3 sempre raggiungibili che 5 di cui
+ * due inutili. (Nello storico restano 5: lì il campo è in cima alla pagina.)
+ */
+const SUGGERIMENTI_MAX = 3;
 
 export function AddExpenseModal({
   open,
@@ -69,7 +70,6 @@ export function AddExpenseModal({
   const [confermaStop, setConfermaStop] = useState(false);
   const importoRef = useRef<HTMLInputElement | null>(null);
   const corpoRef = useRef<HTMLDivElement | null>(null);
-  const descrizioneRef = useRef<HTMLDivElement | null>(null);
   const descrizioneInputRef = useRef<HTMLInputElement | null>(null);
   /*
    * Il testo della descrizione, letto al momento giusto. Lo stato "nota" si
@@ -79,12 +79,6 @@ export function AddExpenseModal({
    */
   const notaCorrente = useRef("");
   const chiusuraNota = useRef<number | null>(null);
-  /*
-   * Di quanto far salire il contenuto quando si scrive la descrizione: la
-   * distanza fra l'inizio del foglio e il campo, misurata nel momento in cui
-   * lo si tocca (dipende dalla dimensione dello schermo e dal testo).
-   */
-  const [salita, setSalita] = useState(0);
   /*
    * Il fuoco dato dall'app (non dal dito dell'utente) non deve attivare la
    * modalità "sto scrivendo l'importo", che oscura e disattiva il resto del
@@ -202,7 +196,7 @@ export function AddExpenseModal({
   );
 
   const suggerimenti = useMemo(
-    () => suggerimentiDescrizione(state.transazioni, nota),
+    () => suggerimentiDescrizione(state.transazioni, nota, SUGGERIMENTI_MAX),
     [state.transazioni, nota],
   );
 
@@ -404,10 +398,7 @@ export function AddExpenseModal({
           campo ? "overflow-hidden" : "overflow-y-auto overscroll-contain"
         }`}
       >
-        <div
-          className="relative transition-transform duration-300 ease-out motion-reduce:transition-none"
-          style={{ transform: campo === "nota" ? `translateY(-${salita}px)` : "translateY(0)" }}
-        >
+        <div>
           {/*
            * ORDINE DEI CAMPI, pensato per la tastiera.
            *
@@ -425,16 +416,18 @@ export function AddExpenseModal({
            * Categorie, data e ricorrenza si toccano e basta: vengono dopo, e si
            * usano a tastiera chiusa, quando tutto lo schermo è libero.
            *
-           * Mentre si scrive, gli altri campi restano al loro posto ma sbiaditi
-           * e non toccabili: si vede dove si è, senza poter finire altrove per
-           * sbaglio. Per chiudere basta "Fine" sulla tastiera.
+           * Mentre si scrive, categorie, data, ricorrenza e salvataggio restano
+           * al loro posto ma sbiaditi e non toccabili. Importo e descrizione
+           * invece restano SEMPRE toccabili l'uno dall'altro: si passa da uno
+           * all'altro con un tocco, e la tastiera resta aperta cambiando solo
+           * da numerica a testuale. Per chiudere basta "Fine".
            */}
 
           {/* Importo */}
           <div
             className={`mb-3 flex items-center justify-center gap-2 rounded-2xl bg-surface px-4 py-5 transition-opacity ${
               campo === "importo" ? "ring-2 ring-primary" : ""
-            } ${campo === "nota" ? "pointer-events-none opacity-40" : ""}`}
+            }`}
           >
             <span className="text-2xl font-semibold text-muted-foreground">€</span>
             <input
@@ -483,19 +476,10 @@ export function AddExpenseModal({
           </div>
 
           {/*
-           * Descrizione, con i suggerimenti sotto.
-           *
-           * Toccandola, il contenuto del foglio scivola su finché il campo non
-           * arriva in cima: l'importo scorre via sotto l'intestazione (non
-           * sparisce, torna giù appena si chiude la tastiera) e sotto il campo
-           * resta tutto lo spazio per i suggerimenti, anche su iPhone SE e con
-           * la Dynamic Island.
-           *
-           * Si muove solo il contenuto del foglio, con una traslazione: niente
-           * "scrollIntoView", che su iPhone sposta anche la pagina e fa
-           * intravedere lo sfondo.
+           * Descrizione, con i suggerimenti sotto. Resta ferma dov'è quando la
+           * si tocca: nessuno spostamento del foglio.
            */}
-          <div ref={descrizioneRef} className="relative mb-3">
+          <div className="relative mb-3">
             <input
               ref={descrizioneInputRef}
               value={nota}
@@ -506,30 +490,6 @@ export function AddExpenseModal({
                   window.clearTimeout(chiusuraNota.current);
                   chiusuraNota.current = null;
                 }
-                // Se la fascia era stata fatta scorrere, si riparte da zero
-                // così la misura qui sotto è quella giusta.
-                corpoRef.current?.scrollTo({ top: 0 });
-                // offsetTop e non getBoundingClientRect: non risente della
-                // traslazione, quindi la misura resta giusta anche se si
-                // tocca di nuovo il campo mentre il contenuto sta tornando giù.
-                //
-                // Si lascia SPAZIO_SOPRA_CAMPO di margine: portando il campo
-                // esattamente al bordo della fascia, che taglia tutto ciò che
-                // sporge, si perdevano l'anello di evidenziazione e il bordo
-                // superiore, e il campo sembrava tagliato in alto.
-                //
-                // Il margine in alto della fascia sposta già tutto in basso di
-                // MARGINE_ALTO_CORPO, quindi lo si aggiunge alla salita: così
-                // il campo arriva comunque a SPAZIO_SOPRA_CAMPO dal bordo, e
-                // dell'importo scivolato via non resta una striscia visibile.
-                setSalita(
-                  Math.max(
-                    0,
-                    (descrizioneRef.current?.offsetTop ?? 0) +
-                      MARGINE_ALTO_CORPO -
-                      SPAZIO_SOPRA_CAMPO,
-                  ),
-                );
                 setCampo("nota");
               }}
               onBlur={() => {
@@ -558,7 +518,7 @@ export function AddExpenseModal({
               placeholder="Descrizione (opzionale)"
               className={`w-full rounded-2xl border bg-surface px-4 py-3 text-base outline-none placeholder:text-muted-foreground ${
                 campo === "nota" ? "border-primary ring-2 ring-primary" : "border-border"
-              } ${campo === "importo" ? "pointer-events-none opacity-40" : ""}`}
+              }`}
             />
             {campo === "nota" && (
               <SuggerimentiDescrizione
