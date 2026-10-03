@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { suggerimentiDescrizione } from "./descrizioni";
+import { categoriaPerDescrizione, suggerimentiDescrizione } from "./descrizioni";
 import type { Transaction } from "./types";
 
 let n = 0;
@@ -53,5 +53,48 @@ describe("suggerimentiDescrizione", () => {
   it("rispetta il limite richiesto", () => {
     const t = [tx("Ba 1"), tx("Ba 2"), tx("Ba 3"), tx("Ba 4"), tx("Ba 5"), tx("Ba 6")];
     expect(suggerimentiDescrizione(t, "ba", 3)).toHaveLength(3);
+  });
+});
+
+describe("categoriaPerDescrizione", () => {
+  function txc(nota: string, categoria: string, data: string): Transaction {
+    n += 1;
+    return { id: `c${n}`, importo: 10, categoria, data, nota };
+  }
+  const tutte = ["cibo", "svago", "abbonamenti", "auto"];
+
+  it("propone la categoria dell'ultima spesa con la stessa descrizione", () => {
+    const t = [txc("Spesa Esselunga", "cibo", "2026-05-01")];
+    expect(categoriaPerDescrizione(t, "Spesa Esselunga", tutte)).toBe("cibo");
+  });
+
+  it("vince la più recente, non la più frequente", () => {
+    const t = [
+      txc("Netflix", "svago", "2026-01-01"),
+      txc("Netflix", "svago", "2026-02-01"),
+      txc("Netflix", "svago", "2026-03-01"),
+      txc("Netflix", "abbonamenti", "2026-04-01"),
+    ];
+    expect(categoriaPerDescrizione(t, "Netflix", tutte)).toBe("abbonamenti");
+  });
+
+  it("non considera maiuscole, accenti e spazi ai bordi", () => {
+    const t = [txc("Caffè al bar", "cibo", "2026-05-01")];
+    expect(categoriaPerDescrizione(t, "  caffe AL BAR ", tutte)).toBe("cibo");
+  });
+
+  it("serve la descrizione intera: un inizio non basta", () => {
+    const t = [txc("Benzina auto", "auto", "2026-05-01")];
+    expect(categoriaPerDescrizione(t, "Benzina", tutte)).toBeNull();
+  });
+
+  it("ignora le categorie che non esistono più", () => {
+    const t = [txc("Palestra", "svago", "2026-01-01"), txc("Palestra", "eliminata", "2026-05-01")];
+    expect(categoriaPerDescrizione(t, "Palestra", tutte)).toBe("svago");
+  });
+
+  it("senza precedenti o senza testo non propone nulla", () => {
+    expect(categoriaPerDescrizione([], "Benzina", tutte)).toBeNull();
+    expect(categoriaPerDescrizione([txc("Benzina", "auto", "2026-05-01")], "  ", tutte)).toBeNull();
   });
 });

@@ -70,3 +70,34 @@ export function suggerimentiDescrizione(
     .slice(0, Math.max(0, limite))
     .map((v) => v.testo);
 }
+
+/**
+ * La categoria usata l'ultima volta con questa descrizione.
+ *
+ * Serve a precompilare la categoria quando si sceglie (o si riscrive) una
+ * descrizione già usata: "Spesa Esselunga" è finita in Cibo le ultime venti
+ * volte, non serve richiederlo. Conta la spesa più RECENTE e non la più
+ * frequente: se un giorno si sposta "Netflix" da Svago ad Abbonamenti, da
+ * quel momento deve proporre Abbonamenti, non restare ancorato al passato.
+ *
+ * Se la categoria nel frattempo è stata eliminata non viene proposta:
+ * selezionarne una che non esiste più lascerebbe la griglia senza nessuna
+ * casella accesa.
+ */
+export function categoriaPerDescrizione(
+  transazioni: Transaction[],
+  descrizione: string,
+  categorieEsistenti: string[],
+): string | null {
+  const chiave = normalizza(descrizione);
+  if (!chiave) return null;
+  const valide = new Set(categorieEsistenti);
+
+  let migliore: Transaction | null = null;
+  for (const t of transazioni) {
+    if (!valide.has(t.categoria)) continue;
+    if (normalizza(t.nota ?? "") !== chiave) continue;
+    if (!migliore || t.data > migliore.data) migliore = t;
+  }
+  return migliore ? migliore.categoria : null;
+}
