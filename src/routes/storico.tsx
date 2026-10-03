@@ -33,6 +33,8 @@ import { AddExpenseModal } from "@/components/AddExpenseModal";
 import { ConfirmPopup } from "@/components/ConfirmPopup";
 import { EditRecurringModal } from "@/components/EditRecurringModal";
 import { EmptyState } from "@/components/EmptyState";
+import { SuggerimentiDescrizione } from "@/components/SuggerimentiDescrizione";
+import { suggerimentiDescrizione } from "@/lib/descrizioni";
 import type { Recurring, Transaction } from "@/lib/types";
 
 export const Route = createFileRoute("/storico")({
@@ -83,6 +85,7 @@ function StoricoPage() {
     "importo" | "categoria" | "nota"
   > | null>(null);
   const [ricerca, setRicerca] = useState("");
+  const [ricercaAttiva, setRicercaAttiva] = useState(false);
   const [prossimeAperte, setProssimeAperte] = useState(false);
   const [ricDaModificare, setRicDaModificare] = useState<Recurring | null>(null);
   const [ricDaEliminare, setRicDaEliminare] = useState<string | null>(null);
@@ -137,6 +140,14 @@ function StoricoPage() {
       : realizzate.filter((t) => meseSel.has(monthKey(t.data)));
   const q = ricerca.trim().toLowerCase();
 
+  // Si propongono le descrizioni di TUTTE le spese, non solo di quelle già
+  // filtrate: un suggerimento che sparisce perché il filtro per mese lo
+  // esclude sarebbe inutile proprio quando serve ritrovare una spesa vecchia.
+  const suggerimenti = useMemo(
+    () => suggerimentiDescrizione(state.transazioni, ricerca),
+    [state.transazioni, ricerca],
+  );
+
   // Un filtro è "attivo" se restringe qualcosa: solo così ha senso proporre
   // di azzerarlo. Con nessun filtro attivo il pulsante prometterebbe una
   // soluzione che non cambia nulla.
@@ -185,15 +196,38 @@ function StoricoPage() {
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold tracking-tight">Storico</h1>
 
-      <div className="flex items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3">
-        <Search size={16} className="shrink-0 text-muted-foreground" />
-        <input
-          value={ricerca}
-          onChange={(e) => setRicerca(e.target.value)}
-          placeholder="Cerca nella descrizione"
-          aria-label="Cerca nelle note"
-          className="w-full min-w-0 bg-transparent text-base outline-none placeholder:text-muted-foreground"
-        />
+      {/*
+       * Ricerca, con le descrizioni già usate proposte sotto: si tocca quella
+       * giusta invece di indovinare come era stata scritta mesi fa. La
+       * tendina compare solo mentre il campo ha il fuoco, altrimenti
+       * resterebbe aperta sopra i risultati che si stanno leggendo.
+       */}
+      <div className="relative">
+        <div className="flex items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3">
+          <Search size={16} className="shrink-0 text-muted-foreground" />
+          <input
+            value={ricerca}
+            onFocus={() => setRicercaAttiva(true)}
+            onBlur={() => setRicercaAttiva(false)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+            onChange={(e) => setRicerca(e.target.value)}
+            placeholder="Cerca nella descrizione"
+            aria-label="Cerca nelle note"
+            className="w-full min-w-0 bg-transparent text-base outline-none placeholder:text-muted-foreground"
+          />
+        </div>
+        {ricercaAttiva && (
+          <SuggerimentiDescrizione
+            voci={suggerimenti}
+            digitato={ricerca}
+            onScegli={(testo) => {
+              setRicerca(testo);
+              setRicercaAttiva(false);
+            }}
+          />
+        )}
       </div>
 
       {/* Filtri rapidi: mese e categoria, selezionabili insieme per filtri personalizzati */}
