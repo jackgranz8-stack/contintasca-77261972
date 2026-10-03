@@ -9,7 +9,7 @@ import { categoriaPerDescrizione, suggerimentiDescrizione } from "@/lib/descrizi
 import { RecurrenceFields, type RegoleRicorrenza } from "./RecurrenceFields";
 import type { Transaction } from "@/lib/types";
 import { BottomSheet } from "./BottomSheet";
-import { SuggerimentiDescrizione } from "./SuggerimentiDescrizione";
+import { CHIUSURA_RITARDATA_MS, SuggerimentiDescrizione } from "./SuggerimentiDescrizione";
 import { ConfirmPopup } from "./ConfirmPopup";
 
 function shiftDay(days: number) {
@@ -54,6 +54,15 @@ export function AddExpenseModal({
   const importoRef = useRef<HTMLInputElement | null>(null);
   const corpoRef = useRef<HTMLDivElement | null>(null);
   const descrizioneRef = useRef<HTMLDivElement | null>(null);
+  const descrizioneInputRef = useRef<HTMLInputElement | null>(null);
+  /*
+   * Il testo della descrizione, letto al momento giusto. Lo stato "nota" si
+   * aggiorna solo al ridisegno successivo: chi lo legge subito dopo aver
+   * scelto un suggerimento troverebbe ancora le lettere digitate prima, e
+   * proporrebbe la categoria sbagliata.
+   */
+  const notaCorrente = useRef("");
+  const chiusuraNota = useRef<number | null>(null);
   /*
    * Di quanto far salire il contenuto quando si scrive la descrizione: la
    * distanza fra l'inizio del foglio e il campo, misurata nel momento in cui
@@ -162,6 +171,20 @@ export function AddExpenseModal({
 
   // Le descrizioni già usate che iniziano per quanto digitato. Si ricalcolano
   // solo quando cambia il testo o l'elenco delle spese, non a ogni ridisegno.
+  // Il testo corrente segue anche le impostazioni fatte all'apertura
+  // (modifica di una spesa, consiglio), che non passano da onChange.
+  useEffect(() => {
+    notaCorrente.current = nota;
+  }, [nota]);
+
+  // Nessuna chiusura ritardata deve sopravvivere alla tendina.
+  useEffect(
+    () => () => {
+      if (chiusuraNota.current) window.clearTimeout(chiusuraNota.current);
+    },
+    [],
+  );
+
   const suggerimenti = useMemo(
     () => suggerimentiDescrizione(state.transazioni, nota),
     [state.transazioni, nota],
@@ -438,8 +461,15 @@ export function AddExpenseModal({
            */}
           <div ref={descrizioneRef} className="relative mb-3">
             <input
+              ref={descrizioneInputRef}
               value={nota}
               onFocus={() => {
+                // Tornato il fuoco prima della chiusura ritardata: la tendina
+                // resta aperta, non si chiude e riapre.
+                if (chiusuraNota.current) {
+                  window.clearTimeout(chiusuraNota.current);
+                  chiusuraNota.current = null;
+                }
                 // Se la fascia era stata fatta scorrere, si riparte da zero
                 // così la misura qui sotto è quella giusta.
                 corpoRef.current?.scrollTo({ top: 0 });
@@ -450,13 +480,27 @@ export function AddExpenseModal({
                 setCampo("nota");
               }}
               onBlur={() => {
-                setCampo((v) => (v === "nota" ? null : v));
-                proponiCategoria(nota);
+                /*
+                 * Chiusura un attimo DOPO la perdita del fuoco, non subito.
+                 * Su iPhone il dito che tocca un suggerimento fa perdere il
+                 * fuoco al campo prima che arrivi il "click": chiudendo
+                 * subito, la tendina sparirebbe e il suggerimento toccato
+                 * non verrebbe mai inserito.
+                 */
+                if (chiusuraNota.current) window.clearTimeout(chiusuraNota.current);
+                chiusuraNota.current = window.setTimeout(() => {
+                  chiusuraNota.current = null;
+                  setCampo((v) => (v === "nota" ? null : v));
+                  proponiCategoria(notaCorrente.current);
+                }, CHIUSURA_RITARDATA_MS);
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") e.currentTarget.blur();
               }}
-              onChange={(e) => setNota(e.target.value)}
+              onChange={(e) => {
+                notaCorrente.current = e.target.value;
+                setNota(e.target.value);
+              }}
               enterKeyHint="done"
               placeholder="Descrizione (opzionale)"
               className={`w-full rounded-2xl border bg-surface px-4 py-3 text-base outline-none placeholder:text-muted-foreground ${
@@ -468,8 +512,13 @@ export function AddExpenseModal({
                 voci={suggerimenti}
                 digitato={nota}
                 onScegli={(testo) => {
+                  notaCorrente.current = testo;
                   setNota(testo);
                   proponiCategoria(testo);
+                  // Scelto il suggerimento la descrizione è finita: si chiude
+                  // la tastiera e si torna al resto del modulo, con la
+                  // categoria già selezionata.
+                  descrizioneInputRef.current?.blur();
                 }}
               />
             )}
