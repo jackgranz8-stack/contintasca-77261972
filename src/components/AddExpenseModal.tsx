@@ -45,7 +45,7 @@ export function AddExpenseModal({
   });
   const [confermaStop, setConfermaStop] = useState(false);
   const importoRef = useRef<HTMLInputElement | null>(null);
-  const notaRef = useRef<HTMLDivElement | null>(null);
+  const notaInputRef = useRef<HTMLInputElement | null>(null);
   /*
    * Il fuoco dato dall'app (non dal dito dell'utente) non deve attivare la
    * modalità "sto scrivendo l'importo", che oscura e disattiva il resto del
@@ -315,12 +315,17 @@ export function AddExpenseModal({
        * sotto il proprio contenuto se non glielo si dice, e il pulsante di
        * salvataggio finirebbe sotto il bordo dello schermo.
        */}
-      <div className="no-scrollbar -mx-4 min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
+      <div
+        data-scroll-lock-allow
+        className={`no-scrollbar -mx-4 min-h-0 flex-1 px-4 ${
+          campo ? "overflow-hidden" : "overflow-y-auto overscroll-contain"
+        }`}
+      >
         {/* Importo in evidenza — solo tastiera nativa iOS */}
         <div
           className={`mb-3 flex items-center justify-center gap-2 rounded-2xl bg-surface px-4 py-5 transition-opacity ${
             campo === "importo" ? "ring-2 ring-primary" : ""
-          } ${campo === "nota" ? "pointer-events-none opacity-40" : ""}`}
+          } ${campo === "nota" ? "hidden" : ""}`}
         >
           <span className="text-2xl font-semibold text-muted-foreground">€</span>
           <input
@@ -349,7 +354,28 @@ export function AddExpenseModal({
           />
         </div>
 
-        <div className={campo ? "pointer-events-none opacity-40" : ""}>
+        {/*
+         * Mentre si scrive l'importo resta solo l'importo, con il suo "OK".
+         * Il pulsante sta QUI, subito sotto la cifra, e non in fondo al
+         * foglio: la tastiera copre la metà bassa dello schermo e un pulsante
+         * là sotto sarebbe irraggiungibile proprio nel momento in cui serve.
+         *
+         * "onPointerDown" annullato: senza, il dito che scende toglie prima
+         * il fuoco al campo, il pulsante sparisce e il tocco finisce nel
+         * vuoto. Così invece il fuoco si toglie dopo, di proposito.
+         */}
+        {campo === "importo" && (
+          <button
+            type="button"
+            onPointerDown={(e) => e.preventDefault()}
+            onClick={() => importoRef.current?.blur()}
+            className="lime-fill mb-3 w-full rounded-2xl py-3.5 text-base font-semibold active:scale-[0.99]"
+          >
+            OK
+          </button>
+        )}
+
+        <div className={campo ? "hidden" : ""}>
           {/*
            * Categorie: griglia su più righe invece della striscia che scorreva
            * di lato. Quelle oltre la terza restavano nascoste e andavano
@@ -420,31 +446,44 @@ export function AddExpenseModal({
          * ogni volta porta solo a scritture leggermente diverse della stessa
          * cosa, che poi nello storico non si trovano più insieme.
          */}
-        <div ref={notaRef} className="relative mb-2.5">
-          <input
-            value={nota}
-            onFocus={() => {
-              setCampo("nota");
-              /*
-               * Si porta il campo in cima alla fascia che scorre: la tendina
-               * si apre sotto, e se il campo resta in fondo le proposte
-               * finiscono oltre il bordo e si vedono solo a metà.
-               */
-              window.setTimeout(
-                () => notaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
-                60,
-              );
-            }}
-            onBlur={() => setCampo((v) => (v === "nota" ? null : v))}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") e.currentTarget.blur();
-            }}
-            onChange={(e) => setNota(e.target.value)}
-            placeholder="Descrizione (opzionale)"
-            className={`w-full rounded-2xl border bg-surface px-4 py-3 text-base outline-none placeholder:text-muted-foreground ${
-              campo === "nota" ? "border-primary ring-2 ring-primary" : "border-border"
-            } ${campo === "importo" ? "pointer-events-none opacity-40" : ""}`}
-          />
+        {/*
+         * Toccando la descrizione, tutto il resto sparisce (non si limita a
+         * sbiadire): il campo resta da solo in cima e sotto ha tutto lo
+         * spazio libero per la tendina dei suggerimenti.
+         *
+         * Il campo NON viene spostato nell'albero, solo i vicini vengono
+         * nascosti: bastava rimontarlo altrove perché il browser gli
+         * togliesse il fuoco e richiudesse la tastiera a metà digitazione.
+         * Per lo stesso motivo niente "scrollIntoView": non serve più
+         * portarlo in alto, perché sopra non è rimasto nulla.
+         */}
+        <div className={`relative mb-2.5 ${campo === "importo" ? "hidden" : ""}`}>
+          <div className="flex items-center gap-2">
+            <input
+              ref={notaInputRef}
+              value={nota}
+              onFocus={() => setCampo("nota")}
+              onBlur={() => setCampo((v) => (v === "nota" ? null : v))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+              }}
+              onChange={(e) => setNota(e.target.value)}
+              placeholder="Descrizione (opzionale)"
+              className={`min-w-0 flex-1 rounded-2xl border bg-surface px-4 py-3 text-base outline-none placeholder:text-muted-foreground ${
+                campo === "nota" ? "border-primary ring-2 ring-primary" : "border-border"
+              }`}
+            />
+            {campo === "nota" && (
+              <button
+                type="button"
+                onPointerDown={(e) => e.preventDefault()}
+                onClick={() => notaInputRef.current?.blur()}
+                className="shrink-0 rounded-2xl bg-surface-2 px-4 py-3 text-sm font-semibold"
+              >
+                OK
+              </button>
+            )}
+          </div>
           {campo === "nota" && (
             <SuggerimentiDescrizione
               voci={suggerimenti}
@@ -457,7 +496,7 @@ export function AddExpenseModal({
         {/* Toggle ricorrenza compatto */}
         <div
           className={`mb-3 flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-2.5 ${
-            campo ? "pointer-events-none opacity-40" : ""
+            campo ? "hidden" : ""
           }`}
         >
           <Repeat size={15} className="shrink-0 text-primary" />
@@ -480,7 +519,7 @@ export function AddExpenseModal({
         <div
           className={`grid transition-[grid-template-rows] duration-300 ease-out ${
             ripeti ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-          }`}
+          } ${campo ? "hidden" : ""}`}
         >
           <div className="overflow-hidden" aria-hidden={!ripeti}>
             <div className="mb-3 rounded-2xl border border-border bg-surface p-3.5">
@@ -490,7 +529,13 @@ export function AddExpenseModal({
         </div>
       </div>
 
-      <div className="shrink-0 pt-3">
+      {/*
+       * Mentre si scrive un campo il salvataggio sparisce: starebbe comunque
+       * dietro alla tastiera, e lasciarlo lì sbiadito fa solo sembrare che
+       * l'app si sia bloccata. Il pulsante da premere in quel momento è
+       * l'"OK" accanto al campo.
+       */}
+      <div className={`shrink-0 pt-3 ${campo ? "hidden" : ""}`}>
         <button
           onClick={salva}
           className="lime-fill w-full rounded-2xl py-3.5 text-base font-semibold active:scale-[0.99]"
