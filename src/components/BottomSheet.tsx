@@ -101,13 +101,11 @@ export function BottomSheet({
       />
       <div
         /*
-         * A tutto schermo il permesso di scorrere NON vale per tutto il
-         * foglio. Con l'attributo sull'intero pannello, un dito trascinato
-         * sull'intestazione o sul pulsante in fondo non viene fermato e
-         * iPhone fa scorrere la pagina che sta dietro, che si intravede
-         * muoversi sotto al foglio. Qui lo riceve solo la maniglia (che non
-         * scorre nulla, ma deve restare trascinabile per chiudere), e tocca
-         * a chi usa il foglio metterlo sulla propria fascia che scorre.
+         * A tutto schermo il permesso di scorrere NON va sull'intero foglio
+         * ma solo sulla fascia che scorre davvero, che chi usa il foglio
+         * marca da sé. Il blocco in use-scroll-lock lascia comunque passare
+         * un gesto solo se lì sotto c'è qualcosa che può scorrere: niente
+         * più trascinamenti che muovono la pagina dietro.
          */
         data-scroll-lock-allow={fullScreen ? undefined : true}
         className={
@@ -118,7 +116,7 @@ export function BottomSheet({
         style={{ transform, transition }}
       >
         <div
-          data-scroll-lock-allow
+          data-scroll-lock-gesture
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
