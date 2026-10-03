@@ -18,6 +18,14 @@ function shiftDay(days: number) {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * Margine lasciato sopra la descrizione quando sale in cima al foglio. Deve
+ * superare l'anello di evidenziazione (2px) con un po' d'aria, ma restare
+ * sotto lo spazio fra importo e descrizione (12px), altrimenti dell'importo
+ * scivolato via resterebbe visibile una striscia.
+ */
+const SPAZIO_SOPRA_CAMPO = 10;
+
 export function AddExpenseModal({
   open,
   onClose,
@@ -476,7 +484,14 @@ export function AddExpenseModal({
                 // offsetTop e non getBoundingClientRect: non risente della
                 // traslazione, quindi la misura resta giusta anche se si
                 // tocca di nuovo il campo mentre il contenuto sta tornando giù.
-                setSalita(descrizioneRef.current?.offsetTop ?? 0);
+                //
+                // Si lascia SPAZIO_SOPRA_CAMPO di margine: portando il campo
+                // esattamente al bordo della fascia, che taglia tutto ciò che
+                // sporge, si perdevano l'anello di evidenziazione e il bordo
+                // superiore, e il campo sembrava tagliato in alto.
+                setSalita(
+                  Math.max(0, (descrizioneRef.current?.offsetTop ?? 0) - SPAZIO_SOPRA_CAMPO),
+                );
                 setCampo("nota");
               }}
               onBlur={() => {

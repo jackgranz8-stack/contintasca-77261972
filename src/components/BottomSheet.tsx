@@ -122,7 +122,7 @@ export function BottomSheet({
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
           className={`flex shrink-0 touch-none justify-center py-2.5 ${
-            fullScreen ? "pt-[calc(env(safe-area-inset-top,0px)+10px)]" : ""
+            fullScreen ? "pt-[calc(env(safe-area-inset-top,0px)+14px)]" : ""
           }`}
         >
           <span aria-hidden className="h-1.5 w-10 rounded-full bg-border" />

@@ -161,10 +161,25 @@ export function AppShell({ children }: { children: ReactNode }) {
           {/* safe-x: margini laterali che diventano più larghi in orizzontale
               sugli iPhone con la tacca, così il contenuto non ci finisce sotto.
               pb-nav: spazio in fondo pari a barra + barra gesti + aria. */}
-          <div className="safe-x pb-nav mx-auto w-full max-w-[430px] pt-[calc(env(safe-area-inset-top,0px)+8px)]">
+          {/*
+           * pt: il contenuto parte 16px sotto la barra di stato (ora,
+           * batteria). Con 8px la prima riga finiva a ridosso della
+           * sfumatura che iOS disegna sotto quella barra e si leggeva male.
+           */}
+          <div className="safe-x pb-nav mx-auto w-full max-w-[430px] pt-[calc(env(safe-area-inset-top,0px)+16px)]">
             {children}
           </div>
         </div>
+
+        {/*
+         * Fascia sotto la barra di stato. L'app disegna il contenuto fin
+         * sotto l'ora e la batteria (stile "black-translucent"): senza questa
+         * fascia, scorrendo, i testi passavano sotto l'orologio e restavano
+         * mezzi coperti. Ha lo stesso colore dello sfondo, quindi da ferma
+         * non si vede; scorrendo, il contenuto ci sparisce sotto in modo
+         * pulito, come nelle app native.
+         */}
+        <div aria-hidden className="status-bar-scrim" />
 
         {bannerVisible && (
           <div
