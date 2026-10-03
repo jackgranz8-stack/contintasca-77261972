@@ -14,10 +14,24 @@ export function BottomSheet({
   open,
   onClose,
   children,
+  fullScreen = false,
 }: {
   open: boolean;
   onClose: () => void;
   children: ReactNode;
+  /**
+   * Foglio a tutta altezza invece che alto quanto il suo contenuto.
+   *
+   * Serve ai moduli lunghi (la nuova spesa): con tutto lo schermo a
+   * disposizione le categorie stanno su più righe tutte visibili e il
+   * pulsante di salvataggio può restare ancorato in fondo, senza che il
+   * foglio cresca e cali di altezza a ogni campo che si apre.
+   *
+   * In questa modalità il foglio NON scorre per conto suo: si divide in tre
+   * fasce (intestazione, contenuto, pulsante) ed è il contenuto a scorrere.
+   * Chi lo usa deve quindi passare dei figli già organizzati così.
+   */
+  fullScreen?: boolean;
 }) {
   const [visible, setVisible] = useState(open);
   const [animateIn, setAnimateIn] = useState(false);
@@ -87,7 +101,11 @@ export function BottomSheet({
       />
       <div
         data-scroll-lock-allow
-        className="no-scrollbar relative z-10 max-h-[92svh] w-full max-w-[430px] overflow-y-auto overscroll-contain rounded-t-3xl border border-border bg-popover pb-[max(env(safe-area-inset-bottom),14px)]"
+        className={
+          fullScreen
+            ? "relative z-10 flex h-[100dvh] w-full max-w-[430px] flex-col overflow-hidden rounded-t-3xl border border-border bg-popover pb-[max(env(safe-area-inset-bottom),14px)]"
+            : "no-scrollbar relative z-10 max-h-[92svh] w-full max-w-[430px] overflow-y-auto overscroll-contain rounded-t-3xl border border-border bg-popover pb-[max(env(safe-area-inset-bottom),14px)]"
+        }
         style={{ transform, transition }}
       >
         <div
@@ -95,11 +113,15 @@ export function BottomSheet({
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
-          className="flex touch-none justify-center py-2.5"
+          className={`flex shrink-0 touch-none justify-center py-2.5 ${
+            fullScreen ? "pt-[calc(env(safe-area-inset-top,0px)+10px)]" : ""
+          }`}
         >
           <span aria-hidden className="h-1.5 w-10 rounded-full bg-border" />
         </div>
-        <div className="px-4 pt-0.5">{children}</div>
+        <div className={fullScreen ? "flex min-h-0 flex-1 flex-col px-4 pt-0.5" : "px-4 pt-0.5"}>
+          {children}
+        </div>
       </div>
     </div>
   );

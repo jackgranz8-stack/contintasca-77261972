@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Repeat, X } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { iconFor } from "@/lib/icons";
 import { formatDay, todayISO, uid } from "@/lib/format";
 import { dataInizioSettimanale, fromISO, giornoRicorrenzaDa } from "@/lib/ricorrenze";
+import { suggerimentiDescrizione } from "@/lib/descrizioni";
 import { RecurrenceFields, type RegoleRicorrenza } from "./RecurrenceFields";
 import type { Transaction } from "@/lib/types";
 import { BottomSheet } from "./BottomSheet";
+import { SuggerimentiDescrizione } from "./SuggerimentiDescrizione";
 import { ConfirmPopup } from "./ConfirmPopup";
 
 function shiftDay(days: number) {
@@ -43,6 +45,7 @@ export function AddExpenseModal({
   });
   const [confermaStop, setConfermaStop] = useState(false);
   const importoRef = useRef<HTMLInputElement | null>(null);
+  const notaRef = useRef<HTMLDivElement | null>(null);
   /*
    * Il fuoco dato dall'app (non dal dito dell'utente) non deve attivare la
    * modalità "sto scrivendo l'importo", che oscura e disattiva il resto del
@@ -139,6 +142,13 @@ export function AddExpenseModal({
   }, [open, edit]);
 
   const valore = Number(importo.replace(",", "."));
+
+  // Le descrizioni già usate che iniziano per quanto digitato. Si ricalcolano
+  // solo quando cambia il testo o l'elenco delle spese, non a ogni ridisegno.
+  const suggerimenti = useMemo(
+    () => suggerimentiDescrizione(state.transazioni, nota),
+    [state.transazioni, nota],
+  );
 
   // Categorie ordinate per uso reale: le più usate per prime, quelle mai usate in fondo.
   const usoPerCategoria = new Map<string, number>();
@@ -287,8 +297,8 @@ export function AddExpenseModal({
   const isFutura = data > todayISO();
 
   return (
-    <BottomSheet open={open} onClose={onClose}>
-      <div className="mb-2 flex items-center justify-between">
+    <BottomSheet open={open} onClose={onClose} fullScreen>
+      <div className="mb-2 flex shrink-0 items-center justify-between">
         <h2 className="text-base font-semibold">{edit ? "Modifica spesa" : "Nuova spesa"}</h2>
         <button
           onClick={onClose}
@@ -299,153 +309,195 @@ export function AddExpenseModal({
         </button>
       </div>
 
-      {/* Importo in evidenza — solo tastiera nativa iOS */}
-      <div
-        className={`mb-3 flex items-center justify-center gap-2 rounded-2xl bg-surface px-4 py-5 transition-opacity ${
-          campo === "importo" ? "ring-2 ring-primary" : ""
-        } ${campo === "nota" ? "pointer-events-none opacity-40" : ""}`}
-      >
-        <span className="text-2xl font-semibold text-muted-foreground">€</span>
-        <input
-          type="number"
-          inputMode="decimal"
-          step="0.01"
-          min="0"
-          value={importo.replace(",", ".")}
-          ref={importoRef}
-          onFocus={(e) => {
-            e.target.select();
-            if (fuocoAutomatico.current) {
-              fuocoAutomatico.current = false;
-              return;
-            }
-            setCampo("importo");
-          }}
-          onBlur={() => setCampo((v) => (v === "importo" ? null : v))}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") e.currentTarget.blur();
-          }}
-          onChange={(e) => setImporto(e.target.value.replace(".", ","))}
-          placeholder="0"
-          aria-label="Importo"
-          className="w-full min-w-0 bg-transparent text-center text-[42px] font-semibold leading-tight tracking-tight outline-none placeholder:text-muted-foreground"
-        />
-      </div>
+      {/*
+       * Fascia che scorre. Il foglio ha un'altezza fissa, quindi serve
+       * "min-h-0": in un contenitore flex un figlio non si restringe mai
+       * sotto il proprio contenuto se non glielo si dice, e il pulsante di
+       * salvataggio finirebbe sotto il bordo dello schermo.
+       */}
+      <div className="no-scrollbar -mx-4 min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
+        {/* Importo in evidenza — solo tastiera nativa iOS */}
+        <div
+          className={`mb-3 flex items-center justify-center gap-2 rounded-2xl bg-surface px-4 py-5 transition-opacity ${
+            campo === "importo" ? "ring-2 ring-primary" : ""
+          } ${campo === "nota" ? "pointer-events-none opacity-40" : ""}`}
+        >
+          <span className="text-2xl font-semibold text-muted-foreground">€</span>
+          <input
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            min="0"
+            value={importo.replace(",", ".")}
+            ref={importoRef}
+            onFocus={(e) => {
+              e.target.select();
+              if (fuocoAutomatico.current) {
+                fuocoAutomatico.current = false;
+                return;
+              }
+              setCampo("importo");
+            }}
+            onBlur={() => setCampo((v) => (v === "importo" ? null : v))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+            onChange={(e) => setImporto(e.target.value.replace(".", ","))}
+            placeholder="0"
+            aria-label="Importo"
+            className="w-full min-w-0 bg-transparent text-center text-[42px] font-semibold leading-tight tracking-tight outline-none placeholder:text-muted-foreground"
+          />
+        </div>
 
-      <div className={campo ? "pointer-events-none opacity-40" : ""}>
-        {/* Categorie: riga orizzontale di icone */}
-        <div className="no-scrollbar -mx-4 mb-3 flex gap-2 overflow-x-auto px-4">
-          {categorieOrdinate.map((c) => {
-            const Icon = iconFor(c.icona);
-            const active = c.id === categoria;
-            return (
+        <div className={campo ? "pointer-events-none opacity-40" : ""}>
+          {/*
+           * Categorie: griglia su più righe invece della striscia che scorreva
+           * di lato. Quelle oltre la terza restavano nascoste e andavano
+           * cercate trascinando; ora si vedono tutte insieme e si tocca
+           * direttamente quella giusta. Restano ordinate per uso, così le più
+           * frequenti capitano comunque nella prima riga.
+           */}
+          <div className="mb-3 grid grid-cols-4 gap-2">
+            {categorieOrdinate.map((c) => {
+              const Icon = iconFor(c.icona);
+              const active = c.id === categoria;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setCategoria(c.id)}
+                  className={`flex flex-col items-center gap-1 rounded-2xl border px-1 py-2 text-[11px] transition-colors ${
+                    active
+                      ? "border-primary bg-surface-2 font-semibold text-foreground"
+                      : "border-border bg-surface text-muted-foreground"
+                  }`}
+                >
+                  <span
+                    className="flex h-9 w-9 items-center justify-center rounded-full"
+                    style={{ backgroundColor: `${c.colore}22`, color: c.colore }}
+                  >
+                    <Icon size={18} />
+                  </span>
+                  <span className="line-clamp-2 w-full text-center leading-tight">{c.nome}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Data */}
+          <div className="no-scrollbar -mx-4 mb-2.5 flex items-center gap-2 overflow-x-auto px-4">
+            {dateChips.map((d) => (
               <button
-                key={c.id}
+                key={d.value}
                 type="button"
-                onClick={() => setCategoria(c.id)}
-                className={`flex w-[68px] shrink-0 flex-col items-center gap-1 rounded-2xl border px-1 py-2 text-[11px] transition-colors ${
-                  active
-                    ? "border-primary bg-surface-2 font-semibold text-foreground"
+                onClick={() => setData(d.value)}
+                className={`shrink-0 rounded-full border px-3.5 py-2 text-xs ${
+                  data === d.value
+                    ? "border-primary bg-surface-2 font-semibold"
                     : "border-border bg-surface text-muted-foreground"
                 }`}
               >
-                <span
-                  className="flex h-9 w-9 items-center justify-center rounded-full"
-                  style={{ backgroundColor: `${c.colore}22`, color: c.colore }}
-                >
-                  <Icon size={18} />
-                </span>
-                <span className="w-full truncate text-center">{c.nome}</span>
+                {d.label}
               </button>
-            );
-          })}
+            ))}
+            <input
+              type="date"
+              value={data}
+              onChange={(e) => setData(e.target.value)}
+              className="chip shrink-0 bg-surface outline-none"
+            />
+          </div>
+          {isFutura && (
+            <p className="mb-2.5 text-[11px] text-muted-foreground">
+              Data futura: sarà una spesa prevista e verrà conteggiata dal {formatDay(data)}.
+            </p>
+          )}
         </div>
 
-        {/* Data */}
-        <div className="no-scrollbar -mx-4 mb-2.5 flex items-center gap-2 overflow-x-auto px-4">
-          {dateChips.map((d) => (
-            <button
-              key={d.value}
-              type="button"
-              onClick={() => setData(d.value)}
-              className={`shrink-0 rounded-full border px-3.5 py-2 text-xs ${
-                data === d.value
-                  ? "border-primary bg-surface-2 font-semibold"
-                  : "border-border bg-surface text-muted-foreground"
-              }`}
-            >
-              {d.label}
-            </button>
-          ))}
+        {/*
+         * Descrizione, con le precedenti proposte sotto mentre si scrive: le
+         * spese ricorrenti hanno quasi sempre lo stesso nome e riscriverlo
+         * ogni volta porta solo a scritture leggermente diverse della stessa
+         * cosa, che poi nello storico non si trovano più insieme.
+         */}
+        <div ref={notaRef} className="relative mb-2.5">
           <input
-            type="date"
-            value={data}
-            onChange={(e) => setData(e.target.value)}
-            className="chip shrink-0 bg-surface outline-none"
+            value={nota}
+            onFocus={() => {
+              setCampo("nota");
+              /*
+               * Si porta il campo in cima alla fascia che scorre: la tendina
+               * si apre sotto, e se il campo resta in fondo le proposte
+               * finiscono oltre il bordo e si vedono solo a metà.
+               */
+              window.setTimeout(
+                () => notaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+                60,
+              );
+            }}
+            onBlur={() => setCampo((v) => (v === "nota" ? null : v))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+            onChange={(e) => setNota(e.target.value)}
+            placeholder="Descrizione (opzionale)"
+            className={`w-full rounded-2xl border bg-surface px-4 py-3 text-base outline-none placeholder:text-muted-foreground ${
+              campo === "nota" ? "border-primary ring-2 ring-primary" : "border-border"
+            } ${campo === "importo" ? "pointer-events-none opacity-40" : ""}`}
           />
+          {campo === "nota" && (
+            <SuggerimentiDescrizione
+              voci={suggerimenti}
+              digitato={nota}
+              onScegli={(testo) => setNota(testo)}
+            />
+          )}
         </div>
-        {isFutura && (
-          <p className="mb-2.5 text-[11px] text-muted-foreground">
-            Data futura: sarà una spesa prevista e verrà conteggiata dal {formatDay(data)}.
-          </p>
-        )}
-      </div>
 
-      <input
-        value={nota}
-        onFocus={() => setCampo("nota")}
-        onBlur={() => setCampo((v) => (v === "nota" ? null : v))}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") e.currentTarget.blur();
-        }}
-        onChange={(e) => setNota(e.target.value)}
-        placeholder="Descrizione (opzionale)"
-        className={`mb-2.5 w-full rounded-2xl border bg-surface px-4 py-3 text-base outline-none placeholder:text-muted-foreground ${
-          campo === "nota" ? "border-primary ring-2 ring-primary" : "border-border"
-        } ${campo === "importo" ? "pointer-events-none opacity-40" : ""}`}
-      />
-
-      {/* Toggle ricorrenza compatto */}
-      <div
-        className={`mb-3 flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-2.5 ${
-          campo ? "pointer-events-none opacity-40" : ""
-        }`}
-      >
-        <Repeat size={15} className="shrink-0 text-primary" />
-        <span className="flex-1 truncate text-sm">Spesa ricorrente</span>
-        <button
-          type="button"
-          onClick={() => setRipeti((v) => !v)}
-          aria-pressed={ripeti}
-          aria-label="Ripeti ogni mese"
-          className={`h-7 w-12 shrink-0 rounded-full p-1 transition-colors ${ripeti ? "lime-fill" : "bg-surface-2"}`}
+        {/* Toggle ricorrenza compatto */}
+        <div
+          className={`mb-3 flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-2.5 ${
+            campo ? "pointer-events-none opacity-40" : ""
+          }`}
         >
-          <span
-            className={`block h-5 w-5 rounded-full bg-background transition-transform ${ripeti ? "translate-x-5" : ""}`}
-          />
-        </button>
-      </div>
+          <Repeat size={15} className="shrink-0 text-primary" />
+          <span className="flex-1 truncate text-sm">Spesa ricorrente</span>
+          <button
+            type="button"
+            onClick={() => setRipeti((v) => !v)}
+            aria-pressed={ripeti}
+            aria-label="Ripeti ogni mese"
+            className={`h-7 w-12 shrink-0 rounded-full p-1 transition-colors ${ripeti ? "lime-fill" : "bg-surface-2"}`}
+          >
+            <span
+              className={`block h-5 w-5 rounded-full bg-background transition-transform ${ripeti ? "translate-x-5" : ""}`}
+            />
+          </button>
+        </div>
 
-      {/* Le opzioni della ricorrenza si aprono solo quando serve: chi
+        {/* Le opzioni della ricorrenza si aprono solo quando serve: chi
           registra una spesa singola non le vede nemmeno. */}
-      <div
-        className={`grid transition-[grid-template-rows] duration-300 ease-out ${
-          ripeti ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-        }`}
-      >
-        <div className="overflow-hidden" aria-hidden={!ripeti}>
-          <div className="mb-3 rounded-2xl border border-border bg-surface p-3.5">
-            <RecurrenceFields value={regole} onChange={setRegole} />
+        <div
+          className={`grid transition-[grid-template-rows] duration-300 ease-out ${
+            ripeti ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+          }`}
+        >
+          <div className="overflow-hidden" aria-hidden={!ripeti}>
+            <div className="mb-3 rounded-2xl border border-border bg-surface p-3.5">
+              <RecurrenceFields value={regole} onChange={setRegole} />
+            </div>
           </div>
         </div>
       </div>
 
-      <button
-        onClick={salva}
-        className="lime-fill w-full rounded-2xl py-3.5 text-base font-semibold active:scale-[0.99]"
-      >
-        {edit ? "Salva modifiche" : "Salva spesa"}
-      </button>
+      <div className="shrink-0 pt-3">
+        <button
+          onClick={salva}
+          className="lime-fill w-full rounded-2xl py-3.5 text-base font-semibold active:scale-[0.99]"
+        >
+          {edit ? "Salva modifiche" : "Salva spesa"}
+        </button>
+      </div>
 
       <ConfirmPopup
         open={confermaStop}
