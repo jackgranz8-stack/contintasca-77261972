@@ -3,6 +3,9 @@ import { useScrollLock } from "@/hooks/use-scroll-lock";
 
 const CLOSE_DRAG_THRESHOLD = 120;
 
+/** Sotto questa altezza coperta (in px) non è una tastiera: si ignora. */
+const SOGLIA_TASTIERA = 80;
+
 /**
  * Foglio che sale dal basso, in stile iOS: entra/esce con una transizione
  * morbida (nessun salto secco come prima), e si può chiudere anche
@@ -56,6 +59,54 @@ export function BottomSheet({
 
   useScrollLock(visible);
 
+  /*
+   * TENDINA SOPRA LA TASTIERA
+   *
+   * La tendina è ancorata al fondo dello schermo. Su iPhone la tastiera
+   * copre il fondo SENZA ridurre la pagina: una tendina bassa come
+   * "Modifica categoria" finiva interamente dietro la tastiera, campi
+   * compresi, e non si vedeva cosa si stava scrivendo.
+   *
+   * Qui si misura quanta parte della pagina è coperta: altezza della pagina
+   * meno l'area davvero visibile (visualViewport, che invece si riduce con la
+   * tastiera). La tendina viene alzata di quel tanto e si appoggia al bordo
+   * superiore della tastiera.
+   *
+   * Vale per tutti i sistemi senza doverli distinguere: su Android la
+   * pagina dichiara "interactive-widget=resizes-content", quindi è la pagina
+   * stessa a restringersi, l'area coperta risulta zero e non si sposta
+   * niente. Su iPhone, che quella dichiarazione la ignora, risulta l'altezza
+   * della tastiera.
+   *
+   * Sotto la soglia si ignora: piccole differenze (barre di Safari, arrotondamenti)
+   * non devono far sobbalzare la tendina.
+   *
+   * Solo per le tendine normali: quella a tutto schermo ha già i campi in
+   * alto, sopra la tastiera, e non va spostata.
+   */
+  const [tastiera, setTastiera] = useState({ coperto: 0, visibile: 0 });
+  useEffect(() => {
+    if (!visible || fullScreen || typeof window === "undefined") return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const aggiorna = () => {
+      const coperto = window.innerHeight - vv.height - vv.offsetTop;
+      setTastiera(
+        coperto > SOGLIA_TASTIERA
+          ? { coperto: Math.round(coperto), visibile: Math.round(vv.height) }
+          : { coperto: 0, visibile: 0 },
+      );
+    };
+    aggiorna();
+    vv.addEventListener("resize", aggiorna);
+    vv.addEventListener("scroll", aggiorna);
+    return () => {
+      vv.removeEventListener("resize", aggiorna);
+      vv.removeEventListener("scroll", aggiorna);
+      setTastiera({ coperto: 0, visibile: 0 });
+    };
+  }, [visible, fullScreen]);
+
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     draggingRef.current = true;
@@ -91,7 +142,10 @@ export function BottomSheet({
       : "transform 320ms cubic-bezier(0.32,0.72,0,1)";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center overscroll-none">
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center overscroll-none transition-[padding] duration-250 ease-out motion-reduce:transition-none"
+      style={{ paddingBottom: tastiera.coperto }}
+    >
       <button
         aria-label="Chiudi"
         onClick={onClose}
@@ -113,7 +167,20 @@ export function BottomSheet({
             ? "relative z-10 flex h-[100dvh] w-full max-w-[430px] flex-col overflow-hidden rounded-t-3xl border border-border bg-popover pb-[max(env(safe-area-inset-bottom),14px)]"
             : "no-scrollbar relative z-10 max-h-[92svh] w-full max-w-[430px] overflow-y-auto overscroll-contain rounded-t-3xl border border-border bg-popover pb-[max(env(safe-area-inset-bottom),14px)]"
         }
-        style={{ transform, transition }}
+        style={{
+          transform,
+          transition,
+          ...(tastiera.coperto
+            ? {
+                // Mai più alta dell'area visibile sopra la tastiera, meno la
+                // barra di stato: se il contenuto non ci sta, scorre dentro.
+                maxHeight: `calc(${tastiera.visibile}px - env(safe-area-inset-top, 0px) - 8px)`,
+                // Lo spazio per la barra "home" di iPhone non serve: in
+                // questo momento sta sotto la tastiera.
+                paddingBottom: 14,
+              }
+            : null),
+        }}
       >
         <div
           data-scroll-lock-gesture
