@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
@@ -12,6 +12,7 @@ import {
   Pencil,
   Repeat,
   Search,
+  X,
 } from "lucide-react";
 import { sum, txInMonth, useApp } from "@/lib/store";
 import { prossimePreviste, sommaPreviste, txRealizzate } from "@/lib/previsioni";
@@ -33,11 +34,8 @@ import { AddExpenseModal } from "@/components/AddExpenseModal";
 import { ConfirmPopup } from "@/components/ConfirmPopup";
 import { EditRecurringModal } from "@/components/EditRecurringModal";
 import { EmptyState } from "@/components/EmptyState";
-import {
-  CHIUSURA_RITARDATA_MS,
-  SuggerimentiDescrizione,
-} from "@/components/SuggerimentiDescrizione";
-import { suggerimentiDescrizione } from "@/lib/descrizioni";
+import { RicercaStorico } from "@/components/RicercaStorico";
+import { contieneTesto } from "@/lib/descrizioni";
 import type { Recurring, Transaction } from "@/lib/types";
 
 export const Route = createFileRoute("/storico")({
@@ -88,15 +86,9 @@ function StoricoPage() {
     "importo" | "categoria" | "nota"
   > | null>(null);
   const [ricerca, setRicerca] = useState("");
-  const [ricercaAttiva, setRicercaAttiva] = useState(false);
-  const ricercaInputRef = useRef<HTMLInputElement | null>(null);
-  const chiusuraRicerca = useRef<number | null>(null);
-  useEffect(
-    () => () => {
-      if (chiusuraRicerca.current) window.clearTimeout(chiusuraRicerca.current);
-    },
-    [],
-  );
+  // Schermata di ricerca a tutto schermo (vedi components/RicercaStorico).
+  const [ricercaAperta, setRicercaAperta] = useState(false);
+  const chiudiRicerca = useCallback(() => setRicercaAperta(false), []);
   const [prossimeAperte, setProssimeAperte] = useState(false);
   const [ricDaModificare, setRicDaModificare] = useState<Recurring | null>(null);
   const [ricDaEliminare, setRicDaEliminare] = useState<string | null>(null);
@@ -149,15 +141,10 @@ function StoricoPage() {
     : meseSel.size === 0
       ? realizzate
       : realizzate.filter((t) => meseSel.has(monthKey(t.data)));
-  const q = ricerca.trim().toLowerCase();
-
-  // Si propongono le descrizioni di TUTTE le spese, non solo di quelle già
-  // filtrate: un suggerimento che sparisce perché il filtro per mese lo
-  // esclude sarebbe inutile proprio quando serve ritrovare una spesa vecchia.
-  const suggerimenti = useMemo(
-    () => suggerimentiDescrizione(state.transazioni, ricerca),
-    [state.transazioni, ricerca],
-  );
+  const q = ricerca.trim();
+  // Stesso confronto dei suggerimenti: "contiene", senza maiuscole né
+  // accenti. Chi cerca "cafe" trova anche "Caffè al bar".
+  const passaRicerca = (t: Transaction) => contieneTesto(t.nota, q);
 
   // Un filtro è "attivo" se restringe qualcosa: solo così ha senso proporre
   // di azzerarlo. Con nessun filtro attivo il pulsante prometterebbe una
@@ -171,9 +158,7 @@ function StoricoPage() {
     setPeriodoRange(null);
   };
   const scoped = catSel.size === 0 ? base : base.filter((t) => catSel.has(t.categoria));
-  const filtrate = scoped
-    .filter((t) => (q ? (t.nota ?? "").toLowerCase().includes(q) : true))
-    .sort((a, b) => (a.data < b.data ? 1 : -1));
+  const filtrate = scoped.filter(passaRicerca).sort((a, b) => (a.data < b.data ? 1 : -1));
   const meseArr = [...meseSel].sort();
   const catArr = [...catSel];
   const meseLabel = periodoRange
@@ -208,57 +193,71 @@ function StoricoPage() {
       <h1 className="text-2xl font-semibold tracking-tight">Storico</h1>
 
       {/*
-       * Ricerca, con le descrizioni già usate proposte sotto: si tocca quella
-       * giusta invece di indovinare come era stata scritta mesi fa. La
-       * tendina compare solo mentre il campo ha il fuoco, altrimenti
-       * resterebbe aperta sopra i risultati che si stanno leggendo.
+       * Ricerca: il campo della pagina serve solo ad aprire la schermata di
+       * ricerca a tutto schermo (RicercaStorico), dove si scrive davvero.
+       * Il tocco mette comunque a fuoco questo campo, così su iPhone la
+       * tastiera si apre subito e resta su quando il fuoco passa al campo
+       * della schermata di ricerca.
        */}
-      <div className="relative">
-        <div className="flex items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3">
-          <Search size={16} className="shrink-0 text-muted-foreground" />
-          <input
-            ref={ricercaInputRef}
-            value={ricerca}
-            onFocus={() => {
-              if (chiusuraRicerca.current) {
-                window.clearTimeout(chiusuraRicerca.current);
-                chiusuraRicerca.current = null;
-              }
-              setRicercaAttiva(true);
-            }}
-            onBlur={() => {
-              // Chiusura un attimo dopo, non subito: su iPhone il tocco su
-              // un suggerimento fa perdere il fuoco al campo prima del
-              // "click", e chiudendo subito il suggerimento non verrebbe
-              // mai inserito.
-              if (chiusuraRicerca.current) window.clearTimeout(chiusuraRicerca.current);
-              chiusuraRicerca.current = window.setTimeout(() => {
-                chiusuraRicerca.current = null;
-                setRicercaAttiva(false);
-              }, CHIUSURA_RITARDATA_MS);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") e.currentTarget.blur();
-            }}
-            onChange={(e) => setRicerca(e.target.value)}
-            placeholder="Cerca nella descrizione"
-            aria-label="Cerca nelle note"
-            className="w-full min-w-0 bg-transparent text-base outline-none placeholder:text-muted-foreground"
-          />
-        </div>
-        {ricercaAttiva && (
-          <SuggerimentiDescrizione
-            voci={suggerimenti}
-            digitato={ricerca}
-            onScegli={(testo) => {
-              setRicerca(testo);
-              // Si chiude la tastiera per mostrare subito i risultati: la
-              // tendina si chiude da sola con la perdita del fuoco.
-              ricercaInputRef.current?.blur();
-            }}
-          />
+      <div className="flex items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3">
+        <Search size={16} className="shrink-0 text-muted-foreground" />
+        <input
+          value={ricerca}
+          onFocus={() => setRicercaAperta(true)}
+          onChange={() => setRicercaAperta(true)}
+          placeholder="Cerca nella descrizione"
+          aria-label="Cerca nella descrizione"
+          className="w-full min-w-0 bg-transparent text-base outline-none placeholder:text-muted-foreground"
+        />
+        {q && (
+          <button
+            type="button"
+            onClick={() => setRicerca("")}
+            aria-label="Cancella ricerca"
+            className="-mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted-foreground"
+          >
+            <X size={13} />
+          </button>
         )}
       </div>
+
+      <RicercaStorico
+        open={ricercaAperta}
+        valoreIniziale={ricerca}
+        transazioni={state.transazioni}
+        onAnnulla={chiudiRicerca}
+        onApplica={(testo) => {
+          setRicerca(testo);
+          setRicercaAperta(false);
+        }}
+        chipPeriodo={
+          <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1">
+            <button
+              onClick={() => {
+                setPeriodoRange(null);
+                setMeseSel(new Set());
+              }}
+              className={chipClass(!periodoRange && meseSel.size === 0)}
+            >
+              Sempre
+            </button>
+            {periodoRange && (
+              <button
+                onClick={() => setPeriodoRange(null)}
+                className={`flex items-center gap-1 ${chipClass(true)}`}
+              >
+                <Calendar size={13} />
+                {formatDay(periodoRange.da)} – {formatDay(periodoRange.a)}
+              </button>
+            )}
+            {mesiDisponibili.map((m) => (
+              <button key={m} onClick={() => toggleMese(m)} className={chipClass(meseSel.has(m))}>
+                {monthChipLabel(m)}
+              </button>
+            ))}
+          </div>
+        }
+      />
 
       {/* Filtri rapidi: mese e categoria, selezionabili insieme per filtri personalizzati */}
       <div className="space-y-2">
@@ -348,13 +347,24 @@ function StoricoPage() {
       </div>
 
       {/* Grafico a barre: seleziona/deseleziona un mese toccando una barra.
+          Segue gli stessi filtri della lista (ricerca e categorie): con
+          "benzina" cercata, ogni barra mostra solo la benzina di quel mese.
+          Il periodo invece non si applica: il grafico È già diviso per mese,
+          e togliere i mesi non selezionati impedirebbe di confrontarli.
           Con filtro categoria attivo, ogni barra si colora in proporzione
           al colore di ciascuna categoria filtrata; senza filtro resta verde. */}
       <section className="card-surface p-5">
-        <h2 className="mb-4 text-sm font-semibold">Andamento nel tempo</h2>
+        <div className="mb-4 flex items-baseline justify-between gap-3">
+          <h2 className="text-sm font-semibold">Andamento nel tempo</h2>
+          {(q || catSel.size > 0) && (
+            <span className="truncate text-[11px] text-muted-foreground">
+              {q ? `Solo “${q}”` : "Solo le categorie scelte"}
+            </span>
+          )}
+        </div>
         <TrendBars
           data={mesiGrafico.map((m) => {
-            const txMese = txRealizzate(txInMonth(state.transazioni, m), oggi);
+            const txMese = txRealizzate(txInMonth(state.transazioni, m), oggi).filter(passaRicerca);
             if (catSel.size === 0) {
               return { key: m, value: sum(txMese) };
             }
