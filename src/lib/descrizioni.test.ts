@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { categoriaPerDescrizione, suggerimentiDescrizione } from "./descrizioni";
+import {
+  categoriaPerDescrizione,
+  contieneTesto,
+  descrizioniFrequenti,
+  posizioneCorrispondenza,
+  suggerimentiDescrizione,
+} from "./descrizioni";
 import type { Transaction } from "./types";
 
 let n = 0;
@@ -14,9 +20,32 @@ describe("suggerimentiDescrizione", () => {
     expect(suggerimentiDescrizione([tx("Benzina")], "   ")).toEqual([]);
   });
 
-  it("propone solo le descrizioni che iniziano per quanto digitato", () => {
+  it("propone solo le descrizioni che contengono quanto digitato", () => {
     const t = [tx("Benzina"), tx("Bar colazione"), tx("Spesa Esselunga")];
     expect(suggerimentiDescrizione(t, "be")).toEqual(["Benzina"]);
+  });
+
+  it("trova anche la seconda parola", () => {
+    const t = [tx("Spesa Esselunga"), tx("Benzina")];
+    expect(suggerimentiDescrizione(t, "esselunga")).toEqual(["Spesa Esselunga"]);
+    expect(suggerimentiDescrizione(t, "lunga")).toEqual(["Spesa Esselunga"]);
+  });
+
+  it("prima l'inizio della descrizione, poi l'inizio di parola, poi il resto", () => {
+    // Ospedale è la più usata, ma la corrispondenza a metà parola viene dopo.
+    const t = [
+      tx("Ospedale"),
+      tx("Ospedale"),
+      tx("Ospedale"),
+      tx("Rimborso spese"),
+      tx("Rimborso spese"),
+      tx("Spesa Conad"),
+    ];
+    expect(suggerimentiDescrizione(t, "spe")).toEqual([
+      "Spesa Conad",
+      "Rimborso spese",
+      "Ospedale",
+    ]);
   });
 
   it("non considera maiuscole e accenti", () => {
@@ -53,6 +82,52 @@ describe("suggerimentiDescrizione", () => {
   it("rispetta il limite richiesto", () => {
     const t = [tx("Ba 1"), tx("Ba 2"), tx("Ba 3"), tx("Ba 4"), tx("Ba 5"), tx("Ba 6")];
     expect(suggerimentiDescrizione(t, "ba", 3)).toHaveLength(3);
+  });
+});
+
+describe("descrizioniFrequenti", () => {
+  it("dalla più usata, a parità di usi la più recente", () => {
+    const t = [
+      tx("Benzina", "2026-01-01"),
+      tx("Benzina", "2026-02-01"),
+      tx("Bar", "2026-03-01"),
+      tx("Palestra", "2026-05-01"),
+      tx(""),
+    ];
+    expect(descrizioniFrequenti(t)).toEqual(["Benzina", "Palestra", "Bar"]);
+    expect(descrizioniFrequenti(t, 1)).toEqual(["Benzina"]);
+  });
+});
+
+describe("contieneTesto", () => {
+  it("cerca in qualsiasi punto, senza maiuscole e accenti", () => {
+    expect(contieneTesto("Spesa Esselunga", "ESSE")).toBe(true);
+    expect(contieneTesto("Caffè al bar", "CAFFE")).toBe(true);
+    expect(contieneTesto("Benzina", "bar")).toBe(false);
+    expect(contieneTesto(undefined, "x")).toBe(false);
+    expect(contieneTesto("qualsiasi", "  ")).toBe(true);
+  });
+});
+
+describe("posizioneCorrispondenza", () => {
+  it("indica la parte trovata nel testo originale", () => {
+    expect(posizioneCorrispondenza("Spesa Esselunga", "esse")).toEqual({ inizio: 6, fine: 10 });
+  });
+
+  it("preferisce l'inizio di una parola", () => {
+    // "spe" compare prima dentro "Ospedale", ma va evidenziata "spese".
+    expect(posizioneCorrispondenza("Ospedale spese", "spe")).toEqual({ inizio: 9, fine: 12 });
+  });
+
+  it("tiene conto degli accenti senza sfasare le posizioni", () => {
+    const testo = "Caffè al bar";
+    const p = posizioneCorrispondenza(testo, "FE AL");
+    expect(p && testo.slice(p.inizio, p.fine)).toBe("fè al");
+  });
+
+  it("niente da evidenziare se non c'è corrispondenza", () => {
+    expect(posizioneCorrispondenza("Benzina", "bar")).toBeNull();
+    expect(posizioneCorrispondenza("Benzina", "")).toBeNull();
   });
 });
 
