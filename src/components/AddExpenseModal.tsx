@@ -179,7 +179,8 @@ export function AddExpenseModal({
 
   const valore = Number(importo.replace(",", "."));
 
-  // Le descrizioni già usate che iniziano per quanto digitato. Si ricalcolano
+  // Le descrizioni già usate che contengono quanto digitato (anche la
+  // seconda parola: "esselunga" trova "Spesa Esselunga"). Si ricalcolano
   // solo quando cambia il testo o l'elenco delle spese, non a ogni ridisegno.
   // Il testo corrente segue anche le impostazioni fatte all'apertura
   // (modifica di una spesa, consiglio), che non passano da onChange.
