@@ -74,10 +74,12 @@ function StoricoPage() {
   const [confermaExport, setConfermaExport] = useState(false);
   const [periodoAperto, setPeriodoAperto] = useState(false);
   const [periodoRange, setPeriodoRange] = useState<{ da: string; a: string } | null>(null);
+  // Un mese fa, in ora locale (toISOString darebbe il giorno prima fra
+  // mezzanotte e l'1 di notte).
   const [periodoDa, setPeriodoDa] = useState(() => {
     const d = new Date();
     d.setMonth(d.getMonth() - 1);
-    return d.toISOString().slice(0, 10);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   });
   const [periodoA, setPeriodoA] = useState(() => todayISO());
   const [periodoPop, setPeriodoPop] = useState(false);

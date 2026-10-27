@@ -22,6 +22,7 @@ import { useThemePreference, type ThemePreference } from "@/lib/theme";
 import { HOUSING_OPTIONS, PALETTE, type Housing } from "@/lib/types";
 import { exportTemplate, exportTransactions, parseImportFile } from "@/lib/excel";
 import { ConfirmPopup } from "@/components/ConfirmPopup";
+import { SiriWidget } from "@/components/SiriWidget";
 import { suggestBudgetsWithHistory } from "@/lib/budget-suggest";
 import { disableFaceId, enrollFaceId, faceIdSupported, isFaceIdEnabled } from "@/lib/webauthn";
 import { isApplePlatform } from "@/lib/platform";
@@ -493,6 +494,8 @@ function ProfiloPage() {
           </div>
         )}
       </section>
+
+      <SiriWidget />
 
       <section className="card-surface overflow-hidden p-0">
         <button
