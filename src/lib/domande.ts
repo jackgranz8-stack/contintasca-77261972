@@ -1,6 +1,14 @@
 import type { Category, Transaction } from "./types";
 import { contieneTesto } from "./descrizioni";
-import { eur, formatDay, monthKey, monthLabel, shiftMonth, spostaGiorni } from "./format";
+import {
+  eur,
+  formatDay,
+  monthChipLabel,
+  monthKey,
+  monthLabel,
+  shiftMonth,
+  spostaGiorni,
+} from "./format";
 import { txRealizzate } from "./previsioni";
 
 /**
@@ -58,13 +66,29 @@ export type Interpretazione = {
   messaggio: string | null;
 };
 
-export type RigaRisposta = { etichetta: string; valore: string; nota?: string | undefined };
+export type RigaRisposta = {
+  etichetta: string;
+  valore: string;
+  nota?: string | undefined;
+  /** Il valore come numero, per disegnare il grafico. */
+  numero?: number | undefined;
+  /** Etichetta corta sotto le colonne ("ott 26"). */
+  breve?: string | undefined;
+  /** Colore della barra (quello della categoria). */
+  colore?: string | undefined;
+};
 export type Risposta = {
   /** Il numero principale, in grande. Assente quando la risposta è un elenco. */
   valore?: string;
   /** La frase che spiega il numero o introduce l'elenco. */
   frase: string;
   righe?: RigaRisposta[];
+  /**
+   * Come disegnare le righe: "colonne" per l'andamento nel tempo (mese per
+   * mese), "barre" orizzontali per confronti e classifiche. Assente = solo
+   * il numero.
+   */
+  grafico?: "colonne" | "barre";
 };
 
 const DATA = /^\d{4}-\d{2}-\d{2}$/;
@@ -439,15 +463,21 @@ export function rispondi(
       for (const t of scelte) per.set(t.categoria, (per.get(t.categoria) ?? 0) + t.importo);
       const righe = [...per.entries()]
         .sort((a, b) => b[1] - a[1])
-        .map(([id, v]) => ({
-          etichetta: categorie.find((c) => c.id === id)?.nome ?? "Categoria eliminata",
-          valore: eur(arrotonda(v)),
-          nota: tot > 0 ? `${Math.round((v / tot) * 100)}%` : undefined,
-        }));
+        .map(([id, v]) => {
+          const c = categorie.find((x) => x.id === id);
+          return {
+            etichetta: c?.nome ?? "Categoria eliminata",
+            valore: eur(arrotonda(v)),
+            nota: tot > 0 ? `${Math.round((v / tot) * 100)}%` : undefined,
+            numero: arrotonda(v),
+            colore: c?.colore,
+          };
+        });
       return {
         valore: eur(arrotonda(tot)),
         frase: frase("Spese", chi, quandoBreve, "per categoria"),
         righe,
+        grafico: "barre",
       };
     }
 
@@ -460,11 +490,17 @@ export function rispondi(
       const righe = [...per.entries()]
         .sort((a, b) => (a[0] < b[0] ? 1 : -1))
         .slice(0, 24)
-        .map(([m, v]) => ({ etichetta: monthLabel(m), valore: eur(arrotonda(v)) }));
+        .map(([m, v]) => ({
+          etichetta: monthLabel(m),
+          valore: eur(arrotonda(v)),
+          numero: arrotonda(v),
+          breve: monthChipLabel(m),
+        }));
       return {
         valore: eur(arrotonda(somma(scelte))),
         frase: frase("Spese", chi, quandoBreve, "mese per mese"),
         righe,
+        grafico: "colonne",
       };
     }
 
@@ -498,8 +534,10 @@ export function rispondi(
           etichetta: t.nota || categorie.find((c) => c.id === t.categoria)?.nome || "Spesa",
           valore: eur(t.importo),
           nota: formatDay(t.data),
+          numero: t.importo,
+          colore: categorie.find((c) => c.id === t.categoria)?.colore,
         }));
-      return { frase: frase("Le spese più alte", chi, quandoBreve), righe };
+      return { frase: frase("Le spese più alte", chi, quandoBreve), righe, grafico: "barre" };
     }
 
     case "frequenti": {
@@ -520,11 +558,12 @@ export function rispondi(
           etichetta: v.testo,
           valore: eur(arrotonda(v.tot)),
           nota: v.n === 1 ? "1 volta" : `${v.n} volte`,
+          numero: arrotonda(v.tot),
         }));
       if (righe.length === 0) {
         return { frase: frase("Le spese", chi, quandoBreve, "non hanno descrizione.") };
       }
-      return { frase: frase("Le spese più frequenti", chi, quandoBreve), righe };
+      return { frase: frase("Le spese più frequenti", chi, quandoBreve), righe, grafico: "barre" };
     }
 
     case "confronto": {
@@ -547,9 +586,16 @@ export function rispondi(
             etichetta: frase(senzaPreposizione(quando)),
             valore: eur(va),
             nota: quante(scelte.length),
+            numero: va,
           },
-          { etichetta: frase(senzaPreposizione(quandoB)), valore: eur(vb), nota: quante(b.length) },
+          {
+            etichetta: frase(senzaPreposizione(quandoB)),
+            valore: eur(vb),
+            nota: quante(b.length),
+            numero: vb,
+          },
         ],
+        grafico: "barre",
       };
     }
 
