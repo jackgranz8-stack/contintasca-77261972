@@ -1,21 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { toast } from "sonner";
-import { Repeat, X } from "lucide-react";
+import { ArrowUp, Loader2, Repeat, Sparkles, X } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { iconFor } from "@/lib/icons";
-import { formatDay, todayISO, uid } from "@/lib/format";
+import { formatDay, spostaGiorni, todayISO, uid } from "@/lib/format";
 import { dataInizioSettimanale, fromISO, giornoRicorrenzaDa } from "@/lib/ricorrenze";
 import { categoriaPerDescrizione, suggerimentiDescrizione } from "@/lib/descrizioni";
 import { RecurrenceFields, type RegoleRicorrenza } from "./RecurrenceFields";
 import type { Transaction } from "@/lib/types";
+import { categoriePerAI, chiamaAI } from "@/lib/ai";
+import { categoriaDaAI } from "@/lib/categoriaAI";
+import { leggiSpesaLocale, normalizzaSpesaAI, type SpesaLetta } from "@/lib/spesaAParole";
 import { BottomSheet } from "./BottomSheet";
 import { CHIUSURA_RITARDATA_MS, SuggerimentiDescrizione } from "./SuggerimentiDescrizione";
 import { ConfirmPopup } from "./ConfirmPopup";
 
+/** Oggi spostato di qualche giorno, in ora locale (vedi spostaGiorni). */
 function shiftDay(days: number) {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return spostaGiorni(todayISO(), days);
 }
 
 /**
@@ -88,6 +91,25 @@ export function AddExpenseModal({
    */
   const fuocoAutomatico = useRef(false);
   const [campo, setCampo] = useState<"importo" | "nota" | null>(null);
+  /*
+   * La categoria selezionata l'ha proposta l'AI (descrizione mai usata
+   * prima)? Lo si dice sopra la griglia, così non sembra una scelta
+   * dell'utente e si capisce che si può cambiare.
+   */
+  const [categoriaAI, setCategoriaAI] = useState(false);
+  /*
+   * "Scrivi a parole": una riga in cima al modulo dove si scrive
+   * "pizza 18 ieri" e i campi si compilano da soli (lib/spesaAParole.ts).
+   */
+  const [aParoleAperto, setAParoleAperto] = useState(false);
+  const aParoleRef = useRef(false);
+  const [frase, setFrase] = useState("");
+  const [lettura, setLettura] = useState<
+    { fase: "pronto" | "attesa" } | { fase: "errore"; testo: string }
+  >({
+    fase: "pronto",
+  });
+  const fraseInputRef = useRef<HTMLInputElement | null>(null);
 
   const regola = edit?.ricorrenteId
     ? state.ricorrenti.find((r) => r.id === edit.ricorrenteId)
@@ -98,6 +120,11 @@ export function AddExpenseModal({
     if (!open) return;
     setConfermaStop(false);
     setCampo(null);
+    setCategoriaAI(false);
+    setAParoleAperto(false);
+    aParoleRef.current = false;
+    setFrase("");
+    setLettura({ fase: "pronto" });
 
     if (edit) {
       setImporto(String(edit.importo).replace(".", ","));
@@ -171,6 +198,8 @@ export function AddExpenseModal({
   useEffect(() => {
     if (!open || edit) return;
     const timer = window.setTimeout(() => {
+      // Se nel frattempo si è aperto "Scrivi a parole", il fuoco resta lì.
+      if (aParoleRef.current) return;
       fuocoAutomatico.current = true;
       importoRef.current?.focus({ preventScroll: true });
     }, 260);
@@ -221,7 +250,79 @@ export function AddExpenseModal({
       testo,
       state.categorie.map((c) => c.id),
     );
-    if (proposta) setCategoria(proposta);
+    if (proposta) {
+      setCategoria(proposta);
+      setCategoriaAI(false);
+      return;
+    }
+    /*
+     * Descrizione mai usata: si chiede all'AI (lib/categoriaAI.ts). La
+     * risposta arriva dopo, quindi va applicata solo se nel frattempo
+     * l'utente non ha scelto una categoria e non ha cambiato descrizione.
+     * Se l'AI non risponde (offline, quota finita) non succede nulla: resta
+     * la categoria che c'era.
+     */
+    const chiesta = testo.trim().toLowerCase();
+    void categoriaDaAI(testo, state.categorie).then((id) => {
+      if (!id || categoriaDecisa.current) return;
+      if (notaCorrente.current.trim().toLowerCase() !== chiesta) return;
+      setCategoria(id);
+      setCategoriaAI(true);
+    });
+  };
+
+  /** Compila il modulo con la spesa letta dalla frase. */
+  const applicaLettura = (letta: SpesaLetta) => {
+    setImporto(String(letta.importo).replace(".", ","));
+    notaCorrente.current = letta.descrizione;
+    setNota(letta.descrizione);
+    setData(letta.data);
+    if (letta.categoria && !categoriaDecisa.current) {
+      setCategoria(letta.categoria);
+      setCategoriaAI(true);
+    } else if (letta.descrizione) {
+      proponiCategoria(letta.descrizione);
+    }
+    setLettura({ fase: "pronto" });
+    setFrase("");
+    setAParoleAperto(false);
+    aParoleRef.current = false;
+    fraseInputRef.current?.blur();
+  };
+
+  const leggiFrase = async () => {
+    const f = frase.trim();
+    if (!f || lettura.fase === "attesa") return;
+    const oggi = todayISO();
+    // Prima il telefono: istantaneo e senza rete. L'AI solo se non basta.
+    const locale = leggiSpesaLocale(f, oggi);
+    if (locale) {
+      applicaLettura(locale);
+      return;
+    }
+    setLettura({ fase: "attesa" });
+    const esito = await chiamaAI("spesa", {
+      testo: f.slice(0, 200),
+      oggi,
+      categorie: categoriePerAI(state.categorie),
+    });
+    if (!esito.ok) {
+      setLettura({ fase: "errore", testo: esito.errore });
+      return;
+    }
+    const letta = normalizzaSpesaAI(
+      esito.dati,
+      oggi,
+      state.categorie.map((c) => c.id),
+    );
+    if (!letta) {
+      setLettura({
+        fase: "errore",
+        testo: "Non ho trovato l'importo. Prova con qualcosa come “pizza 18 ieri”.",
+      });
+      return;
+    }
+    applicaLettura(letta);
   };
 
   // Categorie ordinate per uso reale: le più usate per prime, quelle mai usate in fondo.
@@ -374,13 +475,38 @@ export function AddExpenseModal({
     <BottomSheet open={open} onClose={onClose} fullScreen>
       <div className="mb-2 flex shrink-0 items-center justify-between">
         <h2 className="text-base font-semibold">{edit ? "Modifica spesa" : "Nuova spesa"}</h2>
-        <button
-          onClick={onClose}
-          className="rounded-full bg-surface-2 p-2 text-muted-foreground"
-          aria-label="Chiudi"
-        >
-          <X size={18} />
-        </button>
+        <div className="flex items-center gap-2">
+          {!edit && (
+            <button
+              type="button"
+              onClick={() => {
+                if (aParoleAperto) {
+                  setAParoleAperto(false);
+                  aParoleRef.current = false;
+                  return;
+                }
+                // Il campo deve esistere SUBITO, dentro il tocco: solo così
+                // su iPhone gli si può dare il fuoco con la tastiera aperta.
+                aParoleRef.current = true;
+                flushSync(() => setAParoleAperto(true));
+                fraseInputRef.current?.focus();
+              }}
+              aria-pressed={aParoleAperto}
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ${
+                aParoleAperto ? "border-primary text-primary" : "border-border bg-surface"
+              }`}
+            >
+              <Sparkles size={13} className="text-primary" />A parole
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="rounded-full bg-surface-2 p-2 text-muted-foreground"
+            aria-label="Chiudi"
+          >
+            <X size={18} />
+          </button>
+        </div>
       </div>
 
       {/*
@@ -423,6 +549,53 @@ export function AddExpenseModal({
            * all'altro con un tocco, e la tastiera resta aperta cambiando solo
            * da numerica a testuale. Per chiudere basta "Fine".
            */}
+
+          {/* Scrivi a parole: compila importo, descrizione, data e categoria */}
+          {aParoleAperto && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void leggiFrase();
+              }}
+              className="mb-3"
+            >
+              <div className="flex items-center gap-2 rounded-2xl border border-primary bg-surface py-1.5 pr-1.5 pl-4 ring-2 ring-primary">
+                <input
+                  ref={fraseInputRef}
+                  value={frase}
+                  onChange={(e) => {
+                    setFrase(e.target.value.slice(0, 200));
+                    if (lettura.fase === "errore") setLettura({ fase: "pronto" });
+                  }}
+                  enterKeyHint="done"
+                  placeholder="Es. pizza 18 ieri"
+                  aria-label="Scrivi la spesa a parole"
+                  className="w-full min-w-0 bg-transparent py-1.5 text-base outline-none placeholder:text-muted-foreground"
+                />
+                <button
+                  type="submit"
+                  disabled={!frase.trim() || lettura.fase === "attesa"}
+                  aria-label="Compila"
+                  className="lime-fill flex h-9 w-9 shrink-0 items-center justify-center rounded-full disabled:opacity-40"
+                >
+                  {lettura.fase === "attesa" ? (
+                    <Loader2 size={17} className="animate-spin" />
+                  ) : (
+                    <ArrowUp size={18} />
+                  )}
+                </button>
+              </div>
+              <p
+                className={`mt-1.5 px-1 text-[11px] ${
+                  lettura.fase === "errore" ? "text-warn" : "text-muted-foreground"
+                }`}
+              >
+                {lettura.fase === "errore"
+                  ? lettura.testo
+                  : "Cosa, quanto e quando: “benzina 50 lunedì”, “2 caffè da 1,20”."}
+              </p>
+            </form>
+          )}
 
           {/* Importo */}
           <div
@@ -543,6 +716,12 @@ export function AddExpenseModal({
              * Categorie su griglia: tutte visibili insieme, ordinate per uso
              * così le più frequenti capitano nella prima riga.
              */}
+            {categoriaAI && (
+              <p className="mb-2 flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground">
+                <Sparkles size={12} className="shrink-0 text-primary" />
+                Categoria suggerita dall'AI: tocca per cambiarla
+              </p>
+            )}
             <div className="mb-3 grid grid-cols-4 gap-2">
               {categorieOrdinate.map((c) => {
                 const Icon = iconFor(c.icona);
@@ -554,6 +733,7 @@ export function AddExpenseModal({
                     onClick={() => {
                       categoriaDecisa.current = true;
                       setCategoria(c.id);
+                      setCategoriaAI(false);
                     }}
                     className={`flex flex-col items-center gap-1 rounded-2xl border px-1 py-2 text-[11px] transition-colors ${
                       active
