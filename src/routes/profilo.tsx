@@ -19,10 +19,11 @@ import {
 import { useApp } from "@/lib/store";
 import { uid } from "@/lib/format";
 import { useThemePreference, type ThemePreference } from "@/lib/theme";
-import { HOUSING_OPTIONS, PALETTE, type Housing } from "@/lib/types";
+import { PALETTE } from "@/lib/types";
 import { exportTemplate, exportTransactions, parseImportFile } from "@/lib/excel";
 import { ConfirmPopup } from "@/components/ConfirmPopup";
 import { SiriWidget } from "@/components/SiriWidget";
+import { ProfiloSituazione } from "@/components/ProfiloSituazione";
 import { suggestBudgetsWithHistory } from "@/lib/budget-suggest";
 import { disableFaceId, enrollFaceId, faceIdSupported, isFaceIdEnabled } from "@/lib/webauthn";
 import { isApplePlatform } from "@/lib/platform";
@@ -124,12 +125,6 @@ function ProfiloPage() {
     update((s) => ({ ...s, profilo: { ...s.profilo, nome: nome.trim() } }));
     toast.success("Nome aggiornato");
   };
-
-  const setAbitazione = (abitazione: Housing) =>
-    update((s) => ({ ...s, profilo: { ...s.profilo, abitazione } }));
-  const setAuto = (auto: boolean) => update((s) => ({ ...s, profilo: { ...s.profilo, auto } }));
-  const setPersone = (persone: number) =>
-    update((s) => ({ ...s, profilo: { ...s.profilo, persone } }));
 
   const ricalcolaBudget = () => {
     const totale = parseFloat(nuovoTotale.replace(",", "."));
@@ -383,6 +378,8 @@ function ProfiloPage() {
         )}
       </section>
 
+      <ProfiloSituazione />
+
       {/* Ricalcola budget: compatta, si apre solo se serve */}
       <section className="card-surface overflow-hidden p-0">
         <button
@@ -427,63 +424,9 @@ function ProfiloPage() {
               <span className="text-sm text-muted-foreground">€</span>
             </div>
 
-            <p className="mb-2 text-xs text-muted-foreground">Situazione abitativa</p>
-            <div className="grid grid-cols-2 gap-2">
-              {HOUSING_OPTIONS.map((h) => (
-                <button
-                  key={h.id}
-                  onClick={() => setAbitazione(h.id)}
-                  className={`rounded-2xl border px-3 py-3 text-sm ${
-                    state.profilo.abitazione === h.id
-                      ? "border-primary bg-surface-2"
-                      : "border-border bg-surface text-muted-foreground"
-                  }`}
-                >
-                  {h.label}
-                </button>
-              ))}
-            </div>
-
-            <p className="mt-5 mb-2 text-xs text-muted-foreground">Hai un&apos;auto?</p>
-            <div className="grid grid-cols-2 gap-2">
-              {[true, false].map((v) => (
-                <button
-                  key={String(v)}
-                  onClick={() => setAuto(v)}
-                  className={`rounded-2xl border px-3 py-3 text-sm ${
-                    state.profilo.auto === v
-                      ? "border-primary bg-surface-2"
-                      : "border-border bg-surface text-muted-foreground"
-                  }`}
-                >
-                  {v ? "Sì" : "No"}
-                </button>
-              ))}
-            </div>
-
-            <p className="mt-5 mb-1 text-xs text-muted-foreground">Per quante persone spendi?</p>
-            <p className="mb-2 text-[11px] text-muted-foreground/70">
-              Serve solo a tarare meglio spese come cibo e bollette.
+            <p className="mb-1 text-[11px] text-muted-foreground">
+              Tiene conto di abitazione, auto e persone: li trovi in &quot;La tua situazione&quot;.
             </p>
-            <div className="flex items-center gap-4 rounded-2xl border border-border bg-surface px-4 py-3">
-              <button
-                onClick={() => setPersone(Math.max(1, state.profilo.persone - 1))}
-                className="h-9 w-9 rounded-full bg-surface-2 text-lg"
-                aria-label="Diminuisci"
-              >
-                −
-              </button>
-              <span className="flex-1 text-center text-lg font-semibold">
-                {state.profilo.persone}
-              </span>
-              <button
-                onClick={() => setPersone(Math.min(12, state.profilo.persone + 1))}
-                className="h-9 w-9 rounded-full bg-surface-2 text-lg"
-                aria-label="Aumenta"
-              >
-                +
-              </button>
-            </div>
 
             <button
               onClick={ricalcolaBudget}
