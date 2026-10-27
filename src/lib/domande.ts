@@ -287,12 +287,125 @@ function frase(...pezzi: (string | false | null | undefined)[]) {
  * Calcola la risposta sulle spese GIÀ fatte: quelle con data futura sono
  * previste, non spese, e falserebbero i totali (stessa regola dello storico).
  */
-export function rispondi(
+/* ---------- Parole che indicano una categoria ---------- */
+
+/**
+ * Parole di tutti i giorni che indicano una categoria anche senza nominarla:
+ * "quanto ho speso per la macchina?" vuol dire la categoria Auto. La chiave
+ * è un pezzo del NOME della categoria (le categorie le sceglie l'utente:
+ * "Auto", "Auto e moto", "Trasporti"…), il valore le parole che la indicano.
+ */
+const SINONIMI: [string[], string[]][] = [
+  [
+    ["auto", "trasport", "macchin", "veicol"],
+    [
+      "macchina",
+      "auto",
+      "automobile",
+      "carburante",
+      "benzina",
+      "gasolio",
+      "diesel",
+      "pieno",
+      "meccanico",
+      "autostrada",
+      "pedaggio",
+      "parcheggio",
+      "bollo",
+      "moto",
+      "scooter",
+    ],
+  ],
+  [
+    ["cibo", "spesa", "aliment", "mangiare"],
+    [
+      "cibo",
+      "mangiare",
+      "alimentari",
+      "supermercato",
+      "spesa",
+      "cena",
+      "pranzo",
+      "colazione",
+      "ristorante",
+      "pizzeria",
+    ],
+  ],
+  [
+    ["bollett", "utenz"],
+    ["bolletta", "bollette", "luce", "gas", "acqua", "internet", "telefono", "utenze"],
+  ],
+  [
+    ["casa", "affitt", "mutuo"],
+    ["casa", "affitto", "mutuo", "condominio"],
+  ],
+  [
+    ["medic", "salute"],
+    ["medico", "medici", "dottore", "farmacia", "medicine", "salute", "dentista", "visita"],
+  ],
+  [
+    ["svago", "tempo libero", "divertim"],
+    ["svago", "divertimento", "uscite", "cinema", "hobby"],
+  ],
+];
+
+function semplice(t: string) {
+  return t
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+/** La categoria indicata da una parola ("macchina" → Auto), o null. */
+export function categoriaDaParola(parola: string, categorie: Category[]): string | null {
+  const w = semplice(parola);
+  const r = semplice(radice(parola));
+  if (r.length < 3) return null;
+  // 1. Il nome della categoria stesso ("auto", "bollette" → Bollette).
+  for (const c of categorie) {
+    const n = semplice(c.nome);
+    if (n === w || n.startsWith(r) || (n.length >= 4 && w.startsWith(n))) return c.id;
+  }
+  // 2. Un sinonimo ("macchina" → la categoria il cui nome contiene "auto").
+  for (const [nomi, parole] of SINONIMI) {
+    if (!parole.some((p) => p === w || radice(p) === r)) continue;
+    const c = categorie.find((x) => nomi.some((k) => semplice(x.nome).includes(k)));
+    if (c) return c.id;
+  }
+  return null;
+}
+
+/**
+ * Corregge l'interpretazione quando la parola cercata è in realtà una
+ * categoria. "Quanto ho speso nella macchina?" può arrivare dall'AI come
+ * ricerca della parola "macchina" nelle descrizioni: nessuna spesa si chiama
+ * così, e la risposta sarebbe "nessuna spesa". Se la parola non compare in
+ * nessuna descrizione ma indica una categoria, si cerca per categoria.
+ * Se invece compare ("benzina" usata come descrizione) resta la ricerca per
+ * parola, che è più precisa.
+ */
+export function affinaInterpretazione(
   i: Interpretazione,
+  transazioni: Transaction[],
+  categorie: Category[],
+): Interpretazione {
+  if (!i.testo) return i;
+  const cat = categoriaDaParola(i.testo, categorie);
+  if (!cat) return i;
+  const parola = radice(i.testo);
+  const usata = transazioni.some((t) => contieneTesto(t.nota, parola));
+  if (usata && !i.categorie.includes(cat)) return i;
+  return { ...i, testo: null, categorie: [...new Set([...i.categorie, cat])] };
+}
+
+export function rispondi(
+  interpretazione: Interpretazione,
   transazioni: Transaction[],
   categorie: Category[],
   oggi: string,
 ): Risposta {
+  const i = affinaInterpretazione(interpretazione, transazioni, categorie);
   if (i.tipo === "non_capito") {
     return {
       frase:

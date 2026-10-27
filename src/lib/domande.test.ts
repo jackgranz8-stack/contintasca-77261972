@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { intervalloDi, normalizzaInterpretazione, radice, rispondi } from "./domande";
+import {
+  categoriaDaParola,
+  intervalloDi,
+  normalizzaInterpretazione,
+  radice,
+  rispondi,
+} from "./domande";
 import type { Category, Transaction } from "./types";
 
 const OGGI = "2026-10-26";
@@ -148,3 +154,55 @@ function eurTest(v: number) {
     maximumFractionDigits: v % 1 === 0 ? 0 : 2,
   }).format(v);
 }
+
+describe("categorie indicate a parole", () => {
+  const CAT3: Category[] = [
+    { id: "cibo", nome: "Cibo", icona: "x", colore: "#000", budget: 0 },
+    { id: "auto", nome: "Auto", icona: "x", colore: "#000", budget: 0 },
+    { id: "boll", nome: "Bollette", icona: "x", colore: "#000", budget: 0 },
+  ];
+  const D = [
+    tx("Benzina", "auto", 50, "2026-10-05"),
+    tx("Tagliando", "auto", 120, "2026-10-12"),
+    tx("Spesa Esselunga", "cibo", 80, "2026-10-02"),
+    tx("Luce", "boll", 60, "2026-10-03"),
+  ];
+  const chiedi3 = (g: unknown) =>
+    rispondi(
+      normalizzaInterpretazione(
+        g,
+        CAT3.map((c) => c.id),
+      ),
+      D,
+      CAT3,
+      OGGI,
+    );
+
+  it("macchina → categoria Auto, anche se l'AI la passa come parola", () => {
+    const r = chiedi3({ tipo: "totale", periodo: { tipo: "mese_corrente" }, testo: "macchina" });
+    expect(r.valore).toBe(eurTest(170));
+    expect(r.frase).toContain("in Auto");
+  });
+
+  it("parola e categoria insieme: vale la categoria", () => {
+    const r = chiedi3({
+      tipo: "totale",
+      periodo: { tipo: "mese_corrente" },
+      categorie: ["auto"],
+      testo: "auto",
+    });
+    expect(r.valore).toBe(eurTest(170));
+  });
+
+  it("una parola usata nelle descrizioni resta una ricerca precisa", () => {
+    const r = chiedi3({ tipo: "totale", periodo: { tipo: "mese_corrente" }, testo: "benzina" });
+    expect(r.valore).toBe(eurTest(50));
+  });
+
+  it("nome della categoria e sinonimi", () => {
+    expect(categoriaDaParola("bollette", CAT3)).toBe("boll");
+    expect(categoriaDaParola("luce", CAT3)).toBe("boll");
+    expect(categoriaDaParola("supermercato", CAT3)).toBe("cibo");
+    expect(categoriaDaParola("palestra", CAT3)).toBeNull();
+  });
+});
