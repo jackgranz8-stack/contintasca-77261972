@@ -9,6 +9,8 @@
 //   categoria  "Netflix" → la categoria più adatta fra quelle dell'utente.
 //   riepilogo  i TOTALI di un mese per categoria → 2-3 consigli scritti.
 //              Nessuna singola spesa, nessuna descrizione.
+//   analisi    medie per categoria, confronto con la media Istat e piano per
+//              il budget, già calcolati dall'app → sintesi e consigli.
 //
 // Il modello è gratuito su Groq. La funzione accetta solo utenti con accesso
 // all'app (controlla da sola il token, quindi funziona sia con "Verify JWT"
@@ -42,7 +44,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "
 
 const MAX_TESTO = 200;
 const MAX_CATEGORIE = 60;
-const MAX_DATI_RIEPILOGO = 8000;
+const MAX_DATI_RIEPILOGO = 12000;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -55,7 +57,7 @@ Non conosci le spese e non devi inventare numeri: descrivi solo cosa calcolare.
 
 Schema:
 {
-  "tipo": "totale" | "per_categoria" | "per_mese" | "media_mensile" | "piu_care" | "frequenti" | "confronto" | "ultima" | "non_capito",
+  "tipo": "totale" | "per_categoria" | "per_mese" | "media_mensile" | "piu_care" | "frequenti" | "confronto" | "ultima" | "analisi" | "non_capito",
   "periodo": Periodo,
   "confronto": Periodo | null,
   "categorie": [id di categoria],
@@ -81,6 +83,9 @@ Significato di "tipo":
 - frequenti: le spese che faccio più spesso. limite = quante.
 - confronto: due periodi a confronto ("rispetto al mese scorso", "più o meno dell'anno scorso"). periodo = il primo, confronto = il secondo. Se il secondo non è detto, usa il periodo precedente (mese_corrente → mese_scorso, anno_corrente → anno_scorso).
 - ultima: quando ho fatto l'ultima volta una spesa.
+- analisi: confronto con la media italiana, su cosa spendo troppo, dove/come risparmiare, come restare nel budget, consigli personalizzati ("spendo più della media?", "su cosa devo tagliare?", "come rientro nel budget?").
+- Se l'utente chiede un GRAFICO o una TABELLA, scegli il tipo che li produce: andamento nel tempo ("grafico mese per mese", "come sono andate le spese quest'anno") → per_mese; ripartizione ("grafico per categoria", "torta") → per_categoria; classifiche ("tabella delle spese più care") → piu_care o frequenti; due periodi → confronto.
+- "macchina" = categoria auto se esiste; usa i sinonimi evidenti per scegliere la categoria (supermercato → cibo, luce/gas → bollette).
 - non_capito: la domanda non riguarda le spese o non si può rispondere. In "messaggio" scrivi una frase breve in italiano che spiega cosa si può chiedere.
 
 Regole:
@@ -122,7 +127,22 @@ Regole:
 - Parti da ciò che conta di più: categorie oltre budget o molto sopra la media. Se il mese è andato bene, dillo e suggerisci come mantenere o mettere da parte.
 - Niente consigli su investimenti, prestiti o prodotti finanziari. Niente giudizi sulla persona. Dai del tu.`;
 
-type Modalita = "domanda" | "spesa" | "categoria" | "riepilogo";
+const ISTRUZIONI_ANALISI = `Sei un consulente di finanza personale italiano: concreto, gentile, mai giudicante. Dai del tu.
+Ricevi un'analisi GIÀ CALCOLATA delle spese di una persona: medie mensili per categoria, confronto con la media italiana Istat per una famiglia simile (stesso numero di persone e stessa situazione abitativa), budget, mese in corso e tagli proposti.
+Rispondi con UN SOLO oggetto JSON: {"sintesi": string, "punti": [{"titolo": string, "testo": string}]}
+- sintesi: 1-2 frasi sulla situazione complessiva (dentro o fuori budget, sopra o sotto la media italiana).
+- punti: da 2 a 4, in ordine di importanza. Ognuno: titolo di massimo 6 parole; testo di 1-2 frasi con un'azione concreta per questo mese.
+Regole:
+- Usa SOLO i numeri forniti, così come sono. Non fare calcoli nuovi e non inventare cifre.
+- Tieni conto del profilo: con più persone è normale spendere di più in alimentari; chi è in affitto o con mutuo ha la casa come costo fisso (se la divide, conta la sua quota); senza auto i trasporti dovrebbero essere bassi; al Nord e al Centro i costi sono più alti che al Sud e nelle Isole (la media fornita ne tiene già conto).
+- Se c'è il reddito: un risparmio negativo è la priorità assoluta; un risparmio sotto il 10% del reddito merita attenzione; sopra il 20% va bene. Se il budget supera il reddito, fallo notare.
+- Categorie con riducibile_a_breve = false (casa, bollette, salute, assicurazioni): niente tagli immediati, al massimo un'idea a medio termine (cambiare fornitore, rinegoziare).
+- Se ci sono tagli_proposti, presentali come piano per rientrare nel budget. Se tagli_non_bastano è true, dillo con tatto: servono scelte sui costi fissi o un budget più realistico.
+- Se è tutto sotto controllo, dillo e suggerisci come mettere da parte la differenza.
+- La media italiana è un riferimento, non un obiettivo: chi spende meno non deve spendere di più.
+- Niente investimenti, prestiti o prodotti finanziari.`;
+
+type Modalita = "domanda" | "spesa" | "categoria" | "riepilogo" | "analisi";
 
 function testoBreve(v: unknown, max = MAX_TESTO): string {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
@@ -186,6 +206,16 @@ function preparaRichiesta(
         maxToken: 40,
       };
     }
+    case "analisi": {
+      const dati = JSON.stringify(body.dati ?? null);
+      if (!body.dati || dati.length > MAX_DATI_RIEPILOGO) return { errore: "Dati non validi" };
+      return {
+        sistema: ISTRUZIONI_ANALISI,
+        utente: `Analisi delle spese:\n${dati}`,
+        temperatura: 0.4,
+        maxToken: 700,
+      };
+    }
     case "riepilogo": {
       const dati = JSON.stringify(body.dati ?? null);
       if (!body.dati || dati.length > MAX_DATI_RIEPILOGO) return { errore: "Dati non validi" };
@@ -225,7 +255,7 @@ Deno.serve(async (req) => {
   }
 
   const modalita = body.modalita as Modalita;
-  if (!["domanda", "spesa", "categoria", "riepilogo"].includes(modalita)) {
+  if (!["domanda", "spesa", "categoria", "riepilogo", "analisi"].includes(modalita)) {
     return json({ errore: "Modalità non valida" }, 400);
   }
   const richiesta = preparaRichiesta(modalita, body);
