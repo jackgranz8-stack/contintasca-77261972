@@ -162,11 +162,12 @@ export function AppShell({ children }: { children: ReactNode }) {
               sugli iPhone con la tacca, così il contenuto non ci finisce sotto.
               pb-nav: spazio in fondo pari a barra + barra gesti + aria. */}
           {/*
-           * pt: il contenuto parte 16px sotto la barra di stato (ora,
-           * batteria). Con 8px la prima riga finiva a ridosso della
-           * sfumatura che iOS disegna sotto quella barra e si leggeva male.
+           * pt: il contenuto parte sotto la barra di stato (ora, batteria)
+           * di --aria-alta (vedi styles.css). Con meno spazio la prima riga
+           * finiva dentro la sfumatura che iOS disegna sotto quella barra,
+           * più alta da iOS 26, e la parte alta delle scritte sbiadiva.
            */}
-          <div className="safe-x pb-nav mx-auto w-full max-w-[430px] pt-[calc(env(safe-area-inset-top,0px)+16px)]">
+          <div className="safe-x pb-nav mx-auto w-full max-w-[430px] pt-[calc(env(safe-area-inset-top,0px)+var(--aria-alta))]">
             {children}
           </div>
         </div>

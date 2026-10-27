@@ -134,7 +134,7 @@ export function RicercaStorico({
       aria-label="Cerca nello storico"
       className="fixed inset-x-0 top-0 z-50 flex h-[100dvh] justify-center bg-background animate-in fade-in-0 duration-150 motion-reduce:animate-none"
     >
-      <div className="safe-x flex h-full w-full max-w-[430px] flex-col pt-[calc(env(safe-area-inset-top,0px)+12px)]">
+      <div className="safe-x flex h-full w-full max-w-[430px] flex-col pt-[calc(env(safe-area-inset-top,0px)+var(--aria-alta)-4px)]">
         <div className="flex items-center gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-primary bg-surface px-4 py-3 ring-2 ring-primary">
             <Search size={16} className="shrink-0 text-muted-foreground" />
