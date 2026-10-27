@@ -28,6 +28,7 @@ import { useUi } from "@/components/AppShell";
 import { TrendBars } from "@/components/TrendBars";
 import { Donut } from "@/components/Donut";
 import { SwipeToDelete } from "@/components/SwipeToDelete";
+import { RiepilogoMese } from "@/components/RiepilogoMese";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -57,6 +58,8 @@ function HomePage() {
   const [mese, setMese] = useState(currentMonth());
   const [catSel, setCatSel] = useState<string | "all">("all");
   const [openSwipeTipId, setOpenSwipeTipId] = useState<string | null>(null);
+  // Mese del riepilogo aperto dal consiglio "Riepilogo di …" (null = chiuso).
+  const [riepilogoMese, setRiepilogoMese] = useState<string | null>(null);
 
   const mesi = useMemo(() => lastMonths(6), []);
   const oggi = todayISO();
@@ -116,13 +119,24 @@ function HomePage() {
             // che è quella che il consiglio ha rilevato dai movimenti passati.
             cadenza: "mesi",
             intervallo: 1,
-            inizio: `${currentMonth()}-${String(action.giorno).padStart(2, "0")}`,
+            /*
+             * Si riparte dall'ultimo pagamento già inserito, quando è noto:
+             * così il mese in corso viene registrato in automatico se non è
+             * ancora stato pagato. Prima si segnava come "già registrato" il
+             * giorno di questo mese, e se il pagamento non era ancora stato
+             * inserito a mano quel mese saltava.
+             */
+            inizio:
+              action.ultimaData ?? `${currentMonth()}-${String(action.giorno).padStart(2, "0")}`,
             fine: null,
-            ultimaData: `${currentMonth()}-${String(action.giorno).padStart(2, "0")}`,
+            ultimaData:
+              action.ultimaData ?? `${currentMonth()}-${String(action.giorno).padStart(2, "0")}`,
           },
         ],
       }));
       toast.success("Spesa ricorrente attivata");
+    } else if (action.kind === "riepilogo") {
+      setRiepilogoMese(action.mese);
     } else {
       navigate({ to: "/budget" });
     }
@@ -480,6 +494,7 @@ function HomePage() {
           />
         )}
       </section>
+      <RiepilogoMese mese={riepilogoMese} onClose={() => setRiepilogoMese(null)} />
     </div>
   );
 }

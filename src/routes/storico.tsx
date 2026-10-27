@@ -12,6 +12,7 @@ import {
   Pencil,
   Repeat,
   Search,
+  Sparkles,
   X,
 } from "lucide-react";
 import { sum, txInMonth, useApp } from "@/lib/store";
@@ -35,6 +36,7 @@ import { ConfirmPopup } from "@/components/ConfirmPopup";
 import { EditRecurringModal } from "@/components/EditRecurringModal";
 import { EmptyState } from "@/components/EmptyState";
 import { RicercaStorico } from "@/components/RicercaStorico";
+import { ChiediSpese } from "@/components/ChiediSpese";
 import { contieneTesto } from "@/lib/descrizioni";
 import type { Recurring, Transaction } from "@/lib/types";
 
@@ -89,6 +91,7 @@ function StoricoPage() {
   // Schermata di ricerca a tutto schermo (vedi components/RicercaStorico).
   const [ricercaAperta, setRicercaAperta] = useState(false);
   const chiudiRicerca = useCallback(() => setRicercaAperta(false), []);
+  const [chiediAperto, setChiediAperto] = useState(false);
   const [prossimeAperte, setProssimeAperte] = useState(false);
   const [ricDaModificare, setRicDaModificare] = useState<Recurring | null>(null);
   const [ricDaEliminare, setRicDaEliminare] = useState<string | null>(null);
@@ -190,7 +193,20 @@ function StoricoPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold tracking-tight">Storico</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight">Storico</h1>
+        {/* Domande libere sulle spese (components/ChiediSpese). */}
+        <button
+          type="button"
+          onClick={() => setChiediAperto(true)}
+          className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3.5 py-2 text-xs font-medium"
+        >
+          <Sparkles size={14} className="text-primary" />
+          Chiedi
+        </button>
+      </div>
+
+      <ChiediSpese open={chiediAperto} onClose={() => setChiediAperto(false)} />
 
       {/*
        * Ricerca: il campo della pagina serve solo ad aprire la schermata di
