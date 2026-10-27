@@ -130,6 +130,14 @@
 }
 
 :root {
+  /*
+   * Aria fra la barra di stato (ora, batteria) e la prima riga di contenuto.
+   * Da iOS 26 il sistema sfuma una fascia più alta sotto la barra di stato,
+   * e con 16px la parte alta dei titoli risultava sbiadita. Usata da
+   * AppShell, ricerca dello Storico e tendine a tutto schermo: per spostare
+   * tutto basta cambiare questo valore.
+   */
+  --aria-alta: 28px;
   --radius: 1.25rem;
 
   /*
