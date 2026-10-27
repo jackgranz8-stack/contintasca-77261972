@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { db } from "@/integrations/external/client";
 import { loadRemoteState, persistDiff, wipeRemote } from "./remote";
 import { saveOfflineCache, loadOfflineCache, clearOfflineCache } from "./offlineCache";
+import { unisciModifiche } from "./unisci";
 import {
   initialState,
   type AppState,
@@ -168,22 +169,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const pendingEdits = cached && !sameState(cached.baseline, cached.state);
 
         if (pendingEdits) {
+          /*
+           * Le modifiche fatte sul telefono si applicano SOPRA allo stato del
+           * server, invece di sostituirlo: altrimenti tutto ciò che è
+           * cambiato altrove nel frattempo (una spesa dettata a Siri) verrebbe
+           * cancellato al primo salvataggio. Vedi lib/unisci.ts.
+           */
+          const unito = unisciModifiche(remote, cached.baseline, cached.state);
           baseline.current = remote;
-          setState(cached.state);
+          setState(unito);
           setLoaded(true);
           setLoadError(false);
           try {
             // Rete appena verificata funzionante: si prova a sincronizzare
             // subito, invece di aspettare un evento "online" che non
             // arriverà più (la connessione non sta "tornando", c'è già).
-            await withTimeout(persistDiff(remote, cached.state, userId));
-            baseline.current = cached.state;
-            saveOfflineCache(userId, cached.state, cached.state);
+            await withTimeout(persistDiff(remote, unito, userId));
+            baseline.current = unito;
+            saveOfflineCache(userId, unito, unito);
             toast.success("Modifiche fatte offline sincronizzate");
           } catch {
-            pending.current = cached.state;
+            pending.current = unito;
             setOfflinePending(true);
-            saveOfflineCache(userId, remote, cached.state);
+            saveOfflineCache(userId, remote, unito);
           }
         } else {
           const { next, created } = runRecurring(remote);
@@ -424,6 +432,53 @@ export function AppProvider({ children }: { children: ReactNode }) {
       window.clearInterval(timer);
     };
   }, []);
+
+  /*
+   * RICARICA AL RITORNO NELL'APP
+   *
+   * Le spese ora cambiano anche da fuori (Siri). Tornando sull'app dopo
+   * averla lasciata in secondo piano si rileggono i dati dal server, così
+   * quello che si è dettato compare senza dover chiudere e riaprire.
+   *
+   * Solo se sul telefono non c'è nulla in attesa di salvataggio: in quel
+   * caso ci pensa la sincronizzazione normale, e ricaricare ora
+   * sovrascriverebbe la modifica in corso. Al massimo una volta ogni 20
+   * secondi, per non rileggere tutto a ogni cambio di app.
+   */
+  const statoRef = useRef(state);
+  statoRef.current = state;
+  useEffect(() => {
+    if (!loaded) return;
+    let ultima = Date.now();
+    let inCorso = false;
+    const nienteInSospeso = (base: AppState) =>
+      !pending.current && baseline.current === base && sameState(base, statoRef.current);
+
+    async function ricarica() {
+      const acc = accountRef.current;
+      const base = baseline.current;
+      if (document.visibilityState !== "visible" || !acc || !base || inCorso) return;
+      if (Date.now() - ultima < 20_000 || !nienteInSospeso(base)) return;
+      inCorso = true;
+      ultima = Date.now();
+      try {
+        const remote = await withTimeout(loadRemoteState(acc.id));
+        // Nel frattempo l'utente ha già toccato qualcosa: si lascia stare.
+        if (!nienteInSospeso(base) || sameState(remote, base)) return;
+        const { next } = runRecurring(remote);
+        baseline.current = remote;
+        setState(next);
+        saveOfflineCache(acc.id, remote, next);
+      } catch {
+        // Rete assente: si riproverà al prossimo ritorno sull'app.
+      } finally {
+        inCorso = false;
+      }
+    }
+
+    document.addEventListener("visibilitychange", ricarica);
+    return () => document.removeEventListener("visibilitychange", ricarica);
+  }, [loaded]);
 
   const update = useCallback((fn: (s: AppState) => AppState) => setState((s) => fn(s)), []);
 

@@ -99,7 +99,7 @@ function oggetto(v: unknown): Grezzo {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as Grezzo) : {};
 }
 
-function normalizzaPeriodo(v: unknown): Periodo | null {
+export function normalizzaPeriodo(v: unknown): Periodo | null {
   const p = oggetto(v);
   switch (p.tipo) {
     case "tutto":

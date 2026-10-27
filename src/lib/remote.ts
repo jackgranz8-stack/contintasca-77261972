@@ -8,156 +8,66 @@ import {
   type Transaction,
 } from "./types";
 import { currentMonth } from "./format";
-
-/* ---------- mapping riga DB <-> modello app ---------- */
-
-type CategoryRow = {
-  id: string;
-  name: string | null;
-  icon: string | null;
-  color: string | null;
-  budget: number | string | null;
-};
-
-type TransactionRow = {
-  id: string;
-  category_id: string | null;
-  amount: number | string | null;
-  date: string;
-  note: string | null;
-  recurring_id: string | null;
-};
-
-type RecurringRow = {
-  id: string;
-  category_id: string | null;
-  name: string | null;
-  amount: number | string | null;
-  day: number | null;
-  active: boolean | null;
-  last_generated_month: string | null;
-  // Colonne aggiunte con le cadenze personalizzate. Lette in modo tollerante
-  // (vedi toRecurring): se il database non fosse ancora aggiornato, la
-  // ricorrenza si comporta come una mensile classica invece di rompersi.
-  cadence?: string | null;
-  interval_count?: number | null;
-  start_date?: string | null;
-  end_date?: string | null;
-  last_generated_date?: string | null;
-};
-
-type ProfileRow = {
-  user_id: string;
-  name: string | null;
-  setup_complete: boolean | null;
-  housing: string | null;
-  has_car: string | null;
-  household_size: number | null;
-  created_at: string | null;
-};
-
-const num = (v: number | string | null | undefined) => Number(v ?? 0) || 0;
-
-function toCategory(r: CategoryRow): Category {
-  return {
-    id: r.id,
-    nome: r.name ?? "Senza nome",
-    icona: r.icon ?? "wallet",
-    colore: r.color ?? "#8CE562",
-    budget: num(r.budget),
-  };
-}
-
-function toTransaction(r: TransactionRow): Transaction {
-  return {
-    id: r.id,
-    importo: num(r.amount),
-    categoria: r.category_id ?? "",
-    data: (r.date ?? "").slice(0, 10),
-    nota: r.note ?? "",
-    ricorrenteId: r.recurring_id ?? null,
-  };
-}
-
-function toRecurring(r: RecurringRow): Recurring {
-  const giorno = Math.min(28, Math.max(1, r.day ?? 1));
-  return {
-    id: r.id,
-    nome: r.name ?? "Spesa",
-    categoria: r.category_id ?? "",
-    importo: num(r.amount),
-    giorno,
-    attiva: r.active ?? true,
-    // Valori di ripiego pensati per le ricorrenze create prima delle cadenze
-    // personalizzate: erano tutte "ogni mese al giorno indicato", quindi si
-    // comportano esattamente come prima.
-    cadenza: r.cadence === "settimane" ? "settimane" : "mesi",
-    intervallo: Math.max(1, r.interval_count ?? 1),
-    inizio: r.start_date ?? `${currentMonth()}-${String(giorno).padStart(2, "0")}`,
-    fine: r.end_date ?? null,
-    ...(r.last_generated_date ? { ultimaData: r.last_generated_date } : {}),
-    ...(r.last_generated_month ? { ultimaGenerazione: r.last_generated_month } : {}),
-  };
-}
-
-const categoryPayload = (c: Category, userId: string) => ({
-  id: c.id,
-  user_id: userId,
-  name: c.nome,
-  icon: c.icona,
-  color: c.colore,
-  budget: c.budget,
-});
-
-const transactionPayload = (t: Transaction, userId: string) => ({
-  id: t.id,
-  user_id: userId,
-  category_id: t.categoria || null,
-  amount: t.importo,
-  date: t.data,
-  note: t.nota ?? "",
-  recurring_id: t.ricorrenteId ?? null,
-});
-
-const recurringPayload = (r: Recurring, userId: string) => ({
-  id: r.id,
-  user_id: userId,
-  category_id: r.categoria || null,
-  name: r.nome,
-  amount: r.importo,
-  day: r.giorno,
-  active: r.attiva,
-  cadence: r.cadenza,
-  interval_count: r.intervallo,
-  start_date: r.inizio,
-  end_date: r.fine ?? null,
-  last_generated_date: r.ultimaData ?? null,
-  // Tenuto aggiornato al mese dell'ultima occorrenza per non lasciare la
-  // colonna vecchia in uno stato incoerente con la nuova.
-  last_generated_month: r.ultimaData ? r.ultimaData.slice(0, 7) : (r.ultimaGenerazione ?? null),
-});
+import {
+  type CategoryRow,
+  type ProfileRow,
+  type RecurringRow,
+  type TransactionRow,
+  categoryPayload,
+  num,
+  recurringPayload,
+  toCategory,
+  toRecurring,
+  toTransaction,
+  transactionPayload,
+} from "./righeDb";
 
 /* ---------- lettura ---------- */
 
+/** Righe per blocco: Supabase non ne restituisce più di 1000 per richiesta. */
+const BLOCCO = 1000;
+
+/**
+ * Tutte le righe dell'utente in una tabella, lette a blocchi da 1000.
+ *
+ * Prima si faceva una sola richiesta, e Supabase si ferma a 1000 righe:
+ * superata quella soglia le spese più vecchie sparivano dall'app senza
+ * nessun avviso. L'ordine per id serve a non saltare né ripetere righe fra
+ * un blocco e l'altro.
+ */
+async function tutteLeRighe<T>(tabella: string, colonne: string, userId: string): Promise<T[]> {
+  const righe: T[] = [];
+  for (let da = 0; ; da += BLOCCO) {
+    const { data, error } = await db
+      .from(tabella)
+      .select(colonne)
+      .eq("user_id", userId)
+      .order("id", { ascending: true })
+      .range(da, da + BLOCCO - 1);
+    if (error) throw error;
+    const blocco = (data ?? []) as T[];
+    righe.push(...blocco);
+    if (blocco.length < BLOCCO) return righe;
+  }
+}
+
 export async function loadRemoteState(userId: string): Promise<AppState> {
-  const [profileRes, catRes, txRes, recRes, tipRes] = await Promise.all([
+  const [profileRes, catRows, txRows, recRows, tipRes] = await Promise.all([
     db.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
-    db.from("categories").select("*").eq("user_id", userId),
-    db.from("transactions").select("*").eq("user_id", userId),
-    db.from("recurring").select("*").eq("user_id", userId),
+    tutteLeRighe<CategoryRow>("categories", "*", userId),
+    tutteLeRighe<TransactionRow>("transactions", "*", userId),
+    tutteLeRighe<RecurringRow>("recurring", "*", userId),
+    // Poche righe per utente e senza colonna id certa: basta una richiesta.
     db.from("dismissed_insights").select("key").eq("user_id", userId),
   ]);
 
-  const firstError =
-    profileRes.error ?? catRes.error ?? txRes.error ?? recRes.error ?? tipRes.error;
+  const firstError = profileRes.error ?? tipRes.error;
   if (firstError) throw firstError;
 
   const profile = profileRes.data as ProfileRow | null;
-  const categorie = ((catRes.data ?? []) as CategoryRow[])
-    .map(toCategory)
-    .sort((a, b) => a.nome.localeCompare(b.nome, "it"));
-  const transazioni = ((txRes.data ?? []) as TransactionRow[]).map(toTransaction);
-  const ricorrenti = ((recRes.data ?? []) as RecurringRow[]).map(toRecurring);
+  const categorie = catRows.map(toCategory).sort((a, b) => a.nome.localeCompare(b.nome, "it"));
+  const transazioni = txRows.map(toTransaction);
+  const ricorrenti = recRows.map(toRecurring);
   const consigliIgnorati = ((tipRes.data ?? []) as { key: string }[]).map((r) => r.key);
 
   const base = initialState();
