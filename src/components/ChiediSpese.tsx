@@ -1,58 +1,72 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, Loader2, X } from "lucide-react";
+import { ArrowUp, Loader2, RotateCcw, X } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { todayISO } from "@/lib/format";
 import { categoriePerAI, chiamaAI } from "@/lib/ai";
 import { normalizzaInterpretazione, rispondi, type Risposta } from "@/lib/domande";
 import { BottomSheet } from "./BottomSheet";
+import { GraficoRisposta } from "./GraficoRisposta";
 
 /** Domande pronte: mostrano cosa si può chiedere e si toccano per provarle. */
 const ESEMPI = [
   "Quanto ho speso questo mese?",
   "In cosa spendo di più?",
+  "Grafico delle spese mese per mese",
   "Rispetto al mese scorso?",
-  "Le 3 spese più care dell'anno",
+  "Le 5 spese più care dell'anno",
+  "Quanto spendo al mese per la macchina?",
 ];
 
 const MAX_DOMANDA = 200;
+/** Quante domande tenere in cronologia mentre la schermata è aperta. */
+const MAX_CRONOLOGIA = 20;
 
-type Stato =
-  | { fase: "vuoto" }
-  | { fase: "attesa"; domanda: string }
-  | { fase: "risposta"; domanda: string; risposta: Risposta }
-  | { fase: "errore"; domanda: string; errore: string };
+type Voce =
+  | { id: number; domanda: string; fase: "attesa" }
+  | { id: number; domanda: string; fase: "risposta"; risposta: Risposta }
+  | { id: number; domanda: string; fase: "errore"; errore: string };
 
 /**
- * DOMANDE LIBERE SULLE SPESE
+ * DOMANDE LIBERE SULLE SPESE, A TUTTO SCHERMO
+ *
+ * Si apre a tutto schermo perché le risposte possono essere grafici e
+ * classifiche ("grafico delle spese mese per mese", "in cosa spendo di
+ * più?"), che nella tendina bassa si vedevano male.
+ *
+ * Le domande fatte restano una sotto l'altra finché la schermata è aperta,
+ * la più recente in alto: si possono confrontare due risposte senza
+ * richiederle. Chiudendo si riparte puliti.
  *
  * La domanda va all'AI solo per essere CAPITA; il calcolo lo fa il telefono
- * sulle spese vere (lib/domande.ts). Per questo i numeri sono esatti e le
- * spese non escono mai dall'app: lo si dice anche in fondo alla tendina,
- * perché è la prima cosa che ci si chiede davanti a un'AI in un'app di soldi.
+ * sulle spese vere (lib/domande.ts): i numeri sono esatti e le spese non
+ * escono mai dall'app.
  */
 export function ChiediSpese({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { state } = useApp();
   const [domanda, setDomanda] = useState("");
-  const [stato, setStato] = useState<Stato>({ fase: "vuoto" });
+  const [voci, setVoci] = useState<Voce[]>([]);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  // Solo l'ultima domanda conta: una risposta lenta a una domanda vecchia
-  // non deve sovrascrivere quella nuova.
-  const ultimaRichiesta = useRef(0);
+  const listaRef = useRef<HTMLDivElement | null>(null);
+  const prossimoId = useRef(1);
 
   // Ogni apertura riparte pulita.
   useEffect(() => {
     if (!open) return;
     setDomanda("");
-    setStato({ fase: "vuoto" });
+    setVoci([]);
   }, [open]);
+
+  const aggiorna = (id: number, voce: Voce) =>
+    setVoci((v) => v.map((x) => (x.id === id ? voce : x)));
 
   const chiedi = async (testo: string) => {
     const q = testo.trim().slice(0, MAX_DOMANDA);
     if (!q) return;
-    const id = ++ultimaRichiesta.current;
-    setDomanda(q);
-    setStato({ fase: "attesa", domanda: q });
+    const id = prossimoId.current++;
+    setVoci((v) => [{ id, domanda: q, fase: "attesa" as const }, ...v].slice(0, MAX_CRONOLOGIA));
+    setDomanda("");
     inputRef.current?.blur();
+    listaRef.current?.scrollTo({ top: 0, behavior: "smooth" });
 
     const oggi = todayISO();
     const esito = await chiamaAI("domanda", {
@@ -60,26 +74,26 @@ export function ChiediSpese({ open, onClose }: { open: boolean; onClose: () => v
       oggi,
       categorie: categoriePerAI(state.categorie),
     });
-    if (id !== ultimaRichiesta.current) return;
     if (!esito.ok) {
-      setStato({ fase: "errore", domanda: q, errore: esito.errore });
+      aggiorna(id, { id, domanda: q, fase: "errore", errore: esito.errore });
       return;
     }
     const interpretazione = normalizzaInterpretazione(
       esito.dati,
       state.categorie.map((c) => c.id),
     );
-    setStato({
-      fase: "risposta",
+    aggiorna(id, {
+      id,
       domanda: q,
+      fase: "risposta",
       risposta: rispondi(interpretazione, state.transazioni, state.categorie, oggi),
     });
   };
 
-  const inAttesa = stato.fase === "attesa";
+  const inAttesa = voci.some((v) => v.fase === "attesa");
 
   return (
-    <BottomSheet open={open} onClose={onClose}>
+    <BottomSheet open={open} onClose={onClose} fullScreen>
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-base font-semibold">Chiedi alle tue spese</h2>
         <button
@@ -96,12 +110,18 @@ export function ChiediSpese({ open, onClose }: { open: boolean; onClose: () => v
           e.preventDefault();
           void chiedi(domanda);
         }}
-        className="flex items-center gap-2 rounded-2xl border border-border bg-surface py-1.5 pr-1.5 pl-4 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary"
+        className="flex shrink-0 items-center gap-2 rounded-2xl border border-border bg-surface py-1.5 pr-1.5 pl-4 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary"
       >
         <input
           ref={inputRef}
           value={domanda}
           onChange={(e) => setDomanda(e.target.value.slice(0, MAX_DOMANDA))}
+          onFocus={() => {
+            // Come in "A parole": iPhone non deve spostare in su la schermata.
+            requestAnimationFrame(() => {
+              if (window.scrollY !== 0) window.scrollTo(0, 0);
+            });
+          }}
           enterKeyHint="send"
           placeholder="Fai una domanda sulle spese"
           aria-label="La tua domanda"
@@ -117,8 +137,13 @@ export function ChiediSpese({ open, onClose }: { open: boolean; onClose: () => v
         </button>
       </form>
 
-      <div className="mt-4 min-h-[120px]">
-        {stato.fase === "vuoto" && (
+      {/* Fascia che scorre: esempi, poi le risposte dalla più recente. */}
+      <div
+        ref={listaRef}
+        data-scroll-lock-allow
+        className="no-scrollbar -mx-4 mt-4 min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-6"
+      >
+        {voci.length === 0 && (
           <div className="flex flex-wrap gap-2">
             {ESEMPI.map((e) => (
               <button
@@ -133,55 +158,65 @@ export function ChiediSpese({ open, onClose }: { open: boolean; onClose: () => v
           </div>
         )}
 
-        {stato.fase === "attesa" && (
-          <p className="px-1 pt-2 text-sm text-muted-foreground">Sto leggendo la domanda…</p>
-        )}
-
-        {stato.fase === "errore" && (
-          <div className="rounded-2xl bg-surface p-4">
-            <p className="text-sm">{stato.errore}</p>
-            <button
-              type="button"
-              onClick={() => void chiedi(stato.domanda)}
-              className="mt-2 text-sm font-medium text-primary"
-            >
-              Riprova
-            </button>
-          </div>
-        )}
-
-        {stato.fase === "risposta" && (
-          <div className="card-hero p-5" aria-live="polite">
-            {stato.risposta.valore && (
-              <p className="text-3xl font-semibold tracking-tight">{stato.risposta.valore}</p>
-            )}
-            <p
+        <div className="space-y-4">
+          {voci.map((v, i) => (
+            <article
+              key={v.id}
+              aria-live={i === 0 ? "polite" : undefined}
               className={
-                stato.risposta.valore ? "mt-1 text-xs text-muted-foreground" : "text-sm font-medium"
+                i === 0 ? "card-hero p-5" : "rounded-2xl border border-border bg-surface p-5"
               }
             >
-              {stato.risposta.frase}
-            </p>
-            {stato.risposta.righe && stato.risposta.righe.length > 0 && (
-              <ul className="mt-3 divide-y divide-border border-t border-border">
-                {stato.risposta.righe.map((r, i) => (
-                  <li key={i} className="flex items-baseline gap-3 py-2.5 text-sm">
-                    <span className="min-w-0 flex-1 truncate">{r.etichetta}</span>
-                    {r.nota && (
-                      <span className="shrink-0 text-[11px] text-muted-foreground">{r.nota}</span>
-                    )}
-                    <span className="shrink-0 font-semibold">{r.valore}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
-      </div>
+              <p className="mb-2 text-xs text-muted-foreground">{v.domanda}</p>
 
-      <p className="mt-4 text-center text-[11px] text-muted-foreground">
-        All'AI arriva solo la domanda: le tue spese restano sul telefono.
-      </p>
+              {v.fase === "attesa" && (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 size={15} className="animate-spin" />
+                  Sto leggendo la domanda…
+                </p>
+              )}
+
+              {v.fase === "errore" && (
+                <>
+                  <p className="text-sm">{v.errore}</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVoci((x) => x.filter((y) => y.id !== v.id));
+                      void chiedi(v.domanda);
+                    }}
+                    className="mt-2 flex items-center gap-1.5 text-sm font-medium text-primary"
+                  >
+                    <RotateCcw size={14} /> Riprova
+                  </button>
+                </>
+              )}
+
+              {v.fase === "risposta" && (
+                <>
+                  {v.risposta.valore && (
+                    <p className="text-3xl font-semibold tracking-tight">{v.risposta.valore}</p>
+                  )}
+                  <p
+                    className={
+                      v.risposta.valore
+                        ? "mt-1 text-xs text-muted-foreground"
+                        : "text-sm font-medium"
+                    }
+                  >
+                    {v.risposta.frase}
+                  </p>
+                  <GraficoRisposta risposta={v.risposta} />
+                </>
+              )}
+            </article>
+          ))}
+        </div>
+
+        <p className="mt-6 text-center text-[11px] text-muted-foreground">
+          All'AI arriva solo la domanda: le tue spese restano sul telefono.
+        </p>
+      </div>
     </BottomSheet>
   );
 }

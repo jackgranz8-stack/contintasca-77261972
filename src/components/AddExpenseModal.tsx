@@ -16,6 +16,23 @@ import { BottomSheet } from "./BottomSheet";
 import { CHIUSURA_RITARDATA_MS, SuggerimentiDescrizione } from "./SuggerimentiDescrizione";
 import { ConfirmPopup } from "./ConfirmPopup";
 
+/**
+ * Riporta la pagina in cima dopo che si è aperta la tastiera.
+ *
+ * La prima volta che la tastiera compare, iPhone può far scorrere l'intera
+ * pagina verso l'alto anche se il campo è già visibile: la tendina a tutto
+ * schermo risaliva e l'intestazione si sovrapponeva alla sfumatura sotto
+ * l'ora. Si controlla subito e a tastiera aperta (l'animazione dura circa
+ * 300 ms).
+ */
+function riportaInCima() {
+  const reset = () => {
+    if (window.scrollY !== 0) window.scrollTo(0, 0);
+  };
+  requestAnimationFrame(reset);
+  window.setTimeout(reset, 350);
+}
+
 /** Oggi spostato di qualche giorno, in ora locale (vedi spostaGiorni). */
 function shiftDay(days: number) {
   return spostaGiorni(todayISO(), days);
@@ -489,7 +506,12 @@ export function AddExpenseModal({
                 // su iPhone gli si può dare il fuoco con la tastiera aperta.
                 aParoleRef.current = true;
                 flushSync(() => setAParoleAperto(true));
-                fraseInputRef.current?.focus();
+                if (corpoRef.current) corpoRef.current.scrollTop = 0;
+                // preventScroll: senza, iPhone sposta in su tutta la tendina
+                // per "far posto" alla tastiera, e l'intestazione finiva sotto
+                // la sfumatura della barra di stato.
+                fraseInputRef.current?.focus({ preventScroll: true });
+                riportaInCima();
               }}
               aria-pressed={aParoleAperto}
               className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ${
@@ -567,6 +589,7 @@ export function AddExpenseModal({
                     setFrase(e.target.value.slice(0, 200));
                     if (lettura.fase === "errore") setLettura({ fase: "pronto" });
                   }}
+                  onFocus={riportaInCima}
                   enterKeyHint="done"
                   placeholder="Es. pizza 18 ieri"
                   aria-label="Scrivi la spesa a parole"
