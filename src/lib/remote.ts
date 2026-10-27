@@ -15,6 +15,7 @@ import {
   type TransactionRow,
   categoryPayload,
   num,
+  profiloEsteso,
   recurringPayload,
   toCategory,
   toRecurring,
@@ -83,6 +84,7 @@ export async function loadRemoteState(userId: string): Promise<AppState> {
       abitazione: (profile?.housing as Housing | null) ?? "affitto",
       auto: (profile?.has_car ?? "si") === "si",
       persone: profile?.household_size ?? 1,
+      ...profiloEsteso(profile),
       budgetTotale: categorie.reduce((a, c) => a + c.budget, 0),
       primoUtilizzo: profile?.created_at ?? new Date().toISOString(),
     },
@@ -111,7 +113,10 @@ export async function persistDiff(prev: AppState, next: AppState, userId: string
     p.onboardingCompletato !== n.onboardingCompletato ||
     p.abitazione !== n.abitazione ||
     p.auto !== n.auto ||
-    p.persone !== n.persone
+    p.persone !== n.persone ||
+    p.regione !== n.regione ||
+    p.quotaCasa !== n.quotaCasa ||
+    p.reddito !== n.reddito
   ) {
     ops.push(
       db
@@ -124,6 +129,9 @@ export async function persistDiff(prev: AppState, next: AppState, userId: string
             housing: n.abitazione,
             has_car: n.auto ? "si" : "no",
             household_size: n.persone,
+            region: n.regione || null,
+            housing_share: n.quotaCasa,
+            net_income: n.reddito,
           },
           { onConflict: "user_id" },
         )

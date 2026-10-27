@@ -49,6 +49,7 @@ export const TIPI_DOMANDA = [
   "frequenti",
   "confronto",
   "ultima",
+  "analisi",
   "non_capito",
 ] as const;
 export type TipoDomanda = (typeof TIPI_DOMANDA)[number];
@@ -430,6 +431,11 @@ export function rispondi(
   oggi: string,
 ): Risposta {
   const i = affinaInterpretazione(interpretazione, transazioni, categorie);
+  // L'analisi (media italiana, piano per il budget) ha bisogno del profilo e
+  // di un secondo passaggio dall'AI: la gestisce chi chiama (lib/analisi.ts).
+  if (i.tipo === "analisi") {
+    return { frase: "Analisi delle spese rispetto alla media italiana e al budget." };
+  }
   if (i.tipo === "non_capito") {
     return {
       frase:

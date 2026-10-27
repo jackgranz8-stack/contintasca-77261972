@@ -52,7 +52,23 @@ export type ProfileRow = {
   has_car: string | null;
   household_size: number | null;
   created_at: string | null;
+  /** Colonne aggiunte con supabase/migrations/20261028100000_profilo_analisi.sql */
+  region?: string | null;
+  housing_share?: number | string | null;
+  net_income?: number | string | null;
 };
+
+/** Regione, quota casa e reddito dalla riga del profilo (colonne facoltative). */
+export function profiloEsteso(r: ProfileRow | null) {
+  const quota = Number(r?.housing_share ?? 1);
+  const reddito =
+    r?.net_income === null || r?.net_income === undefined ? null : Number(r.net_income);
+  return {
+    regione: r?.region ?? "",
+    quotaCasa: Number.isFinite(quota) && quota > 0 && quota <= 1 ? quota : 1,
+    reddito: reddito !== null && Number.isFinite(reddito) && reddito > 0 ? reddito : null,
+  };
+}
 
 export const num = (v: number | string | null | undefined) => Number(v ?? 0) || 0;
 

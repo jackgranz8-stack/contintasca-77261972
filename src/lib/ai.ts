@@ -8,9 +8,11 @@ import { db } from "@/integrations/external/client";
  * - domanda:   la domanda e i nomi delle categorie (i conti li fa il telefono);
  * - spesa:     la frase scritta ("pizza 18 ieri") e i nomi delle categorie;
  * - categoria: una descrizione e i nomi delle categorie;
- * - riepilogo: i TOTALI di un mese per categoria, mai le singole spese.
+ * - riepilogo: i TOTALI di un mese per categoria, mai le singole spese;
+ * - analisi:   medie per categoria, confronto Istat e piano per il budget
+ *              (già calcolati sul telefono), per scrivere i consigli.
  */
-export type ModalitaAI = "domanda" | "spesa" | "categoria" | "riepilogo";
+export type ModalitaAI = "domanda" | "spesa" | "categoria" | "riepilogo" | "analisi";
 
 export type EsitoAI = { ok: true; dati: unknown } | { ok: false; errore: string };
 

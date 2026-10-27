@@ -66,7 +66,37 @@ export type Profile = {
   auto: boolean;
   persone: number;
   primoUtilizzo: string; // ISO
+  /** Regione di residenza ("" = non indicata): tara la media italiana di confronto. */
+  regione: string;
+  /** Quota di affitto o mutuo pagata dall'utente (1 = tutto, 0.5 = metà). */
+  quotaCasa: number;
+  /** Reddito netto mensile, facoltativo: serve a calcolare quanto si risparmia. */
+  reddito: number | null;
 };
+
+/** Le regioni italiane, per il profilo. */
+export const REGIONI = [
+  "Abruzzo",
+  "Basilicata",
+  "Calabria",
+  "Campania",
+  "Emilia-Romagna",
+  "Friuli-Venezia Giulia",
+  "Lazio",
+  "Liguria",
+  "Lombardia",
+  "Marche",
+  "Molise",
+  "Piemonte",
+  "Puglia",
+  "Sardegna",
+  "Sicilia",
+  "Toscana",
+  "Trentino-Alto Adige",
+  "Umbria",
+  "Valle d'Aosta",
+  "Veneto",
+] as const;
 
 export type AppState = {
   categorie: Category[];
@@ -128,6 +158,9 @@ export function emptyProfile(): Profile {
     auto: true,
     persone: 1,
     primoUtilizzo: new Date().toISOString(),
+    regione: "",
+    quotaCasa: 1,
+    reddito: null,
   };
 }
 
