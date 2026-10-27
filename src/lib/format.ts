@@ -63,6 +63,17 @@ export function todayISO() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/**
+ * Una data (YYYY-MM-DD) spostata di n giorni, calcolata sull'ora LOCALE.
+ * Non si usa toISOString(): restituisce la data in ora UTC, e in Italia fra
+ * mezzanotte e l'1 (le 2 d'estate) darebbe il giorno prima.
+ */
+export function spostaGiorni(iso: string, n: number) {
+  const d = new Date(iso + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function eur(n: number) {
   return new Intl.NumberFormat("it-IT", {
     style: "currency",

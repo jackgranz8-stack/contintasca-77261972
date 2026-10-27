@@ -1,10 +1,20 @@
 import type { AppState } from "./types";
+import { trovaAbbonamenti } from "./abbonamenti";
 import { currentMonth, monthKey, monthLabel, shiftMonth, todayISO } from "./format";
 
 export type TipAction =
   | { kind: "setBudget"; categoria: string; importo: number }
-  | { kind: "activateRecurring"; nome: string; categoria: string; importo: number; giorno: number }
+  | {
+      kind: "activateRecurring";
+      nome: string;
+      categoria: string;
+      importo: number;
+      giorno: number;
+      /** Data dell'ultimo pagamento già inserito: la ricorrente riparte da lì. */
+      ultimaData?: string;
+    }
   | { kind: "openBudget" }
+  | { kind: "riepilogo"; mese: string }
   | { kind: "ack" };
 
 export type Tip = {
@@ -77,8 +87,34 @@ export function buildTips(state: AppState): Tip[] {
         percChiusa != null
           ? `A ${monthLabel(meseChiuso)} hai speso ${Math.round(sommaChiusa)}€, il ${percChiusa}% del budget di quel mese.`
           : `A ${monthLabel(meseChiuso)} hai speso ${Math.round(sommaChiusa)}€.`,
-      azione: "",
-      action: { kind: "ack" },
+      azione: "Riepilogo e consigli",
+      action: { kind: "riepilogo", mese: meseChiuso },
+    });
+  }
+
+  // d) abbonamenti non ancora ricorrenti (vedi lib/abbonamenti.ts). Vengono
+  // prima dei consigli sui budget: sono pochi e concreti, e con il limite di
+  // 6 consigli in fondo all'elenco rischiavano di non comparire mai.
+  // Al massimo 2 alla volta: gli altri compaiono quando questi vengono
+  // accettati o ignorati, senza riempire la Home.
+  const abbonamenti = trovaAbbonamenti(state, oggiISO).filter(
+    (a) => !state.consigliIgnorati.includes(`fixed-${a.chiave}`),
+  );
+  for (const a of abbonamenti.slice(0, 2)) {
+    tips.push({
+      id: `fixed-${a.chiave}`,
+      tono: "info",
+      titolo: "Sembra un abbonamento",
+      testo: `"${a.nome}" da ${a.importo.toFixed(2).replace(".", ",").replace(",00", "")}€ torna ogni mese da ${a.mesi} mesi in ${catName(a.categoria)}. Rendilo ricorrente: si registrerà da solo il giorno ${a.giorno}.`,
+      azione: "Rendi ricorrente",
+      action: {
+        kind: "activateRecurring",
+        nome: a.nome,
+        categoria: a.categoria,
+        importo: a.importo,
+        giorno: a.giorno,
+        ultimaData: a.ultimaData,
+      },
     });
   }
 
@@ -130,40 +166,6 @@ export function buildTips(state: AppState): Tip[] {
         action: { kind: "openBudget" },
       });
     }
-  }
-
-  // d) spese fisse non ancora ricorrenti: stesso importo per 3 mesi di fila
-  const groups = new Map<string, { mesi: Set<string>; ultima: string }>();
-  for (const t of realizzate) {
-    const m = monthKey(t.data);
-    if (!prevMonths.includes(m) && m !== mk) continue;
-    const k = `${t.categoria}|${t.importo}|${(t.nota || "").trim().toLowerCase()}`;
-    const g = groups.get(k) ?? { mesi: new Set<string>(), ultima: t.data };
-    g.mesi.add(m);
-    if (t.data > g.ultima) g.ultima = t.data;
-    groups.set(k, g);
-  }
-  for (const [k, g] of groups) {
-    if (g.mesi.size < 3) continue;
-    const parts = k.split("|");
-    const categoria = parts[0] ?? "";
-    const importo = Number(parts[1] ?? 0);
-    const nota = parts[2] ?? "";
-    if (!state.categorie.some((c) => c.id === categoria)) continue;
-    const già = state.ricorrenti.some(
-      (r) => r.categoria === categoria && Math.abs(r.importo - importo) < 0.01,
-    );
-    if (già) continue;
-    const giornoMese = Math.min(28, Math.max(1, new Date(g.ultima + "T00:00:00").getDate()));
-    const nome = nota ? nota.charAt(0).toUpperCase() + nota.slice(1) : catName(categoria);
-    tips.push({
-      id: `fixed-${k}`,
-      tono: "info",
-      titolo: "Sembra una spesa fissa",
-      testo: `"${nome}" da ${Math.round(importo)}€ compare da 3 mesi in ${catName(categoria)}. Puoi renderla ricorrente e non pensarci più.`,
-      azione: "Rendi ricorrente",
-      action: { kind: "activateRecurring", nome, categoria, importo, giorno: giornoMese },
-    });
   }
 
   return tips.filter((t) => !state.consigliIgnorati.includes(t.id)).slice(0, 6);
