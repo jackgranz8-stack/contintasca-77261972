@@ -6,9 +6,13 @@ import { categoriePerAI, chiamaAI } from "@/lib/ai";
 import { normalizzaInterpretazione, rispondi, type Risposta } from "@/lib/domande";
 import { BottomSheet } from "./BottomSheet";
 import { GraficoRisposta } from "./GraficoRisposta";
+import { AnalisiRisposta, type StatoCommento } from "./AnalisiRisposta";
+import { calcolaAnalisi, datiAnalisiPerAI, normalizzaCommento, type Analisi } from "@/lib/analisi";
 
 /** Domande pronte: mostrano cosa si può chiedere e si toccano per provarle. */
 const ESEMPI = [
+  "Dove spendo più della media italiana?",
+  "Su cosa risparmio per restare nel budget?",
   "Quanto ho speso questo mese?",
   "In cosa spendo di più?",
   "Grafico delle spese mese per mese",
@@ -24,6 +28,7 @@ const MAX_CRONOLOGIA = 20;
 type Voce =
   | { id: number; domanda: string; fase: "attesa" }
   | { id: number; domanda: string; fase: "risposta"; risposta: Risposta }
+  | { id: number; domanda: string; fase: "analisi"; analisi: Analisi; commento: StatoCommento }
   | { id: number; domanda: string; fase: "errore"; errore: string };
 
 /**
@@ -59,6 +64,24 @@ export function ChiediSpese({ open, onClose }: { open: boolean; onClose: () => v
   const aggiorna = (id: number, voce: Voce) =>
     setVoci((v) => v.map((x) => (x.id === id ? voce : x)));
 
+  /*
+   * ANALISI: i numeri si calcolano qui e si mostrano subito; poi si chiede
+   * all'AI di commentarli (solo totali e confronti, mai le singole spese).
+   */
+  const commenta = async (id: number, domanda: string, analisi: Analisi) => {
+    aggiorna(id, { id, domanda, fase: "analisi", analisi, commento: { fase: "attesa" } });
+    const esito = await chiamaAI("analisi", { dati: datiAnalisiPerAI(analisi) });
+    const commento: StatoCommento = !esito.ok
+      ? { fase: "errore", errore: esito.errore }
+      : (() => {
+          const c = normalizzaCommento(esito.dati);
+          return c.punti.length || c.sintesi
+            ? { fase: "pronto" as const, ...c }
+            : { fase: "errore" as const, errore: "Nessun consiglio ricevuto, riprova." };
+        })();
+    aggiorna(id, { id, domanda, fase: "analisi", analisi, commento });
+  };
+
   const chiedi = async (testo: string) => {
     const q = testo.trim().slice(0, MAX_DOMANDA);
     if (!q) return;
@@ -82,6 +105,10 @@ export function ChiediSpese({ open, onClose }: { open: boolean; onClose: () => v
       esito.dati,
       state.categorie.map((c) => c.id),
     );
+    if (interpretazione.tipo === "analisi") {
+      await commenta(id, q, calcolaAnalisi(state, oggi));
+      return;
+    }
     aggiorna(id, {
       id,
       domanda: q,
@@ -192,6 +219,14 @@ export function ChiediSpese({ open, onClose }: { open: boolean; onClose: () => v
                 </>
               )}
 
+              {v.fase === "analisi" && (
+                <AnalisiRisposta
+                  analisi={v.analisi}
+                  commento={v.commento}
+                  onRiprova={() => void commenta(v.id, v.domanda, v.analisi)}
+                />
+              )}
+
               {v.fase === "risposta" && (
                 <>
                   {v.risposta.valore && (
@@ -214,7 +249,8 @@ export function ChiediSpese({ open, onClose }: { open: boolean; onClose: () => v
         </div>
 
         <p className="mt-6 text-center text-[11px] text-muted-foreground">
-          All'AI arriva solo la domanda: le tue spese restano sul telefono.
+          All'AI arrivano solo la domanda e, per le analisi, i totali per categoria: mai le singole
+          spese.
         </p>
       </div>
     </BottomSheet>
