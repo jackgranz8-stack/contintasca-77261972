@@ -57,6 +57,11 @@ function monthLabel(key, short = false) {
   const name = MONTHS[(m ?? 1) - 1] ?? "";
   return short ? name.slice(0, 3) : `${name} ${y}`;
 }
+function monthChipLabel(key) {
+  const [y, m] = key.split("-").map(Number);
+  const name = MONTHS[(m ?? 1) - 1] ?? "";
+  return `${name.slice(0, 3).toLowerCase()} ${String(y).slice(-2)}`;
+}
 function shiftMonth(key, delta) {
   const [y, m] = key.split("-").map(Number);
   const d = new Date(y, m - 1 + delta, 1);
@@ -199,6 +204,7 @@ var TIPI_DOMANDA = [
   "frequenti",
   "confronto",
   "ultima",
+  "analisi",
   "non_capito"
 ];
 var DATA = /^\d{4}-\d{2}-\d{2}$/;
@@ -431,6 +437,9 @@ function affinaInterpretazione(i, transazioni, categorie) {
 }
 function rispondi(interpretazione, transazioni, categorie, oggi) {
   const i = affinaInterpretazione(interpretazione, transazioni, categorie);
+  if (i.tipo === "analisi") {
+    return { frase: "Analisi delle spese rispetto alla media italiana e al budget." };
+  }
   if (i.tipo === "non_capito") {
     return {
       frase: i.messaggio ?? "Non ho capito la domanda. Prova con qualcosa come \u201Cquanto ho speso in benzina quest'anno?\u201D"
@@ -454,15 +463,21 @@ function rispondi(interpretazione, transazioni, categorie, oggi) {
       const tot = somma(scelte);
       const per = /* @__PURE__ */ new Map();
       for (const t of scelte) per.set(t.categoria, (per.get(t.categoria) ?? 0) + t.importo);
-      const righe = [...per.entries()].sort((a, b) => b[1] - a[1]).map(([id, v]) => ({
-        etichetta: categorie.find((c) => c.id === id)?.nome ?? "Categoria eliminata",
-        valore: eur(arrotonda(v)),
-        nota: tot > 0 ? `${Math.round(v / tot * 100)}%` : void 0
-      }));
+      const righe = [...per.entries()].sort((a, b) => b[1] - a[1]).map(([id, v]) => {
+        const c = categorie.find((x) => x.id === id);
+        return {
+          etichetta: c?.nome ?? "Categoria eliminata",
+          valore: eur(arrotonda(v)),
+          nota: tot > 0 ? `${Math.round(v / tot * 100)}%` : void 0,
+          numero: arrotonda(v),
+          colore: c?.colore
+        };
+      });
       return {
         valore: eur(arrotonda(tot)),
         frase: frase("Spese", chi, quandoBreve, "per categoria"),
-        righe
+        righe,
+        grafico: "barre"
       };
     }
     case "per_mese": {
@@ -471,11 +486,17 @@ function rispondi(interpretazione, transazioni, categorie, oggi) {
         const m = monthKey(t.data);
         per.set(m, (per.get(m) ?? 0) + t.importo);
       }
-      const righe = [...per.entries()].sort((a, b) => a[0] < b[0] ? 1 : -1).slice(0, 24).map(([m, v]) => ({ etichetta: monthLabel(m), valore: eur(arrotonda(v)) }));
+      const righe = [...per.entries()].sort((a, b) => a[0] < b[0] ? 1 : -1).slice(0, 24).map(([m, v]) => ({
+        etichetta: monthLabel(m),
+        valore: eur(arrotonda(v)),
+        numero: arrotonda(v),
+        breve: monthChipLabel(m)
+      }));
       return {
         valore: eur(arrotonda(somma(scelte))),
         frase: frase("Spese", chi, quandoBreve, "mese per mese"),
-        righe
+        righe,
+        grafico: "colonne"
       };
     }
     case "media_mensile": {
@@ -500,9 +521,11 @@ function rispondi(interpretazione, transazioni, categorie, oggi) {
       const righe = [...scelte].sort((a, b) => b.importo - a.importo).slice(0, i.limite).map((t) => ({
         etichetta: t.nota || categorie.find((c) => c.id === t.categoria)?.nome || "Spesa",
         valore: eur(t.importo),
-        nota: formatDay(t.data)
+        nota: formatDay(t.data),
+        numero: t.importo,
+        colore: categorie.find((c) => c.id === t.categoria)?.colore
       }));
-      return { frase: frase("Le spese pi\xF9 alte", chi, quandoBreve), righe };
+      return { frase: frase("Le spese pi\xF9 alte", chi, quandoBreve), righe, grafico: "barre" };
     }
     case "frequenti": {
       const per = /* @__PURE__ */ new Map();
@@ -518,12 +541,13 @@ function rispondi(interpretazione, transazioni, categorie, oggi) {
       const righe = [...per.values()].sort((a, b) => b.n - a.n || b.tot - a.tot).slice(0, i.limite).map((v) => ({
         etichetta: v.testo,
         valore: eur(arrotonda(v.tot)),
-        nota: v.n === 1 ? "1 volta" : `${v.n} volte`
+        nota: v.n === 1 ? "1 volta" : `${v.n} volte`,
+        numero: arrotonda(v.tot)
       }));
       if (righe.length === 0) {
         return { frase: frase("Le spese", chi, quandoBreve, "non hanno descrizione.") };
       }
-      return { frase: frase("Le spese pi\xF9 frequenti", chi, quandoBreve), righe };
+      return { frase: frase("Le spese pi\xF9 frequenti", chi, quandoBreve), righe, grafico: "barre" };
     }
     case "confronto": {
       const altro = i.confronto ?? { tipo: "tutto" };
@@ -541,10 +565,17 @@ function rispondi(interpretazione, transazioni, categorie, oggi) {
           {
             etichetta: frase(senzaPreposizione(quando)),
             valore: eur(va),
-            nota: quante(scelte.length)
+            nota: quante(scelte.length),
+            numero: va
           },
-          { etichetta: frase(senzaPreposizione(quandoB)), valore: eur(vb), nota: quante(b.length) }
-        ]
+          {
+            etichetta: frase(senzaPreposizione(quandoB)),
+            valore: eur(vb),
+            nota: quante(b.length),
+            numero: vb
+          }
+        ],
+        grafico: "barre"
       };
     }
     case "ultima": {
@@ -853,70 +884,347 @@ function datiWidget(state, oggi) {
   };
 }
 
-// src/lib/riepilogo.ts
-var MESI_MEDIA = 3;
+// src/lib/analisi.ts
+var ISTAT_TOTALE = 2782.36;
+var ISTAT_AFFITTI_FIGURATIVI = 611.44;
+var ISTAT_RISTRUTTURAZIONI = 37.19;
+var ISTAT_AFFITTO_MEDIO = 438;
+var ISTAT_QUOTA_AFFITTO = 0.181;
+var ISTAT_RATA_MUTUO = 565;
+var ISTAT_PER_AREA = {
+  nordOvest: 2974.07,
+  nordEst: 3086.67,
+  centro: 3052.18,
+  sud: 2215.48,
+  isole: 2338.13
+};
+var AFFITTO_PER_AREA = {
+  nordOvest: 477,
+  nordEst: 463,
+  centro: 456,
+  sud: 369,
+  isole: 371
+};
+var AREA_DI = {
+  Piemonte: "nordOvest",
+  "Valle d'Aosta": "nordOvest",
+  Liguria: "nordOvest",
+  Lombardia: "nordOvest",
+  "Trentino-Alto Adige": "nordEst",
+  Veneto: "nordEst",
+  "Friuli-Venezia Giulia": "nordEst",
+  "Emilia-Romagna": "nordEst",
+  Toscana: "centro",
+  Umbria: "centro",
+  Marche: "centro",
+  Lazio: "centro",
+  Abruzzo: "sud",
+  Molise: "sud",
+  Campania: "sud",
+  Puglia: "sud",
+  Basilicata: "sud",
+  Calabria: "sud",
+  Sicilia: "isole",
+  Sardegna: "isole"
+};
+var NOME_AREA = {
+  nordOvest: "Nord-ovest",
+  nordEst: "Nord-est",
+  centro: "Centro",
+  sud: "Sud",
+  isole: "Isole"
+};
+function areaDi(regione) {
+  return AREA_DI[regione] ?? null;
+}
+var ISTAT_PER_COMPONENTI = {
+  1: 2070.43,
+  2: 2895.94,
+  3: 3306.02,
+  4: 3582.58,
+  5: 3578.53
+};
+var VOCI = [
+  {
+    chiave: "salute",
+    nome: "Salute",
+    mensile: 113.18,
+    parole: ["medic", "salute", "farmac", "sanit", "dentist"],
+    riducibile: false,
+    quotaTaglio: 0
+  },
+  {
+    chiave: "ristorazione",
+    nome: "Ristoranti e bar",
+    mensile: 163.67,
+    parole: ["ristor", "bar", "uscit", "pizzer", "aperitiv", "fuori"],
+    riducibile: true,
+    quotaTaglio: 0.25
+  },
+  {
+    chiave: "alimentari",
+    nome: "Alimentari",
+    mensile: 552.06,
+    parole: ["cibo", "spesa", "aliment", "supermerc", "mangiar", "cucina"],
+    riducibile: true,
+    quotaTaglio: 0.1
+  },
+  {
+    chiave: "trasporti",
+    nome: "Trasporti",
+    mensile: 294.06,
+    parole: ["auto", "macchin", "trasport", "carbur", "benzin", "moto", "mezzi", "viaggi lavoro"],
+    riducibile: true,
+    quotaTaglio: 0.1
+  },
+  {
+    chiave: "utenze",
+    // Abitazione al netto di affitti figurativi, ristrutturazioni e affitti
+    // veri (in media su tutte le famiglie): acqua, luce, gas, condominio,
+    // piccola manutenzione. È una stima ricavata dai dati Istat.
+    nome: "Bollette e spese della casa",
+    mensile: 1000.8 - ISTAT_AFFITTI_FIGURATIVI - ISTAT_RISTRUTTURAZIONI - ISTAT_AFFITTO_MEDIO * ISTAT_QUOTA_AFFITTO,
+    parole: ["bollett", "utenz", "luce", "gas", "acqua", "energia", "condomin"],
+    riducibile: false,
+    quotaTaglio: 0
+  },
+  {
+    chiave: "comunicazione",
+    nome: "Telefono e internet",
+    mensile: 70.82,
+    parole: ["telefon", "internet", "cellular", "abbonament"],
+    riducibile: true,
+    quotaTaglio: 0.15
+  },
+  {
+    chiave: "ricreazione",
+    nome: "Svago, sport e cultura",
+    mensile: 105.31,
+    parole: ["svago", "tempo libero", "divertim", "hobby", "sport", "palestr", "cultur", "viagg"],
+    riducibile: true,
+    quotaTaglio: 0.25
+  },
+  {
+    chiave: "abbigliamento",
+    nome: "Abbigliamento",
+    mensile: 105.4,
+    parole: ["abbigl", "vestit", "scarpe", "moda"],
+    riducibile: true,
+    quotaTaglio: 0.25
+  },
+  {
+    chiave: "cura",
+    nome: "Cura della persona",
+    mensile: 131.89,
+    parole: ["cura", "bellezz", "parrucch", "igiene", "estetist"],
+    riducibile: true,
+    quotaTaglio: 0.2
+  },
+  {
+    chiave: "assicurazioni",
+    nome: "Assicurazioni e banca",
+    mensile: 71.52,
+    parole: ["assicur", "banca", "conto"],
+    riducibile: false,
+    quotaTaglio: 0
+  },
+  {
+    chiave: "istruzione",
+    nome: "Istruzione",
+    mensile: 16.99,
+    parole: ["scuol", "istruz", "univers", "corso"],
+    riducibile: false,
+    quotaTaglio: 0
+  },
+  {
+    chiave: "tabacchi",
+    nome: "Alcolici e tabacchi",
+    mensile: 42.27,
+    parole: ["tabacc", "sigar", "alcol", "vino", "birra"],
+    riducibile: true,
+    quotaTaglio: 0.3
+  },
+  {
+    chiave: "casa",
+    nome: "Casa",
+    mensile: 114.39,
+    // mobili, articoli e servizi per la casa; + affitto/mutuo dal profilo
+    parole: ["casa", "affitt", "mutuo", "arred"],
+    riducibile: false,
+    quotaTaglio: 0
+  }
+];
+function semplice2(t) {
+  return t.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+function voceIstatPer(nomeCategoria2) {
+  const n = semplice2(nomeCategoria2);
+  return VOCI.find((v) => v.parole.some((p) => n.includes(p))) ?? null;
+}
+function fattoreFamiglia(persone) {
+  const p = Math.min(5, Math.max(1, Math.round(persone || 1)));
+  return (ISTAT_PER_COMPONENTI[p] ?? ISTAT_TOTALE) / ISTAT_TOTALE;
+}
+function fattoreArea(regione) {
+  const a = areaDi(regione);
+  return a ? ISTAT_PER_AREA[a] / ISTAT_TOTALE : 1;
+}
+function riferimentoPer(v, p) {
+  const base = v.mensile * fattoreFamiglia(p.persone) * fattoreArea(p.regione);
+  if (v.chiave !== "casa") return base;
+  const area = areaDi(p.regione);
+  const affitto = area ? AFFITTO_PER_AREA[area] : ISTAT_AFFITTO_MEDIO;
+  const quota = p.quotaCasa > 0 && p.quotaCasa <= 1 ? p.quotaCasa : 1;
+  const alloggio = p.abitazione === "affitto" ? affitto * quota : p.abitazione === "mutuo" ? ISTAT_RATA_MUTUO * quota : 0;
+  return base + alloggio;
+}
 var r2 = (n) => Math.round(n * 100) / 100;
-function calcolaRiepilogo(state, mese, oggi) {
+var a5 = (n) => Math.max(5, Math.round(n / 5) * 5);
+var MESI_ANALISI = 3;
+function calcolaAnalisi(state, oggi) {
+  const mc = monthKey(oggi);
   const reali = state.transazioni.filter((t) => t.data <= oggi);
-  const delMese = (m) => reali.filter((t) => monthKey(t.data) === m);
-  const somma2 = (l) => l.reduce((a, t) => a + t.importo, 0);
-  const precedenti = Array.from({ length: MESI_MEDIA }, (_, i) => shiftMonth(mese, -(i + 1)));
-  const totaliPrecedenti = precedenti.map((m) => somma2(delMese(m))).filter((v) => v > 0);
-  const tx = delMese(mese);
-  const categorie = state.categorie.map((c) => {
-    const speso = somma2(tx.filter((t) => t.categoria === c.id));
-    const prec = precedenti.map((m) => somma2(delMese(m).filter((t) => t.categoria === c.id))).filter((v) => v > 0);
+  const chiusi = Array.from({ length: MESI_ANALISI }, (_, i) => shiftMonth(mc, -(i + 1))).filter((m2) => reali.some((t) => monthKey(t.data) === m2)).reverse();
+  const mesi = chiusi.length > 0 ? chiusi : [mc];
+  const nMesi = mesi.length;
+  const delPeriodo = reali.filter((t) => mesi.includes(monthKey(t.data)));
+  const { persone, abitazione, auto, regione, quotaCasa, reddito } = state.profilo;
+  const voci = state.categorie.map((c) => {
+    const tua = r2(
+      delPeriodo.filter((t) => t.categoria === c.id).reduce((s, t) => s + t.importo, 0) / nMesi
+    );
+    const v = voceIstatPer(c.nome);
+    const riferimento = v ? r2(riferimentoPer(v, state.profilo)) : null;
+    const differenza = riferimento !== null ? r2(tua - riferimento) : null;
     return {
       id: c.id,
       nome: c.nome,
-      speso: r2(speso),
-      media: prec.length ? r2(prec.reduce((a, b) => a + b, 0) / prec.length) : null,
-      budget: c.budget
+      colore: c.colore,
+      tua,
+      budget: c.budget,
+      riferimento,
+      voceIstat: v?.nome ?? null,
+      differenza,
+      differenzaPct: riferimento && riferimento > 0 ? Math.round((tua - riferimento) / riferimento * 100) : null,
+      riducibile: v?.riducibile ?? true
     };
-  }).filter((c) => c.speso > 0 || (c.media ?? 0) > 0).sort((a, b) => b.speso - a.speso);
+  }).filter((v) => v.tua > 0 || v.budget > 0).sort((a, b) => (b.differenza ?? -Infinity) - (a.differenza ?? -Infinity) || b.tua - a.tua);
+  const totaleTuo = r2(voci.reduce((s, v) => s + v.tua, 0));
+  const budgetTotale = state.categorie.reduce((s, c) => s + c.budget, 0);
+  const totaleRiferimento = r2(
+    (ISTAT_TOTALE - ISTAT_AFFITTI_FIGURATIVI) * fattoreFamiglia(persone) * fattoreArea(regione)
+  );
+  const risparmioMedio = reddito ? r2(reddito - totaleTuo) : null;
+  const area = areaDi(regione);
+  const [y, m] = mc.split("-").map(Number);
+  const giorniMese = new Date(y ?? 2e3, m ?? 1, 0).getDate();
+  const giorno = Number(oggi.slice(8, 10));
+  const spesoMese = r2(
+    reali.filter((t) => monthKey(t.data) === mc).reduce((s, t) => s + t.importo, 0)
+  );
+  const giorniRimasti = giorniMese - giorno + 1;
+  const restante = budgetTotale > 0 ? r2(budgetTotale - spesoMese) : null;
+  const scartoBudget = budgetTotale > 0 ? r2(totaleTuo - budgetTotale) : null;
+  const piano = [];
+  let pianoInsufficiente = false;
+  if (scartoBudget !== null && scartoBudget > 0) {
+    const candidati = voci.filter((v) => v.riducibile && v.tua > 0).map((v) => {
+      const quota = voceIstatPer(v.nome)?.quotaTaglio ?? 0.15;
+      const eccesso = Math.max(0, v.differenza ?? 0);
+      const potenziale = Math.min(v.tua * 0.5, Math.max(eccesso, v.tua * quota));
+      return { v, potenziale };
+    }).filter((c) => c.potenziale >= 5);
+    const totPotenziale = candidati.reduce((s, c) => s + c.potenziale, 0);
+    pianoInsufficiente = totPotenziale < scartoBudget;
+    for (const { v, potenziale } of candidati) {
+      const quotaGap = totPotenziale > 0 ? scartoBudget * potenziale / totPotenziale : 0;
+      const taglio = a5(Math.min(potenziale, quotaGap));
+      piano.push({ id: v.id, nome: v.nome, taglio, nuovoTetto: r2(Math.max(0, v.tua - taglio)) });
+    }
+    piano.sort((a, b) => b.taglio - a.taglio);
+    while (piano.length > 1) {
+      const totale = piano.reduce((s, p) => s + p.taglio, 0);
+      const ultimo = piano[piano.length - 1];
+      if (totale - ultimo.taglio < scartoBudget) break;
+      piano.pop();
+    }
+  }
   return {
-    mese,
-    etichetta: monthLabel(mese),
-    totale: r2(somma2(tx)),
-    numeroSpese: tx.length,
-    budgetTotale: state.categorie.reduce((a, c) => a + c.budget, 0),
-    mediaPrecedente: totaliPrecedenti.length ? r2(totaliPrecedenti.reduce((a, b) => a + b, 0) / totaliPrecedenti.length) : null,
-    categorie
+    mesi,
+    etichettaPeriodo: chiusi.length > 0 ? nMesi === 1 ? monthLabel(mesi[0]) : `media di ${monthLabel(mesi[0]).toLowerCase()} \u2013 ${monthLabel(mesi[nMesi - 1]).toLowerCase()}` : `${monthLabel(mc).toLowerCase()} (mese in corso)`,
+    persone,
+    abitazione,
+    auto,
+    regione,
+    area: area ? NOME_AREA[area] : null,
+    quotaCasa,
+    reddito,
+    risparmioMedio,
+    tassoRisparmio: reddito && risparmioMedio !== null ? Math.round(risparmioMedio / reddito * 100) : null,
+    totaleTuo,
+    totaleRiferimento,
+    budgetTotale,
+    scartoBudget,
+    meseCorrente: {
+      etichetta: monthLabel(mc),
+      speso: spesoMese,
+      giorniRimasti,
+      proiezione: r2(giorno > 0 ? spesoMese / giorno * giorniMese : spesoMese),
+      restante,
+      alGiorno: restante !== null && giorniRimasti > 0 ? r2(Math.max(0, restante) / giorniRimasti) : null
+    },
+    voci,
+    piano,
+    pianoInsufficiente
   };
 }
-function variazione(attuale, riferimento) {
-  if (riferimento === null || riferimento <= 0) return null;
-  return Math.round((attuale - riferimento) / riferimento * 100);
-}
-function datiPerAI(r, profilo) {
-  return {
-    mese: r.etichetta,
-    totale: r.totale,
-    budget_totale: r.budgetTotale || null,
-    percentuale_budget: r.budgetTotale > 0 ? Math.round(r.totale / r.budgetTotale * 100) : null,
-    media_mesi_precedenti: r.mediaPrecedente,
-    variazione_su_media_percento: variazione(r.totale, r.mediaPrecedente),
-    profilo: { persone: profilo.persone, abitazione: profilo.abitazione, auto: profilo.auto },
-    categorie: r.categorie.map((c) => ({
-      nome: c.nome,
-      speso: c.speso,
-      media_mesi_precedenti: c.media,
-      variazione_percento: variazione(c.speso, c.media),
-      budget: c.budget || null,
-      oltre_budget: c.budget > 0 ? r2(Math.max(0, c.speso - c.budget)) : null
-    }))
-  };
-}
-function normalizzaConsigli(grezzi) {
-  const lista = grezzi?.consigli;
-  if (!Array.isArray(lista)) return [];
-  return lista.map((c) => c && typeof c === "object" ? c : {}).filter((c) => typeof c.titolo === "string" && typeof c.testo === "string").map((c) => ({
-    titolo: String(c.titolo).trim().slice(0, 80),
-    testo: String(c.testo).trim().slice(0, 400)
-  })).filter((c) => c.titolo && c.testo).slice(0, 3);
+var euro = (n) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n).replace(/\s/g, " ");
+function riassuntoParlato(a) {
+  const frasi = [];
+  const m = a.meseCorrente;
+  if (m.restante !== null) {
+    frasi.push(
+      m.restante >= 0 ? `Questo mese hai speso ${euro(m.speso)}: ti restano ${euro(m.restante)} per ${m.giorniRimasti} giorni, circa ${euro(m.alGiorno ?? 0)} al giorno.` : `Questo mese hai gi\xE0 superato il budget di ${euro(-m.restante)}.`
+    );
+  } else {
+    frasi.push(`Questo mese hai speso ${euro(m.speso)}. Non hai ancora impostato un budget.`);
+  }
+  if (a.risparmioMedio !== null) {
+    frasi.push(
+      a.risparmioMedio >= 0 ? `In media metti da parte ${euro(a.risparmioMedio)} al mese, il ${a.tassoRisparmio}% di quello che guadagni.` : `In media spendi ${euro(-a.risparmioMedio)} al mese pi\xF9 di quanto guadagni.`
+    );
+  }
+  const sopra = a.voci.filter((v) => (v.differenza ?? 0) >= 10 && (v.differenzaPct ?? 0) >= 10);
+  if (sopra.length > 0) {
+    frasi.push(
+      `Rispetto alla media italiana per una famiglia come la tua spendi di pi\xF9 in ${sopra.slice(0, 3).map((v) => `${v.nome}, pi\xF9 ${euro(v.differenza ?? 0)}`).join("; ")}.`
+    );
+  } else {
+    frasi.push("Nessuna categoria \xE8 sopra la media italiana per una famiglia come la tua.");
+  }
+  if (a.piano.length > 0) {
+    frasi.push(
+      `Per restare nel budget riduci ${a.piano.slice(0, 3).map((p) => `${p.nome} di ${euro(p.taglio)}`).join(", ")} al mese.`
+    );
+    if (a.pianoInsufficiente) {
+      frasi.push("Da sole le spese variabili non bastano: rivedi il budget o i costi fissi.");
+    }
+  } else if (a.scartoBudget !== null) {
+    frasi.push("In media resti dentro il budget: la differenza puoi metterla da parte.");
+  }
+  return frasi.join(" ");
 }
 
 // src/lib/righeDb.ts
+function profiloEsteso(r) {
+  const quota = Number(r?.housing_share ?? 1);
+  const reddito = r?.net_income === null || r?.net_income === void 0 ? null : Number(r.net_income);
+  return {
+    regione: r?.region ?? "",
+    quotaCasa: Number.isFinite(quota) && quota > 0 && quota <= 1 ? quota : 1,
+    reddito: reddito !== null && Number.isFinite(reddito) && reddito > 0 ? reddito : null
+  };
+}
 var num = (v) => Number(v ?? 0) || 0;
 function toCategory(r) {
   return {
@@ -976,7 +1284,10 @@ function emptyProfile() {
     abitazione: "affitto",
     auto: true,
     persone: 1,
-    primoUtilizzo: (/* @__PURE__ */ new Date()).toISOString()
+    primoUtilizzo: (/* @__PURE__ */ new Date()).toISOString(),
+    regione: "",
+    quotaCasa: 1,
+    reddito: null
   };
 }
 function initialState() {
@@ -1089,7 +1400,8 @@ async function caricaStato(utente) {
         ...base.profilo,
         abitazione: p?.housing ?? "affitto",
         auto: (p?.has_car ?? "si") === "si",
-        persone: p?.household_size ?? 1
+        persone: p?.household_size ?? 1,
+        ...profiloEsteso(prof.data ?? null)
       }
     }
   };
@@ -1107,15 +1419,12 @@ domanda \u2192 "domanda": {"tipo": "totale"|"per_categoria"|"per_mese"|"media_me
   Senza periodo: "quanto ho speso" \u2192 mese_corrente, il resto \u2192 tutto.
 elimina \u2192 "riferimento": {"ultima": true se dice "l'ultima spesa"/"quella appena messa", "testo": parola della descrizione | null, "importo": numero | null, "periodo": Periodo | null}
 modifica \u2192 "riferimento" come sopra + "modifiche": {"importo"?: numero, "descrizione"?: string, "data"?: "AAAA-MM-GG", "categoria"?: id}. Metti solo i campi da cambiare. "la pizza di ieri era 20 euro" \u2192 riferimento {testo:"pizza", periodo: {"tipo":"intervallo","da":ieri,"a":ieri}}, modifiche {importo:20}.
-consiglio \u2192 l'utente chiede consigli o come risparmiare.
+consiglio \u2192 l'utente chiede consigli, come risparmiare, su cosa spende pi\xF9 della media italiana o come restare nel budget.
 non_capito \u2192 "messaggio": una frase breve in italiano che spiega cosa si pu\xF2 dire.
 
 Periodo: {"tipo":"tutto"} | {"tipo":"mese_corrente"} | {"tipo":"mese_scorso"} | {"tipo":"anno_corrente"} | {"tipo":"anno_scorso"} | {"tipo":"ultimi_giorni","n":N} (oggi compreso) | {"tipo":"ultimi_mesi","n":N} | {"tipo":"mese","valore":"AAAA-MM"} | {"tipo":"anno","valore":"AAAA"} | {"tipo":"intervallo","da":"AAAA-MM-GG","a":"AAAA-MM-GG"}
 Categorie: usa solo gli id dati, se la frase nomina quella categoria, un suo sinonimo (macchina \u2192 Auto, supermercato \u2192 Cibo, luce \u2192 Bollette) o una spesa che vi appartiene chiaramente. "testo": una parola minuscola al singolare, per cose che non sono categorie (benzina, esselunga, pizza).`;
 var ISTRUZIONI_CATEGORIA = `Scegli la categoria di una spesa personale dalla sua descrizione. Rispondi con UN SOLO oggetto JSON: {"categoria": id | null}. Usa solo gli id dati; null se nessuna \xE8 adatta.`;
-var ISTRUZIONI_CONSIGLIO = `Sei un consulente di finanza personale pratico e gentile. Ricevi i TOTALI di un mese per categoria (con media dei mesi precedenti e budget) e scrivi 2 consigli brevi da LEGGERE AD ALTA VOCE.
-Rispondi con UN SOLO oggetto JSON: {"consigli": [{"titolo": string, "testo": string}]}
-Usa solo i numeri forniti, senza calcoli nuovi. Testo: una frase, con un'azione concreta. Niente investimenti o prodotti finanziari. Dai del tu.`;
 async function chiediGroq(sistema, utente, maxToken, temperatura = 0) {
   if (!GROQ_API_KEY) throw new Error("GROQ_API_KEY mancante");
   const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -1196,6 +1505,9 @@ async function esegui(comando, { state, ordinateDaInserimento }, utente, oggi) {
       return { messaggio: fraseAggiunta(t, state.categorie, oggi) };
     }
     case "domanda":
+      if (comando.interpretazione.tipo === "analisi") {
+        return { messaggio: riassuntoParlato(calcolaAnalisi(state, oggi)) };
+      }
       return {
         messaggio: rispostaParlata(
           rispondi(comando.interpretazione, state.transazioni, state.categorie, oggi)
@@ -1229,24 +1541,8 @@ async function esegui(comando, { state, ordinateDaInserimento }, utente, oggi) {
         })
       };
     }
-    case "consiglio": {
-      const mese = Number(oggi.slice(8, 10)) <= 10 ? shiftMonth(monthKey(oggi), -1) : monthKey(oggi);
-      const r = calcolaRiepilogo(state, mese, oggi);
-      if (r.numeroSpese === 0)
-        return { messaggio: "Non ci sono ancora abbastanza spese per un consiglio." };
-      const consigli = normalizzaConsigli(
-        await chiediGroq(
-          ISTRUZIONI_CONSIGLIO,
-          `Totali del mese:
-${JSON.stringify(datiPerAI(r, state.profilo))}`,
-          300,
-          0.4
-        )
-      );
-      if (!consigli.length)
-        return { messaggio: "Non sono riuscito a preparare un consiglio, riprova." };
-      return { messaggio: consigli.map((c) => `${c.titolo}. ${c.testo}`).join(" ") };
-    }
+    case "consiglio":
+      return { messaggio: riassuntoParlato(calcolaAnalisi(state, oggi)) };
   }
 }
 async function confermaAzione(token, utente, s, oggi) {

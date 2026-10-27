@@ -11,7 +11,8 @@
 //   - aggiunge una spesa ("pizza 18 ieri");
 //   - risponde a una domanda ("quanto ho speso questo mese?");
 //   - elimina o modifica una spesa, SEMPRE dopo conferma;
-//   - dà un consiglio sul mese ("come posso risparmiare?");
+//   - analizza le spese ("come posso risparmiare?", "spendo più della media
+//     italiana?"): mese in corso, confronto Istat, piano per il budget;
 //   - con modalita "widget" restituisce i numeri del mese per il widget.
 // Risponde con { messaggio } da far pronunciare a Siri, più { conferma }
 // quando serve un "sì" prima di procedere.
@@ -48,14 +49,15 @@ import {
 import { rispondi } from "../../../src/lib/domande.ts";
 import { leggiSpesaLocale } from "../../../src/lib/spesaAParole.ts";
 import { categoriaPerDescrizione } from "../../../src/lib/descrizioni.ts";
-import { calcolaRiepilogo, datiPerAI, normalizzaConsigli } from "../../../src/lib/riepilogo.ts";
-import { shiftMonth, monthKey } from "../../../src/lib/format.ts";
+import { calcolaAnalisi, riassuntoParlato } from "../../../src/lib/analisi.ts";
 import {
+  profiloEsteso,
   toCategory,
   toRecurring,
   toTransaction,
   transactionPayload,
   type CategoryRow,
+  type ProfileRow,
   type RecurringRow,
   type TransactionRow,
 } from "../../../src/lib/righeDb.ts";
@@ -222,6 +224,7 @@ async function caricaStato(utente: string): Promise<StatoConOrdine> {
         abitazione: (p?.housing as Housing | undefined) ?? "affitto",
         auto: (p?.has_car ?? "si") === "si",
         persone: p?.household_size ?? 1,
+        ...profiloEsteso((prof.data ?? null) as ProfileRow | null),
       },
     },
   };
@@ -242,17 +245,13 @@ domanda → "domanda": {"tipo": "totale"|"per_categoria"|"per_mese"|"media_mensi
   Senza periodo: "quanto ho speso" → mese_corrente, il resto → tutto.
 elimina → "riferimento": {"ultima": true se dice "l'ultima spesa"/"quella appena messa", "testo": parola della descrizione | null, "importo": numero | null, "periodo": Periodo | null}
 modifica → "riferimento" come sopra + "modifiche": {"importo"?: numero, "descrizione"?: string, "data"?: "AAAA-MM-GG", "categoria"?: id}. Metti solo i campi da cambiare. "la pizza di ieri era 20 euro" → riferimento {testo:"pizza", periodo: {"tipo":"intervallo","da":ieri,"a":ieri}}, modifiche {importo:20}.
-consiglio → l'utente chiede consigli o come risparmiare.
+consiglio → l'utente chiede consigli, come risparmiare, su cosa spende più della media italiana o come restare nel budget.
 non_capito → "messaggio": una frase breve in italiano che spiega cosa si può dire.
 
 Periodo: {"tipo":"tutto"} | {"tipo":"mese_corrente"} | {"tipo":"mese_scorso"} | {"tipo":"anno_corrente"} | {"tipo":"anno_scorso"} | {"tipo":"ultimi_giorni","n":N} (oggi compreso) | {"tipo":"ultimi_mesi","n":N} | {"tipo":"mese","valore":"AAAA-MM"} | {"tipo":"anno","valore":"AAAA"} | {"tipo":"intervallo","da":"AAAA-MM-GG","a":"AAAA-MM-GG"}
 Categorie: usa solo gli id dati, se la frase nomina quella categoria, un suo sinonimo (macchina → Auto, supermercato → Cibo, luce → Bollette) o una spesa che vi appartiene chiaramente. "testo": una parola minuscola al singolare, per cose che non sono categorie (benzina, esselunga, pizza).`;
 
 const ISTRUZIONI_CATEGORIA = `Scegli la categoria di una spesa personale dalla sua descrizione. Rispondi con UN SOLO oggetto JSON: {"categoria": id | null}. Usa solo gli id dati; null se nessuna è adatta.`;
-
-const ISTRUZIONI_CONSIGLIO = `Sei un consulente di finanza personale pratico e gentile. Ricevi i TOTALI di un mese per categoria (con media dei mesi precedenti e budget) e scrivi 2 consigli brevi da LEGGERE AD ALTA VOCE.
-Rispondi con UN SOLO oggetto JSON: {"consigli": [{"titolo": string, "testo": string}]}
-Usa solo i numeri forniti, senza calcoli nuovi. Testo: una frase, con un'azione concreta. Niente investimenti o prodotti finanziari. Dai del tu.`;
 
 async function chiediGroq(sistema: string, utente: string, maxToken: number, temperatura = 0) {
   if (!GROQ_API_KEY) throw new Error("GROQ_API_KEY mancante");
@@ -347,6 +346,9 @@ async function esegui(
     }
 
     case "domanda":
+      if (comando.interpretazione.tipo === "analisi") {
+        return { messaggio: riassuntoParlato(calcolaAnalisi(state, oggi)) };
+      }
       return {
         messaggio: rispostaParlata(
           rispondi(comando.interpretazione, state.transazioni, state.categorie, oggi),
@@ -382,25 +384,10 @@ async function esegui(
       };
     }
 
-    case "consiglio": {
-      // Mese appena chiuso se siamo nei primi 10 giorni, altrimenti quello in corso.
-      const mese =
-        Number(oggi.slice(8, 10)) <= 10 ? shiftMonth(monthKey(oggi), -1) : monthKey(oggi);
-      const r = calcolaRiepilogo(state, mese, oggi);
-      if (r.numeroSpese === 0)
-        return { messaggio: "Non ci sono ancora abbastanza spese per un consiglio." };
-      const consigli = normalizzaConsigli(
-        await chiediGroq(
-          ISTRUZIONI_CONSIGLIO,
-          `Totali del mese:\n${JSON.stringify(datiPerAI(r, state.profilo))}`,
-          300,
-          0.4,
-        ),
-      );
-      if (!consigli.length)
-        return { messaggio: "Non sono riuscito a preparare un consiglio, riprova." };
-      return { messaggio: consigli.map((c) => `${c.titolo}. ${c.testo}`).join(" ") };
-    }
+    case "consiglio":
+      // Analisi completa (mese in corso, media italiana, piano per il budget)
+      // riassunta in poche frasi, senza AI: a voce servono i numeri chiave.
+      return { messaggio: riassuntoParlato(calcolaAnalisi(state, oggi)) };
   }
 }
 
